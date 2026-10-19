@@ -1,7 +1,7 @@
 """Revoke the migration role's EXECUTE on batch_access_status.
 
-Revision ID: 0100_revoke_probe_execute
-Revises: 0099_batch_update_qualifiers
+Revision ID: 0101_revoke_probe_execute
+Revises: 0100_calendar_dates
 
 0098 creates ``public.batch_access_status(uuid)`` and sets the owner to the
 migration role (the database owner). PostgreSQL records that owner's EXECUTE
@@ -22,8 +22,8 @@ This revision only revokes. It does not grant.
 """
 from alembic import op
 
-revision = "0100_revoke_probe_execute"
-down_revision = "0099_batch_update_qualifiers"
+revision = "0101_revoke_probe_execute"
+down_revision = "0100_calendar_dates"
 branch_labels = None
 depends_on = None
 

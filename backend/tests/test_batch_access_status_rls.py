@@ -810,7 +810,7 @@ def test_migration_role_cannot_execute_and_lims_app_still_403(
             conn.commit()
             assert _privilege(conn, MIGRATION_ROLE) is True
 
-        command.downgrade(cfg, "0099_batch_update_qualifiers")
+        command.downgrade(cfg, "0100_calendar_dates")
         with migrated_engine.connect() as conn:
             assert _privilege(conn, MIGRATION_ROLE) is True
             assert _privilege(conn, "lims_app") is True
