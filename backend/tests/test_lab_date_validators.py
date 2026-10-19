@@ -29,6 +29,7 @@ from app.schemas.test import (
     TestUpdate,
 )
 from app.schemas._dates import is_future
+from app.schemas.batch import BatchCreate, BatchCreateWithContainersRequest, BatchUpdate
 from models.lab_setting import LAB_SETTINGS_ID, LabSetting
 
 UID = uuid4()
@@ -200,6 +201,57 @@ def test_response_models_accept_a_stored_future_date(utc_moment, lab_day, monkey
     for model, build in _RESPONSE_CASES:
         parsed = model(**build(tomorrow))
         assert parsed is not None
+
+
+def test_offset_input_is_stored_as_lab_midnight_on_every_input_model(monkeypatch):
+    """Aware UTC midnight becomes the lab day. Response models do not rewrite it."""
+    monkeypatch.setattr(lab_time, "_utcnow", lambda: datetime(2026, 10, 20, 0, 0, tzinfo=timezone.utc))
+    lab_time.remember_lab_zone("America/New_York")
+    aware = datetime(2026, 10, 20, 0, 0, tzinfo=timezone.utc)
+    expected = datetime(2026, 10, 19, 0, 0)
+    names = ("received_date", "report_date", "due_date", "test_date", "review_date", "entry_date")
+    for model, build in _CASES:
+        parsed = model(**build(aware))
+        saw_date = False
+        for name in names:
+            value = getattr(parsed, name, None)
+            if value is None:
+                continue
+            saw_date = True
+            assert value == expected, (model.__name__, name, value)
+            assert value.tzinfo is None, model.__name__
+        assert saw_date is True, model.__name__
+        naive = datetime(2026, 10, 19, 0, 0)
+        kept = model(**build(naive))
+        for name in names:
+            value = getattr(kept, name, None)
+            if value is None:
+                continue
+            assert value == naive, (model.__name__, name, value)
+            assert value.tzinfo is None
+    for model, build in _RESPONSE_CASES:
+        parsed = model(**build(aware))
+        for name in ("received_date", "test_date", "entry_date"):
+            value = getattr(parsed, name, None)
+            if value is None:
+                continue
+            assert value == aware, (model.__name__, name, value)
+            assert value.tzinfo is not None
+    later = datetime(2026, 10, 21, 0, 0, tzinfo=timezone.utc)
+    for model in (BatchCreate, BatchUpdate, BatchCreateWithContainersRequest):
+        if model is BatchUpdate:
+            parsed = model(start_date=aware, end_date=later)
+        else:
+            parsed = model(status=UID, start_date=aware, end_date=later)
+        assert parsed.start_date == expected
+        assert parsed.start_date.tzinfo is None
+        assert parsed.end_date == datetime(2026, 10, 20, 0, 0)
+        assert parsed.end_date.tzinfo is None
+        date_only = model(status=UID, start_date=datetime(2026, 11, 1, 0, 0)) if model is not BatchUpdate else model(
+            start_date=datetime(2026, 11, 1, 0, 0)
+        )
+        assert date_only.start_date == datetime(2026, 11, 1, 0, 0)
+        assert date_only.start_date.tzinfo is None
 
 
 def test_days_from_today_follows_the_lab_calendar(monkeypatch):

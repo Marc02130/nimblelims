@@ -1,7 +1,7 @@
 """
 Pydantic schemas for samples
 """
-from app.schemas._dates import is_future
+from app.schemas._dates import is_future, store_calendar_day
 from pydantic import ConfigDict, Field, validator, model_validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
@@ -72,7 +72,11 @@ class BulkSampleAccessioningRequest(BaseModel):
     def validate_dates(cls, v):
         if is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
+
+    @validator('due_date')
+    def store_due_date(cls, v):
+        return store_calendar_day(v)
 
     @model_validator(mode='after')
     def validate_uniques_have_names_or_auto_naming(self):
@@ -114,7 +118,12 @@ class SampleCreate(SampleBase):
     def validate_dates(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
+
+    @validator('due_date', 'date_sampled')
+    def store_open_calendar_dates(cls, v):
+        """Deadlines and collection days are calendar dates and are not future-capped."""
+        return store_calendar_day(v)
 
     @validator('temperature')
     def validate_temperature(cls, v):
@@ -149,7 +158,12 @@ class SampleUpdate(BaseModel):
     def validate_dates(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
+
+    @validator('due_date', 'date_sampled')
+    def store_open_calendar_dates(cls, v):
+        """Deadlines and collection days are calendar dates and are not future-capped."""
+        return store_calendar_day(v)
 
     @validator('temperature')
     def validate_temperature(cls, v):
@@ -200,7 +214,11 @@ class BulkSampleAccessioningRequest(BaseModel):
     def validate_dates(cls, v):
         if is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
+
+    @validator('due_date')
+    def store_due_date(cls, v):
+        return store_calendar_day(v)
 
     @model_validator(mode='after')
     def validate_uniques_have_names_or_auto_naming(self):
@@ -333,7 +351,11 @@ class SampleAccessioningRequest(BaseModel):
     def validate_received_date(cls, v):
         if is_future(v):
             raise ValueError('Received date cannot be in the future')
-        return v
+        return store_calendar_day(v)
+
+    @validator('due_date')
+    def store_due_date(cls, v):
+        return store_calendar_day(v)
 
     @validator('temperature')
     def validate_temperature(cls, v):
@@ -397,7 +419,11 @@ class BulkSampleAccessioningRequest(BaseModel):
     def validate_dates(cls, v):
         if is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
+
+    @validator('due_date')
+    def store_due_date(cls, v):
+        return store_calendar_day(v)
 
     @model_validator(mode='after')
     def validate_uniques_have_names_or_auto_naming(self):

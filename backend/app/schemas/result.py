@@ -1,7 +1,7 @@
 """
 Pydantic schemas for results
 """
-from app.schemas._dates import is_future
+from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
@@ -37,7 +37,7 @@ class ResultCreate(ResultBase):
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class ResultUpdate(BaseModel):
@@ -55,7 +55,7 @@ class ResultUpdate(BaseModel):
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class ResultResponse(ResultBase):
@@ -117,7 +117,7 @@ class TestResultEntry(BaseModel):
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class BatchResultsEntryRequestUS28(BaseModel):

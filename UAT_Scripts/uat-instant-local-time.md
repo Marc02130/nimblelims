@@ -33,6 +33,7 @@ On each of these, a created or updated time matches the local clock, and the JSO
 
 1. Receive a sample with received date today. The received date stays that calendar day. It does not move to yesterday in the evening.
 2. Due date, test date, review date, result entry date, reagent Used on, and batch start and end dates stay the day that was entered.
+3. With the lab zone `America/New_York` and the clock at 8 PM EDT on 2026-10-19, send `2026-10-20T00:00:00Z` as sample received or report, accession received, test test or review, `PATCH /tests/{id}/review`, result `entry_date` (POST, PATCH, and `POST /results/batch`), and batch start or end. Each stored value is naive `2026-10-19 00:00`, its day count is today, and GET of that row is **200**. `2026-10-19T23:30:00-04:00` stores the same lab day. `2026-10-21T00:00:00Z` and `2026-10-20T04:00:00Z` are lab tomorrow and are **422** on the future-checked fields. Batch start and end accept a later lab day. `2026-10-19` and `2026-10-19T00:00:00` stay `2026-10-19 00:00`.
 
 ## IT-4 Empty instants
 
