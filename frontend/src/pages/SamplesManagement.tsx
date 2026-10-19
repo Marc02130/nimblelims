@@ -29,7 +29,7 @@ import SampleForm from '../components/samples/SampleForm';
 import AskedForForm, { AskedForFormValues } from '../components/asked-for/AskedForForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { apiErrorText } from '../utils/apiErrorText';
-import { formatInstant } from '../utils/localDate';
+import { formatCalendarDay, formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 import ListFilterChips from '../components/common/ListFilterChips';
@@ -360,7 +360,7 @@ const SamplesManagement: React.FC = () => {
       field: 'due_date', 
       headerName: 'Due Date', 
       width: 120,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      valueGetter: (value) => formatCalendarDay(value),
     },
     { 
       field: 'modified_at', 

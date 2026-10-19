@@ -125,6 +125,8 @@ describe('Dashboard', () => {
       expect(screen.getByText('Sample 2')).toBeInTheDocument();
       expect(screen.getByText('Blood')).toBeInTheDocument();
       expect(screen.getByText('Urine')).toBeInTheDocument();
+      expect(screen.getByText(new Date(2024, 11, 31).toLocaleDateString())).toBeInTheDocument();
+      expect(screen.getByText(new Date(2024, 11, 30).toLocaleDateString())).toBeInTheDocument();
     });
   });
 

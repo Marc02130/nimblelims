@@ -121,12 +121,33 @@ def _install_access_functions(engine):
         conn.commit()
 
 
+def _install_lab_day_function(engine) -> None:
+    """results.entry_date defaults to current_lab_day(), which must exist first."""
+    import importlib.util
+    from pathlib import Path
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "db"
+        / "migrations"
+        / "versions"
+        / "0104_current_lab_day.py"
+    )
+    spec = importlib.util.spec_from_file_location("_mig_0104_current_lab_day", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    with engine.connect() as conn:
+        conn.execute(text(mod.CREATE_FUNCTION))
+        conn.commit()
+
+
 @pytest.fixture(scope="session")
 def db_engine(pg_container):
     """Create engine and schema once per test session."""
     engine = create_engine(pg_container.get_connection_url())
     apply_init_extensions(engine)
     apply_zz_roles(engine)
+    _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
     yield engine

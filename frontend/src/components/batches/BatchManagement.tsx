@@ -28,7 +28,7 @@ import BatchForm from './BatchForm';
 import BatchFormEnhanced from './BatchFormEnhanced';
 import ContainerGrid from './ContainerGrid';
 import { apiService } from '../../services/apiService';
-import { formatInstant } from '../../utils/localDate';
+import { formatCalendarDay, formatInstant } from '../../utils/localDate';
 import { useUser } from '../../contexts/UserContext';
 
 interface Batch {
@@ -329,10 +329,10 @@ const BatchManagement: React.FC<BatchManagementProps> = ({ onBack }) => {
                     <strong>Status:</strong> {getStatusName(selectedBatch.status)}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Start Date:</strong> {selectedBatch.start_date ? new Date(selectedBatch.start_date).toLocaleDateString() : 'Not set'}
+                    <strong>Start Date:</strong> {selectedBatch.start_date ? formatCalendarDay(selectedBatch.start_date) : 'Not set'}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>End Date:</strong> {selectedBatch.end_date ? new Date(selectedBatch.end_date).toLocaleDateString() : 'Not set'}
+                    <strong>End Date:</strong> {selectedBatch.end_date ? formatCalendarDay(selectedBatch.end_date) : 'Not set'}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Created:</strong> {formatInstant(selectedBatch.created_at)}

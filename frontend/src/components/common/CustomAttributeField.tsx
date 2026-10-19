@@ -13,6 +13,7 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { parseCalendarDate } from '../../utils/localDate';
 
 interface CustomAttributeConfig {
   id: string;
@@ -98,13 +99,13 @@ const CustomAttributeField: React.FC<CustomAttributeFieldProps> = ({
         );
 
       case 'date':
-        const minDate = rules.min_date ? new Date(rules.min_date) : undefined;
-        const maxDate = rules.max_date ? new Date(rules.max_date) : undefined;
+        const minDate = rules.min_date ? parseCalendarDate(rules.min_date) ?? undefined : undefined;
+        const maxDate = rules.max_date ? parseCalendarDate(rules.max_date) ?? undefined : undefined;
         return (
           <LocalizationProvider dateAdapter={AdapterDateFns}>
             <DatePicker
               label={displayLabel}
-              value={value ? new Date(value) : null}
+              value={parseCalendarDate(value)}
               onChange={(date) => {
                 if (date) {
                   // Format date in local timezone as YYYY-MM-DD

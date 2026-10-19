@@ -60,3 +60,33 @@ def test_importing_app_database_raises_in_production_without_database_url():
     assert proc.returncode != 0
     assert "DATABASE_URL is required" in output
     assert "postgresql://" not in output
+
+
+def test_create_uat_users_requires_migrate_url(monkeypatch):
+    import create_uat_users
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://lims_app@127.0.0.1:5432/lims_db")
+    monkeypatch.delenv("MIGRATE_DATABASE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="MIGRATE_DATABASE_URL is required"):
+        create_uat_users._owner_url()
+    source = (BACKEND / "create_uat_users.py").read_text()
+    assert "postgresql://" not in source
+
+
+def test_plate_layout_script_requires_database_url(monkeypatch):
+    import importlib.util
+
+    path = BACKEND / "db" / "migrations" / "data" / "migrate_plate_layout_to_wells.py"
+    spec = importlib.util.spec_from_file_location("migrate_plate_layout_to_wells", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv(
+        "MIGRATE_DATABASE_URL",
+        "postgresql://lims_migrate@127.0.0.1:5432/lims_db",
+    )
+    with pytest.raises(RuntimeError, match="DATABASE_URL is required"):
+        mod.database_url()
+    source = path.read_text()
+    assert "postgresql://" not in source
+    assert "create_engine(DATABASE_URL)" not in source

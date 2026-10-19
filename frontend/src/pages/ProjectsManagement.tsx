@@ -19,7 +19,7 @@ import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams, GridToolbar }
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
-import { formatInstant } from '../utils/localDate';
+import { formatCalendarDay, formatInstant } from '../utils/localDate';
 import ProjectForm from '../components/projects/ProjectForm';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
@@ -246,7 +246,7 @@ const ProjectsManagement: React.FC = () => {
       field: 'start_date',
       headerName: 'Start Date',
       width: 120,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      valueGetter: (value) => formatCalendarDay(value),
     },
     {
       field: 'created_at',

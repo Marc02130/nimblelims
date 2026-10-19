@@ -5,7 +5,7 @@ from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -55,7 +55,9 @@ class TestUpdate(BaseModel):
 
 
 class TestResponse(TestBase):
-    """Schema for test response"""
+    """Schema for test response. Lab days are SQL date, sent as YYYY-MM-DD."""
+    review_date: Optional[date] = None
+    test_date: Optional[date] = None
     id: UUID
     active: bool
     created_at: datetime

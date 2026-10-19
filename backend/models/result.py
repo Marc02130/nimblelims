@@ -30,7 +30,7 @@ class Result(Base):
     reported_result = Column(String(255), nullable=True)
     qualifiers = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
     calculated_result = Column(String(255), nullable=True)
-    entry_date = Column(Date, server_default=text("CURRENT_DATE"), nullable=False)
+    entry_date = Column(Date, server_default=text("current_lab_day()"), nullable=False)
     entered_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')
 

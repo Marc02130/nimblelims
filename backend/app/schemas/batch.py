@@ -5,7 +5,7 @@ from pydantic import Field, validator
 from app.schemas._dates import store_calendar_day
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -108,6 +108,8 @@ class BatchContainerResponse(BaseModel):
 
 class BatchResponse(BatchBase):
     """Schema for batch response"""
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     id: UUID
     active: bool
     created_at: datetime
