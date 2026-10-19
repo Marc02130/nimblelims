@@ -278,7 +278,7 @@ class LimsRunService:
 
     def _mint_tests_at_start(self, run: LimsRun) -> None:
         """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
-        from datetime import datetime, timezone
+        from app.core.lab_time import current_lab_day
         from models.analysis import Analysis
         from models.list import List, ListEntry
         from models.sample import Sample
@@ -351,7 +351,7 @@ class LimsRunService:
                     analysis_id=run.analysis_id,
                     status=status_row.id,
                     asked_for_params=params,
-                    test_date=datetime.now(timezone.utc),
+                    test_date=current_lab_day(),
                     technician_id=self._user_id(),
                     created_by=self._user_id(),
                     modified_by=self._user_id(),

@@ -1,15 +1,16 @@
 """Shared calendar-day helpers for schema validators.
 
-Lab-day columns stay ``timestamp without time zone``. Instant columns are
+Lab-day columns are SQL ``date``. Instant columns are
 ``timestamptz``. A future check compares calendar days in the lab timezone.
 A naive midnight is a date-only value (``YYYY-MM-DD``, or a row saved that
 way) and is that calendar day with no zone shift. Any other datetime,
 including one with an offset, is converted into the lab zone. A time that
 is still today in the lab is accepted after UTC has rolled to the next day.
 
-Storage of an offset-bearing calendar value is naive midnight of that lab
-day. Date-only input is left as written. Response models do not call
-``store_calendar_day``; a row already saved is returned as stored.
+Storage of a calendar value is naive midnight of the lab day, then a SQL
+``date``. A naive non-midnight value keeps its own date (lab-zone wall
+time). Response models do not call ``store_calendar_day``; a row already
+saved is returned as stored.
 """
 from datetime import date, datetime
 from typing import Optional, Union
@@ -38,18 +39,19 @@ def is_future(value, *, today: Optional[date] = None) -> bool:
 def store_calendar_day(value: Optional[Union[date, datetime]]):
     """Persist a calendar field as the lab day's naive midnight.
 
-    ``None`` stays ``None``. A plain ``date`` and a naive ``datetime``
-    (a ``YYYY-MM-DD`` value, or a non-midnight naive value already written
-    that way) are unchanged. ``datetime`` is a ``date`` subclass, so it is
-    checked first. An offset-bearing datetime becomes naive midnight of
-    ``as_calendar_day`` in the lab zone. Columns are ``timestamp without
-    time zone``; that midnight is what a later read treats as the lab day.
+    ``None`` stays ``None``. A plain ``date`` becomes naive midnight of that
+    day. A naive ``datetime`` is lab-zone wall time, so midnight and
+    non-midnight both become midnight of ``value.date()``. ``datetime`` is a
+    ``date`` subclass, so it is checked first. An offset-bearing datetime
+    becomes naive midnight of ``as_calendar_day`` in the lab zone. The column
+    is SQL ``date``; the time on this midnight is not stored.
     """
     if value is None:
         return None
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value
-        day = as_calendar_day(value, current_lab_zone())
+            day = value.date()
+        else:
+            day = as_calendar_day(value, current_lab_zone())
         return datetime(day.year, day.month, day.day)
-    return value
+    return datetime(value.year, value.month, value.day)

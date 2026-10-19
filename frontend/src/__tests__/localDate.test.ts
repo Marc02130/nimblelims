@@ -1,4 +1,4 @@
-import { localDateString } from '../utils/localDate';
+import { formatCalendarDate, localDateString, parseCalendarDate } from '../utils/localDate';
 
 describe('localDateString', () => {
   test.each([
@@ -18,5 +18,21 @@ describe('localDateString', () => {
   test("defaults to the browser's own calendar date", () => {
     const now = new Date(2026, 0, 5, 9, 0);
     expect(localDateString(now)).toBe('2026-01-05');
+  });
+});
+
+describe('calendar form values', () => {
+  test('parses a date-only string as that local calendar day', () => {
+    const parsed = parseCalendarDate('2026-10-19');
+    expect(parsed).not.toBeNull();
+    expect(parsed?.getFullYear()).toBe(2026);
+    expect(parsed?.getMonth()).toBe(9);
+    expect(parsed?.getDate()).toBe(19);
+    expect(new Date('2026-10-19').getUTCHours()).toBe(0);
+  });
+
+  test('submits the picker day without shifting through UTC', () => {
+    const picked = new Date(2026, 9, 19, 0, 0, 0);
+    expect(formatCalendarDate(picked)).toBe('2026-10-19');
   });
 });

@@ -30,7 +30,7 @@ from app.core.security import get_current_user
 from app.core.patch_fields import explicit_updates
 from datetime import datetime, timezone
 
-from app.core.lab_time import days_from_today, resolve_lab_timezone
+from app.core.lab_time import current_lab_day, days_from_today, resolve_lab_timezone
 from app.schemas._dates import store_calendar_day
 from uuid import UUID
 
@@ -914,7 +914,7 @@ def create_batch(
                 name=qc_sample_name,
                 description=f"QC sample ({qc_type_entry.name})" + (f": {qc_addition.notes}" if qc_addition.notes else ""),
                 due_date=qc_due_date,
-                received_date=datetime.now(timezone.utc),
+                received_date=current_lab_day(),
                 sample_type=qc_sample_type,  # Use inherited or default sample type
                 status=received_status.id,
                 matrix=qc_matrix,  # Use inherited or default matrix

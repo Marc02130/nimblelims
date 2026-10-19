@@ -1,7 +1,8 @@
 """
 Pydantic schemas for projects
 """
-from pydantic import Field
+from pydantic import Field, validator
+from app.schemas._dates import store_calendar_day
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -19,6 +20,11 @@ class ProjectBase(BaseModel):
     status: UUID
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
+    @validator("start_date", "due_date")
+    def normalize_project_days(cls, value):
+        """Start and due are lab calendar days. An offset becomes that lab day."""
+        return store_calendar_day(value)
+
 
 class ProjectCreate(BaseModel):
     """Schema for creating a new project"""
@@ -30,6 +36,11 @@ class ProjectCreate(BaseModel):
     client_project_id: Optional[UUID] = Field(None, description="Optional client project ID for grouping (US-25)")
     status: UUID
     custom_attributes: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Custom attributes as JSON")
+
+    @validator("start_date", "due_date")
+    def normalize_project_days(cls, value):
+        """Start and due are lab calendar days. An offset becomes that lab day."""
+        return store_calendar_day(value)
 
 
 class ProjectUpdate(BaseModel):
@@ -43,6 +54,11 @@ class ProjectUpdate(BaseModel):
     status: Optional[UUID] = None
     custom_attributes: Optional[Dict[str, Any]] = None
     active: Optional[bool] = None
+
+    @validator("start_date", "due_date")
+    def normalize_project_days(cls, value):
+        """Start and due are lab calendar days. An offset becomes that lab day."""
+        return store_calendar_day(value)
 
 
 class ProjectResponse(BaseModel):

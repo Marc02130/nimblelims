@@ -29,8 +29,8 @@ Key features:
 **Batch-Specific Fields**:
 - **type**: FK to list_entries.id (batch type, optional)
 - **status**: FK to list_entries.id (batch status, required)
-- **start_date**: DateTime (optional)
-- **end_date**: DateTime (optional)
+- **start_date**: date (optional). The lab calendar day, not a timestamp.
+- **end_date**: date (optional). The lab calendar day, not a timestamp.
 - **custom_attributes**: JSONB for custom fields
 
 **Relationships**:
@@ -151,7 +151,7 @@ Created → In Process → Completed
 
 **Note**: Status transitions are not enforced by the system; any status can be set at any time.
 
-`PATCH /batches/{id}/status` requires `batch:update` (Administrator, Lab Manager, and Lab Technician). Choosing the `batch_status` entry named **In Process** stores `start_date` as naive midnight of the lab's calendar day. **Completed** stores `end_date` the same way. The match is the entry's name on the `batch_status` list.
+`PATCH /batches/{id}/status` requires `batch:update` (Administrator, Lab Manager, and Lab Technician). Choosing the `batch_status` entry named **In Process** stores `start_date` as the lab's calendar day. **Completed** stores `end_date` the same way. A QC sample created with the batch gets `received_date` as that same lab day. The match is the entry's name on the `batch_status` list.
 
 ## Batch Types
 

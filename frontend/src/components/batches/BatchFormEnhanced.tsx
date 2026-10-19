@@ -47,6 +47,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { apiService, EligibleSample, BatchCompatibilityResult, BatchCompatibilityWarning } from '../../services/apiService';
+import { formatCalendarDate } from '../../utils/localDate';
 import { useUser } from '../../contexts/UserContext';
 
 interface BatchFormEnhancedProps {
@@ -705,8 +706,8 @@ const BatchFormEnhanced: React.FC<BatchFormEnhancedProps> = ({ onSuccess, onCanc
         description: formData.description,
         type: formData.type || undefined,
         status: formData.status,
-        start_date: formData.start_date?.toISOString(),
-        end_date: formData.end_date?.toISOString(),
+        start_date: formatCalendarDate(formData.start_date),
+        end_date: formatCalendarDate(formData.end_date),
         container_ids: formData.container_ids.length > 0 ? formData.container_ids : undefined,
         cross_project: formData.cross_project,
         divergent_analyses: formData.divergent_analyses.length > 0 ? formData.divergent_analyses : undefined,

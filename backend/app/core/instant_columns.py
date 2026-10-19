@@ -1,17 +1,20 @@
 """UTC instant columns versus lab-day columns.
 
 Instant columns hold a moment. They are ``timestamptz``. The migration
-``0100_instant_timestamptz`` reads a naive UTC wall time with
-``USING col AT TIME ZONE 'UTC'`` so the instant does not shift.
+reads a naive UTC wall time with ``USING col AT TIME ZONE 'UTC'`` so the
+instant does not shift.
 
-Calendar columns hold a lab day. They stay ``timestamp without time zone``.
-SQL ``date`` columns stay ``date``. Custom-attribute JSON is not a column
-type here and is not rewritten.
+Calendar columns are SQL ``date`` (``0100_calendar_dates``). Reagent dates
+were already SQL ``date``. This migration does not alter either set.
+Custom-attribute JSON is not a column type here and is not rewritten.
 """
 from __future__ import annotations
 
-# Lab days stored as timestamp without time zone. Do not convert these.
-CALENDAR_TIMESTAMP_COLUMNS = frozenset(
+# No lab day remains ``timestamp without time zone``.
+CALENDAR_TIMESTAMP_COLUMNS = frozenset()
+
+# Civil dates. Already SQL date. The timestamptz migration does not touch them.
+SQL_DATE_COLUMNS = frozenset(
     {
         "batches.start_date",
         "batches.end_date",
@@ -24,12 +27,6 @@ CALENDAR_TIMESTAMP_COLUMNS = frozenset(
         "tests.review_date",
         "tests.test_date",
         "results.entry_date",
-    }
-)
-
-# Civil dates. Already SQL date. The timestamptz migration does not touch them.
-SQL_DATE_COLUMNS = frozenset(
-    {
         "reagent_lots.expiration_date",
         "reagent_lots.purchased_date",
         "reagent_lots.received_date",

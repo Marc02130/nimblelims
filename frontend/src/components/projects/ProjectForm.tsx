@@ -26,6 +26,7 @@ import { useFormik } from 'formik';
 import * as yup from 'yup';
 import CustomAttributeField from '../common/CustomAttributeField';
 import { apiService } from '../../services/apiService';
+import { formatCalendarDate, parseCalendarDate } from '../../utils/localDate';
 
 interface CustomAttributeConfig {
   id: string;
@@ -249,7 +250,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     initialValues: {
       name: project?.name || '',
       description: project?.description || '',
-      start_date: project?.start_date ? new Date(project.start_date) : new Date(),
+      start_date: project?.start_date ? parseCalendarDate(project.start_date) ?? new Date() : new Date(),
       client_id: project?.client_id || '',
       client_project_id: project?.client_project_id || '',
       status: project?.status || '',
@@ -280,12 +281,18 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setLoading(true);
       setError(null);
       try {
+        const startDate = values.start_date instanceof Date
+          ? formatCalendarDate(values.start_date)
+          : null;
+        if (startDate === null) {
+          setError('Start date is required');
+          setLoading(false);
+          return;
+        }
         await onSubmit({
           name: values.name,
           description: values.description || undefined,
-          start_date: values.start_date instanceof Date 
-            ? values.start_date.toISOString() 
-            : values.start_date,
+          start_date: startDate,
           client_id: values.client_id,
           client_project_id: values.client_project_id || undefined,
           status: values.status,

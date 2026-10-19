@@ -31,6 +31,8 @@ from app.core.rbac import (
 from app.core.security import get_current_user
 from app.core.patch_fields import explicit_updates
 from datetime import datetime, timezone
+
+from app.core.lab_time import current_lab_day
 from uuid import UUID
 
 router = APIRouter()
@@ -540,7 +542,7 @@ def enter_batch_results_us28(
                 # Update batch status to "Completed" if all tests are complete
                 if all_tests_complete and batch.status != completed_status_entry.id:
                     batch.status = completed_status_entry.id
-                    batch.end_date = datetime.now(timezone.utc)
+                    batch.end_date = current_lab_day()
                     batch.modified_by = current_user.id
                     batch.modified_at = datetime.now(timezone.utc)
         
