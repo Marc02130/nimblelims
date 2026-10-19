@@ -23,9 +23,9 @@ class SchemaTable(Base):
     kind = Column(String(16), nullable=False)
     status = Column(String(16), nullable=False, default="active")
     active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
     columns = relationship("SchemaColumn", back_populates="table")
@@ -60,9 +60,9 @@ class SchemaColumn(Base):
     # Alembic/ORM and only described here. Reflected columns never get UI DDL.
     origin = Column(String(16), nullable=False, default="ui")
     active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
     table = relationship("SchemaTable", back_populates="columns")
@@ -89,9 +89,9 @@ class SchemaRelation(Base):
     cardinality = Column(String(16), nullable=False)
     status = Column(String(16), nullable=False, default="active")
     active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
     from_table = relationship("SchemaTable", foreign_keys=[from_table_id])
@@ -109,9 +109,9 @@ class SchemaLayout(Base):
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
     role_id = Column(PostgresUUID(as_uuid=True), ForeignKey("roles.id"), nullable=False)
     screen_key = Column(String(64), nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
     fields = relationship("SchemaLayoutField", back_populates="layout", cascade="all, delete-orphan")
@@ -143,9 +143,9 @@ class SchemaPrivilege(Base):
     table_id = Column(PostgresUUID(as_uuid=True), ForeignKey("schema_tables.id"), nullable=False)
     column_id = Column(PostgresUUID(as_uuid=True), ForeignKey("schema_columns.id"), nullable=True)
     access = Column(String(16), nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
-    modified_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    modified_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey("users.id"))
 
 
@@ -161,7 +161,7 @@ class SchemaChange(Base):
     before_status = Column(String(32), nullable=True)
     after_status = Column(String(32), nullable=True)
     definition_text = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
 
 
 class UiSchemaDdlLog(Base):
@@ -177,4 +177,4 @@ class UiSchemaDdlLog(Base):
     pg_type = Column(String(32), nullable=True)
     nullable = Column(Boolean, nullable=True)
     list_fk = Column(Boolean, nullable=True)
-    applied_at = Column(DateTime, default=func.now(), nullable=False)
+    applied_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)

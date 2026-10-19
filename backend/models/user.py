@@ -22,7 +22,7 @@ class User(BaseModel):
     email = Column(String(255), unique=True, nullable=False)
     role_id = Column(PostgresUUID(as_uuid=True), ForeignKey('roles.id'), nullable=False)
     client_id = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
-    last_login = Column(DateTime)
+    last_login = Column(DateTime(timezone=True))
     # Q7: seeded/bootstrap users must change password before using the app
     must_change_password = Column(Boolean, nullable=False, default=False, server_default='false')
     # Incremented whenever the password changes so older JWTs stop working.

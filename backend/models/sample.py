@@ -156,14 +156,14 @@ class SampleTypeTransition(Base):
         index=True,
     )
     active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("users.id"),
         nullable=True,
     )
     modified_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
