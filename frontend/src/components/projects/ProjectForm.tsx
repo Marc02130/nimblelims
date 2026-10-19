@@ -281,12 +281,18 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setLoading(true);
       setError(null);
       try {
+        const startDate = values.start_date instanceof Date
+          ? formatCalendarDate(values.start_date)
+          : null;
+        if (startDate === null) {
+          setError('Start date is required');
+          setLoading(false);
+          return;
+        }
         await onSubmit({
           name: values.name,
           description: values.description || undefined,
-          start_date: values.start_date instanceof Date
-            ? formatCalendarDate(values.start_date)
-            : values.start_date,
+          start_date: startDate,
           client_id: values.client_id,
           client_project_id: values.client_project_id || undefined,
           status: values.status,
