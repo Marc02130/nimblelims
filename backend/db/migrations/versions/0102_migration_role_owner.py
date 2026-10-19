@@ -129,8 +129,8 @@ def upgrade() -> None:
                   JOIN pg_namespace n ON n.oid = c.relnamespace
                  WHERE n.nspname IN ('public', 'lims')
                    AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
-                   AND c.relowner <> (
-                       SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'lims_migrate'
+                   AND c.relowner = (
+                       SELECT oid FROM pg_catalog.pg_roles WHERE rolname = current_user
                    )
                    AND NOT EXISTS (
                        SELECT 1
@@ -186,8 +186,8 @@ def upgrade() -> None:
                   JOIN pg_namespace n ON n.oid = p.pronamespace
                  WHERE n.nspname IN ('public', 'lims')
                    AND p.prokind = 'f'
-                   AND p.proowner <> (
-                       SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'lims_migrate'
+                   AND p.proowner = (
+                       SELECT oid FROM pg_catalog.pg_roles WHERE rolname = current_user
                    )
                    AND NOT EXISTS (
                        SELECT 1
@@ -209,8 +209,8 @@ def upgrade() -> None:
                   JOIN pg_namespace n ON n.oid = t.typnamespace
                  WHERE n.nspname IN ('public', 'lims')
                    AND t.typtype IN ('e', 'd')
-                   AND t.typowner <> (
-                       SELECT oid FROM pg_catalog.pg_roles WHERE rolname = 'lims_migrate'
+                   AND t.typowner = (
+                       SELECT oid FROM pg_catalog.pg_roles WHERE rolname = current_user
                    )
                    AND NOT EXISTS (
                        SELECT 1

@@ -39,3 +39,27 @@ def test_snapshot_requires_lims_app_nosuperuser_and_nobypassrls(migrated_engine)
             )
         ).scalar()
         assert owner == "lims_migrate"
+        ddl_owner = conn.execute(
+            text(
+                """
+                SELECT r.rolname
+                FROM pg_proc p
+                JOIN pg_namespace n ON n.oid = p.pronamespace
+                JOIN pg_roles r ON r.oid = p.proowner
+                WHERE n.nspname = 'public'
+                  AND p.proname = 'ui_schema_create_table'
+                """
+            )
+        ).scalar()
+        assert ddl_owner == "lims_migrate"
+        ddl_flags = conn.execute(
+            text(
+                """
+                SELECT rolsuper, rolbypassrls
+                FROM pg_roles
+                WHERE rolname = 'schema_apply'
+                """
+            )
+        ).one()
+        assert ddl_flags[0] is False
+        assert ddl_flags[1] is False

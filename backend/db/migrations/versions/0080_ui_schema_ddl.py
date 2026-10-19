@@ -67,6 +67,15 @@ def upgrade() -> None:
         DO $$
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'schema_apply') THEN
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM pg_catalog.pg_roles
+                     WHERE rolname = current_user
+                       AND rolsuper IS TRUE
+                ) THEN
+                    RAISE EXCEPTION
+                        'schema_apply must be created by the bootstrap superuser before migrations';
+                END IF;
                 CREATE ROLE schema_apply NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;
             END IF;
         END $$;
@@ -426,7 +435,21 @@ def upgrade() -> None:
         "ui_schema_drop_column(text,text)",
         "ui_schema_drop_table(text)",
     ):
-        op.execute(f"ALTER FUNCTION {fn} OWNER TO schema_apply")
+        op.execute(
+            f"""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                      FROM pg_catalog.pg_roles
+                     WHERE rolname = current_user
+                       AND rolsuper IS TRUE
+                ) THEN
+                    ALTER FUNCTION {fn} OWNER TO schema_apply;
+                END IF;
+            END $$;
+            """
+        )
         op.execute(f"REVOKE ALL ON FUNCTION {fn} FROM PUBLIC")
         op.execute(
             f"""
