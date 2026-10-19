@@ -288,14 +288,17 @@ describe('ResultsEntryTable', () => {
   });
 
   it('loads qualifiers and displays them in dropdown', async () => {
+    const user = userEvent.setup();
     render(<ResultsEntryTable {...defaultProps} />);
 
     await waitFor(() => {
-      expect(mockApiService.getListEntries).toHaveBeenCalledWith('qualifiers');
+      expect(mockApiService.getListEntries).toHaveBeenCalledWith('result_qualifiers');
     });
 
-    // Check if qualifier dropdowns are present
     const qualifierSelects = await screen.findAllByRole('combobox', { name: 'Qualifiers' });
     expect(qualifierSelects.length).toBeGreaterThan(0);
+    await user.click(qualifierSelects[0]);
+    expect(await screen.findByRole('option', { name: 'ND' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '<' })).toBeInTheDocument();
   });
 });

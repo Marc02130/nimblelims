@@ -766,12 +766,12 @@ Get batch details with containers.
 ### GET /batches/{id}/containers
 Containers in the batch, with each content's `sample_id`, `sample_name`, `qc_type`, and `sample.qc_type`. Enter Results uses this list. An empty batch returns `[]`.
 
-**Requires:** `batch:read`. A caller whose client does not own the batch's projects is **403**. A missing batch is **404**. Row-level security still hides samples the caller cannot see.
+**Requires:** `batch:read`. A missing batch is **404**. Under row-level security the batch row itself is hidden when the caller cannot reach it through `has_project_access`, so another client's batch is also **404**. The handler's **403** branch does not run, because the query never returns the row. Seeing that the batch exists, and which client owns it, without returning its other columns would need a `SECURITY DEFINER` function, a new policy, or a grant. None of those are in place. The same **404** applies to `GET /batches/{id}`, `GET /batches/{id}/tests`, `POST /batches/{id}/containers`, `PATCH /batches/{id}`, `PATCH /batches/{id}/status`, and `DELETE /batches/{id}`.
 
 ### GET /batches/{id}/tests
 Active tests for samples in those containers. Returns a JSON array (`id`, `name`, `status`, `analysis_id`, `sample_id`), not the paginated `/tests` envelope. An empty batch returns `[]`.
 
-**Requires:** `batch:read`. Same **403** / **404** rules as the containers route. Test rows are still filtered by the tests access policy.
+**Requires:** `batch:read`. Same visibility rule as the containers route: another client's batch is **404** while row-level security hides the batch. Test rows the caller can see are still filtered by the tests access policy.
 
 ### POST /batches/{id}/containers
 Add container to existing batch.
@@ -2508,6 +2508,10 @@ Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) fo
 Curve Curator counts for one run. **Requires** `experiment:manage`.
 
 **Response:** `total`, `by_category`, `by_review_status`, `ic50_range`, `mean_r_squared`, `fit_in_progress`, `last_fit_at`. `last_fit_at` is the latest `fit_triggered_at` (or `created_at` when the fit time was not stored) among results that are not superseded. It is UTC and ends in `Z`. It is `null` when the run has no current fit. The dose-response tab shows that instant in the browser's local time, and shows — only when `last_fit_at` is null.
+
+A fit treats a sample as a positive or negative control only when `samples.qc_type` points at a list entry whose `code` is `positive` or `negative`. The entry's display name is not used. Seed rows `Positive Control` and `Negative Control` on `qc_types` are backfilled with those codes. Renaming the entry leaves the code in place. A missing control is **422** `detail.code` `missing_positive_control` or `missing_negative_control`, with `detail.message` naming the code the QC type needs. The curve SVG uses the same codes and still draws an un-normalized plot when a control is absent.
+
+Result qualifiers are the list `result_qualifiers` (`GET /lists/result_qualifiers/entries`). `GET /lists/qualifiers/entries` is **404**. Enter Results loads `result_qualifiers`.
 
 ### GET /v1/lims-runs/{id}/promotion/preview
 Dry-run of what publish would write to existing Tests/Results when `analysis_id` is set. **No DB writes and no Test creation.**

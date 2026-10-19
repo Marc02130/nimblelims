@@ -173,7 +173,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
 
   const loadQualifiers = async () => {
     try {
-      const data = await apiService.getListEntries('qualifiers');
+      const data = await apiService.getListEntries('result_qualifiers');
       setQualifiers(data);
     } catch (err) {
       console.error('Failed to load qualifiers:', err);
