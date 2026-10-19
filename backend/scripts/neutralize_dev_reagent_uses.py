@@ -19,10 +19,13 @@ against the dev database. Point ``DATABASE_URL`` at that database yourself.
 
 Usage
 -----
+Export ``LIMS_APP_PASSWORD`` first. The shell expands it in the URL.
+
+  export LIMS_APP_PASSWORD
   cd backend
-  DATABASE_URL='postgresql://lims_app:lims_app_password@localhost:5432/lims_db' \\
+  DATABASE_URL="postgresql://lims_app:${LIMS_APP_PASSWORD}@localhost:5432/lims_db" \\
     python scripts/neutralize_dev_reagent_uses.py
-  DATABASE_URL='postgresql://lims_app:lims_app_password@localhost:5432/lims_db' \\
+  DATABASE_URL="postgresql://lims_app:${LIMS_APP_PASSWORD}@localhost:5432/lims_db" \\
     python scripts/neutralize_dev_reagent_uses.py --apply
 """
 from __future__ import annotations

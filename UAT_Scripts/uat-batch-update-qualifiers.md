@@ -34,19 +34,21 @@ Client and Configuration Editor do not receive `batch:update`. `batch:delete` is
 
 Do not run this in CI. It was not run against the dev database when this change was added. There were no row ids in the repo, so the script selects active `reagent_uses` with `used_on = 2026-10-28` and expects exactly four.
 
-Dry run (prints the rows, writes nothing):
+Dry run (prints the rows, writes nothing). Export `LIMS_APP_PASSWORD` first; the shell expands it in the URL:
 
 ```bash
+export LIMS_APP_PASSWORD
 cd backend
-DATABASE_URL='postgresql://lims_app:lims_app_password@localhost:5432/lims_db' \
+DATABASE_URL="postgresql://lims_app:${LIMS_APP_PASSWORD}@localhost:5432/lims_db" \
   python scripts/neutralize_dev_reagent_uses.py
 ```
 
-Apply, only after the dry run shows those four rows on the dev database:
+Apply, only after the dry run shows those four rows on the dev database. Export `LIMS_APP_PASSWORD` first:
 
 ```bash
+export LIMS_APP_PASSWORD
 cd backend
-DATABASE_URL='postgresql://lims_app:lims_app_password@localhost:5432/lims_db' \
+DATABASE_URL="postgresql://lims_app:${LIMS_APP_PASSWORD}@localhost:5432/lims_db" \
   python scripts/neutralize_dev_reagent_uses.py --apply
 ```
 
