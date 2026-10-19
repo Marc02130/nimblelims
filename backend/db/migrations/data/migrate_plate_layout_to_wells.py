@@ -22,16 +22,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://lims_user:lims_password@localhost:5432/lims_db",
-)
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
+def database_url() -> str:
+    """Runtime URL. DATABASE_URL only, with no embedded fallback."""
+    from app.core.db_url import resolve_db_url
+
+    return resolve_db_url()
 
 
 def migrate() -> None:
+    engine = create_engine(database_url())
+    SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
     try:
         # Load all templates with a plate_layout in their template_definition
@@ -107,6 +108,7 @@ def migrate() -> None:
         raise
     finally:
         db.close()
+        engine.dispose()
 
 
 if __name__ == "__main__":

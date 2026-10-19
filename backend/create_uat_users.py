@@ -62,15 +62,10 @@ def _uat_password() -> tuple[str, bool]:
 
 
 def _owner_url() -> str:
-    """
-    Prefer owner/migrator URL so RLS does not hide clients/users when no
-    app.current_user_id is set (runtime DATABASE_URL is lims_app).
-    """
-    return (
-        os.getenv("MIGRATE_DATABASE_URL")
-        or os.getenv("DATABASE_URL")
-        or "postgresql://lims_user:lims_password@db:5432/lims_db"
-    )
+    """Owner connection. MIGRATE_DATABASE_URL only, with no embedded fallback."""
+    from app.core.db_url import resolve_db_url
+
+    return resolve_db_url(migrate=True)
 
 
 def _session():
@@ -83,7 +78,7 @@ def _session():
     if user == "lims_app":
         print(
             "WARNING: connected as lims_app — RLS may hide clients. "
-            "Set MIGRATE_DATABASE_URL to lims_user for this script."
+            "MIGRATE_DATABASE_URL must be the lims_migrate connection."
         )
     engine = create_engine(url)
     return sessionmaker(bind=engine)(), engine
