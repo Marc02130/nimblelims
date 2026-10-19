@@ -658,6 +658,94 @@ def test_store_calendar_day_leaves_naive_and_none(monkeypatch):
     assert store_calendar_day(offset).tzinfo is None
 
 
+def test_omitted_entry_date_stores_the_lab_day_when_utc_has_rolled(
+    client, db_session, test_admin_user, monkeypatch
+):
+    """POST /results and POST /results/batch omit entry_date.
+
+    2026-10-20T01:00Z is lab day 2026-10-19 in America/New_York, not the UTC date.
+    """
+    monkeypatch.setattr(
+        lab_time, "_utcnow", lambda: datetime(2026, 10, 20, 1, 0, tzinfo=timezone.utc)
+    )
+    _save_zone(db_session, "America/New_York")
+    world = _world(db_session, test_admin_user)
+    headers = _login(client)
+    posted_analyte = Analyte(
+        name=f"Posted Analyte {uuid4().hex[:8]}",
+        description="Omitted entry date",
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    batch_analyte = Analyte(
+        name=f"Batch Analyte {uuid4().hex[:8]}",
+        description="Omitted entry date",
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add_all([posted_analyte, batch_analyte])
+    db_session.flush()
+    db_session.add_all(
+        [
+            AnalysisAnalyte(
+                analysis_id=world["test"].analysis_id,
+                analyte_id=posted_analyte.id,
+                data_type="numeric",
+            ),
+            AnalysisAnalyte(
+                analysis_id=world["test"].analysis_id,
+                analyte_id=batch_analyte.id,
+                data_type="numeric",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    posted = client.post(
+        "/results/",
+        json={
+            "test_id": str(world["test"].id),
+            "analyte_id": str(posted_analyte.id),
+            "entered_by": str(world["admin_id"]),
+            "raw_result": "1.0",
+        },
+        headers=headers,
+    )
+    assert posted.status_code == 200, posted.text
+    db_session.expire_all()
+    posted_row = db_session.query(Result).filter(Result.id == posted.json()["id"]).one()
+    assert posted_row.entry_date == date(2026, 10, 19)
+
+    batched = client.post(
+        "/results/batch",
+        json={
+            "batch_id": str(world["batch"].id),
+            "results": [
+                {
+                    "test_id": str(world["test"].id),
+                    "analyte_results": [
+                        {
+                            "analyte_id": str(batch_analyte.id),
+                            "raw_result": "2.0",
+                        }
+                    ],
+                }
+            ],
+        },
+        headers=headers,
+    )
+    assert batched.status_code == 200, batched.text
+    batch_row = (
+        db_session.query(Result)
+        .filter(
+            Result.test_id == world["test"].id,
+            Result.analyte_id == batch_analyte.id,
+        )
+        .one()
+    )
+    assert batch_row.entry_date == date(2026, 10, 19)
+
+
 def test_name_preview_corrupt_zone_is_503(client, db_session, test_admin_user):
     db_session.query(NameTemplate).filter(NameTemplate.entity_type == "project").update(
         {"active": False}, synchronize_session=False

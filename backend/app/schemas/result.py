@@ -1,6 +1,7 @@
 """
 Pydantic schemas for results
 """
+from app.core.lab_time import current_lab_day
 from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
@@ -17,7 +18,7 @@ class ResultBase(BaseModel):
     reported_result: Optional[str] = Field(None, max_length=255, description="Reported result value")
     qualifiers: Optional[UUID] = Field(None, description="ID of qualifier from list_entries")
     calculated_result: Optional[str] = Field(None, max_length=255, description="Calculated result (post-MVP)")
-    entry_date: datetime = Field(default_factory=datetime.utcnow, description="Date result was entered")
+    entry_date: datetime = Field(default_factory=current_lab_day, description="Date result was entered")
     entered_by: UUID = Field(..., description="ID of user who entered result")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
     replicate: int = Field(1, ge=1, description="Replicate number (default 1)")

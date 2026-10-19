@@ -417,7 +417,7 @@ def enter_batch_results_us28(
                     existing_result.modified_at = datetime.utcnow()
                     created_results.append(existing_result)
                 else:
-                    # Create new result. An omitted entry date stays the write instant.
+                    # Create new result. An omitted entry date is the lab calendar day.
                     new_result = Result(
                         test_id=test_result_entry.test_id,
                         analyte_id=analyte_id,
@@ -425,7 +425,7 @@ def enter_batch_results_us28(
                         reported_result=analyte_result.reported_result,
                         qualifiers=analyte_result.qualifiers,
                         entry_date=(
-                            datetime.utcnow()
+                            current_lab_day()
                             if test_result_entry.entry_date is None
                             else test_result_entry.entry_date
                         ),
