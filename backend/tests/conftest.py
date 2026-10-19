@@ -263,6 +263,7 @@ def db_session(db_engine):
         join_transaction_mode="create_savepoint",
     )
     session = TestingSessionLocal()
+    _ensure_test_lab_timezone(session)
 
     yield session
 
@@ -286,8 +287,6 @@ def _ensure_test_lab_timezone(session) -> None:
 @pytest.fixture(scope="function")
 def client(db_session):
     """FastAPI test client with DB session override."""
-    _ensure_test_lab_timezone(db_session)
-
     def override_get_db():
         from app.core.lab_time import publish_lab_zone
 

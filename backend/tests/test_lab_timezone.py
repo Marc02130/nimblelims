@@ -58,6 +58,7 @@ def test_migration_only_adds_lab_settings():
 
 def test_env_seeds_an_empty_setting(monkeypatch, db_session):
     """LAB_TIMEZONE does not seed. An empty row stays empty and fails loudly."""
+    _clear_lab_timezone(db_session)
     monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
     with pytest.raises(lab_time.LabTimezoneUnset, match="lab timezone not configured"):
         lab_time.resolve_lab_timezone(db_session)
@@ -67,7 +68,11 @@ def test_env_seeds_an_empty_setting(monkeypatch, db_session):
 
 def test_saved_zone_wins_over_the_environment(monkeypatch, db_session):
     monkeypatch.setenv("LAB_TIMEZONE", "UTC")
-    db_session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="America/Chicago"))
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        db_session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="America/Chicago"))
+    else:
+        row.timezone = "America/Chicago"
     db_session.flush()
     assert lab_time.resolve_lab_timezone(db_session) == "America/Chicago"
     monkeypatch.setenv("LAB_TIMEZONE", "Pacific/Honolulu")
@@ -75,6 +80,7 @@ def test_saved_zone_wins_over_the_environment(monkeypatch, db_session):
 
 
 def test_invalid_env_does_not_seed(monkeypatch, db_session):
+    _clear_lab_timezone(db_session)
     monkeypatch.setenv("LAB_TIMEZONE", "Mars/Olympus_Mons")
     with pytest.raises(lab_time.LabTimezoneUnset) as caught:
         lab_time.resolve_lab_timezone(db_session)
@@ -86,6 +92,7 @@ def test_invalid_env_does_not_seed(monkeypatch, db_session):
 
 
 def test_missing_env_and_empty_row_refuse(monkeypatch, db_session):
+    _clear_lab_timezone(db_session)
     monkeypatch.delenv("LAB_TIMEZONE", raising=False)
     with pytest.raises(lab_time.LabTimezoneUnset) as missing:
         lab_time.resolve_lab_timezone(db_session)
