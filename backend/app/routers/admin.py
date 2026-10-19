@@ -18,6 +18,7 @@ from app.schemas._instants import APIModel as BaseModel
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
 from app.core.patch_fields import explicit_updates
+from app.core.lab_time import LabTimezoneInvalid
 from app.core.name_generation import fill_date_placeholders, template_calendar
 from uuid import UUID
 from datetime import datetime
@@ -257,6 +258,8 @@ def preview_generated_name(
         
         return NamePreviewResponse(preview=preview)
     except HTTPException:
+        raise
+    except LabTimezoneInvalid:
         raise
     except Exception as e:
         # Log unexpected errors and return a generic error

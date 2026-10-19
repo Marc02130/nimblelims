@@ -13,6 +13,7 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import TestForm from '../components/tests/TestForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
+import { apiErrorText } from '../utils/apiErrorText';
 import { formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
@@ -105,7 +106,7 @@ const TestsManagement: React.FC = () => {
       } else if (err.response?.status === 404) {
         setError('No tests found. This may be due to access restrictions.');
       } else {
-        setError(err.response?.data?.detail || 'Failed to load tests');
+        setError(apiErrorText(err, 'Failed to load tests'));
       }
     } finally {
       setLoading(false);
@@ -118,7 +119,7 @@ const TestsManagement: React.FC = () => {
       setSelectedTest(test);
       setShowForm(true);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load test');
+      setError(apiErrorText(err, 'Failed to load test'));
     }
   };
 
@@ -130,7 +131,7 @@ const TestsManagement: React.FC = () => {
       setShowForm(false);
       setSelectedTest(null);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update test');
+      setError(apiErrorText(err, 'Failed to update test'));
       throw err;
     }
   };

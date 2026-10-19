@@ -88,9 +88,16 @@ const fillRequiredResults = async () => {
 };
 
 describe('BatchResultsEntryTable', () => {
-  it('caps entry date at the browser today', async () => {
+  it('caps entry date at the browser today and refuses a typed later day', async () => {
+    const user = userEvent.setup();
     render(<BatchResultsEntryTable {...defaultProps} />);
-    expect(await screen.findByLabelText('Entry date')).toHaveAttribute('max', localDateString());
+    const dateInput = await screen.findByLabelText('Entry date');
+    expect(dateInput).toHaveAttribute('max', localDateString());
+    fireEvent.change(dateInput, { target: { value: '2099-01-01' } });
+    await user.click(screen.getByText('Submit Results'));
+    expect(await screen.findByText('Entry date cannot be in the future')).toBeInTheDocument();
+    expect(screen.queryByText('Confirm Submission')).not.toBeInTheDocument();
+    expect(mockApiService.enterBatchResults).not.toHaveBeenCalled();
   });
 
   beforeEach(() => {

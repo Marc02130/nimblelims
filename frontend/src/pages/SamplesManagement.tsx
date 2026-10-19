@@ -28,6 +28,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import AskedForForm, { AskedForFormValues } from '../components/asked-for/AskedForForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
+import { apiErrorText } from '../utils/apiErrorText';
 import { formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
@@ -245,7 +246,7 @@ const SamplesManagement: React.FC = () => {
       } else if (err.response?.status === 404) {
         setError('No samples found. This may be due to access restrictions.');
       } else {
-        setError(err.response?.data?.detail || 'Failed to load samples');
+        setError(apiErrorText(err, 'Failed to load samples'));
       }
     } finally {
       setLoading(false);
@@ -260,7 +261,7 @@ const SamplesManagement: React.FC = () => {
       setViewMode(true);
       setShowForm(true);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load sample');
+      setError(apiErrorText(err, 'Failed to load sample'));
     }
   };
 
@@ -272,7 +273,7 @@ const SamplesManagement: React.FC = () => {
       setViewMode(false);
       setShowForm(true);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load sample');
+      setError(apiErrorText(err, 'Failed to load sample'));
     }
   };
 
@@ -284,7 +285,7 @@ const SamplesManagement: React.FC = () => {
       setShowForm(false);
       setSelectedSample(null);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update sample');
+      setError(apiErrorText(err, 'Failed to update sample'));
       throw err;
     }
   };
@@ -308,7 +309,7 @@ const SamplesManagement: React.FC = () => {
         })),
       );
     } catch (err: any) {
-      setAssignError(err.response?.data?.detail || 'Failed to load processes');
+      setAssignError(apiErrorText(err, 'Failed to load processes'));
       setProcesses([]);
     }
   };
@@ -328,13 +329,8 @@ const SamplesManagement: React.FC = () => {
         `Assigned ${selectedIds.length} sample${selectedIds.length === 1 ? '' : 's'} to the process`,
       );
     } catch (err: any) {
-      const detail = err.response?.data?.detail;
       setAssignError(
-        typeof detail === 'string'
-          ? detail
-          : Array.isArray(detail)
-            ? detail.map((d: any) => d.msg || d).join('; ')
-            : 'Failed to assign samples (they may already be on this process)',
+        apiErrorText(err, 'Failed to assign samples (they may already be on this process)'),
       );
     } finally {
       setAssignLoading(false);

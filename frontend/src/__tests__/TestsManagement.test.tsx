@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import TestsManagement from '../pages/TestsManagement';
 import { apiService } from '../services/apiService';
@@ -214,6 +215,49 @@ describe('TestsManagement', () => {
         expect(button.closest('button')).toBeDisabled();
       });
     });
+  });
+
+  it('renders a 422 validation list as text and keeps the form', async () => {
+    const user = userEvent.setup();
+    const testData = {
+      id: '1',
+      name: 'TEST-001',
+      status: 'status-id',
+      sample_id: 'sample-id',
+      analysis_id: 'analysis-id',
+      created_at: '2025-01-01T00:00:00Z',
+      sample: { name: 'SAMPLE-001' },
+      analysis: { name: 'Analysis 1' },
+    };
+    mockedApiService.getTests.mockResolvedValue({ tests: [testData] });
+    mockedApiService.getTest.mockResolvedValue(testData);
+    mockedApiService.getListEntries.mockResolvedValue([{ id: 'status-id', name: 'In Process' }]);
+    mockedApiService.getCustomAttributeConfigs.mockResolvedValue({ configs: [] });
+    mockedApiService.updateTest.mockRejectedValue({
+      response: {
+        data: {
+          detail: [
+            {
+              type: 'value_error',
+              loc: ['body', 'test_date'],
+              msg: 'Value error, Date cannot be in the future',
+              input: '2026-10-19',
+              ctx: { error: {} },
+            },
+          ],
+        },
+      },
+    });
+
+    renderWithProviders(<TestsManagement />);
+    const edit = await screen.findByLabelText('Edit test TEST-001');
+    await user.click(edit);
+    expect(await screen.findByText('Edit Test: TEST-001')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Update test' }));
+
+    expect(await screen.findByText('Date cannot be in the future')).toBeInTheDocument();
+    expect(screen.getByText('Edit Test: TEST-001')).toBeInTheDocument();
+    expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
   });
 });
 

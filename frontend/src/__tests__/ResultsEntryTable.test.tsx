@@ -208,12 +208,27 @@ describe('ResultsEntryTable', () => {
     expect(defaultProps.onResultsSaved).toHaveBeenCalled();
   });
 
-  it('caps entry date at the browser today and shows the API sentence', async () => {
+  it('caps entry date at the browser today and shows the API sentence once', async () => {
     const user = userEvent.setup();
     mockApiService.enterBatchResults.mockRejectedValue({
       response: {
         data: {
-          detail: [{ loc: ['body', 'results', 0, 'entry_date'], msg: 'Entry date cannot be in the future' }],
+          detail: [
+            {
+              type: 'value_error',
+              loc: ['body', 'results', 0, 'entry_date'],
+              msg: 'Value error, Entry date cannot be in the future',
+              input: '2026-10-19',
+              ctx: { error: {} },
+            },
+            {
+              type: 'value_error',
+              loc: ['body', 'results', 0, 'entry_date'],
+              msg: 'Value error, Entry date cannot be in the future',
+              input: '2026-10-19',
+              ctx: { error: {} },
+            },
+          ],
         },
       },
     });
@@ -223,7 +238,23 @@ describe('ResultsEntryTable', () => {
     expect(await screen.findByLabelText('Entry date')).toHaveAttribute('max', localDateString());
     await user.click(screen.getByText('Save Results'));
 
-    expect(await screen.findByText('results.0.entry_date: Entry date cannot be in the future')).toBeInTheDocument();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Entry date cannot be in the future');
+    expect(alert.textContent?.match(/Entry date cannot be in the future/g)).toHaveLength(1);
+    expect(alert).not.toHaveTextContent('results.0.entry_date');
+    expect(alert).not.toHaveTextContent('Value error');
+  });
+
+  it('refuses a typed entry date after today without posting', async () => {
+    const user = userEvent.setup();
+    render(<ResultsEntryTable {...defaultProps} />);
+
+    const dateInput = await screen.findByLabelText('Entry date');
+    fireEvent.change(dateInput, { target: { value: '2099-01-01' } });
+    await user.click(screen.getByText('Save Results'));
+
+    expect(await screen.findByText('Entry date cannot be in the future')).toBeInTheDocument();
+    expect(mockApiService.enterBatchResults).not.toHaveBeenCalled();
   });
 
   it('handles API errors gracefully', async () => {
