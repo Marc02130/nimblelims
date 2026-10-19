@@ -11,11 +11,14 @@ app.current_user_id. PUBLIC cannot execute it.
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
 from app.core.security import create_access_token, get_password_hash
@@ -25,6 +28,7 @@ from app.main import app
 CLIENT_ROLE = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 BATCH_READ = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
 FN = "public.batch_access_status(uuid)"
+MIGRATION_ROLE = "lims_user"  # pragma: allowlist secret
 
 
 def _scalar(conn, sql, **params):
@@ -528,9 +532,29 @@ def test_function_lockdown(migrated_engine, batch_world):
             {"fn": FN},
         ).scalar() is True
         assert conn.execute(
+            text("SELECT has_function_privilege(:role, :fn, 'EXECUTE')"),
+            {"role": MIGRATION_ROLE, "fn": FN},
+        ).scalar() is False
+        assert conn.execute(
             text("SELECT has_function_privilege('app_test_role', :fn, 'EXECUTE')"),
             {"fn": FN},
         ).scalar() is False
+        migration_grant = conn.execute(
+            text(
+                """
+                SELECT COALESCE(bool_or(r.rolname = :role), false)
+                FROM pg_proc p
+                JOIN pg_namespace n ON n.oid = p.pronamespace
+                CROSS JOIN LATERAL aclexplode(p.proacl) AS acl
+                JOIN pg_roles r ON r.oid = acl.grantee
+                WHERE n.nspname = 'public'
+                  AND p.proname = 'batch_access_status'
+                  AND acl.privilege_type = 'EXECUTE'
+                """
+            ),
+            {"role": MIGRATION_ROLE},
+        ).scalar()
+        assert migration_grant is False
     nobody_conn = migrated_engine.connect().execution_options(isolation_level="AUTOCOMMIT")
     nobody_conn.execute(text("CREATE ROLE batch_access_nobody NOLOGIN"))
     try:
@@ -733,3 +757,93 @@ def test_mixed_batch_returns_only_the_callers_rows(lims_app_client, batch_world)
     assert container_ids == [str(caller["container_id"])]
     assert str(owner["container_id"]) not in detail.text
     assert owner["container_name"] not in detail.text
+
+
+def _privilege(conn, role: str) -> bool:
+    return conn.execute(
+        text("SELECT has_function_privilege(:role, :fn, 'EXECUTE')"),
+        {"role": role, "fn": FN},
+    ).scalar() is True
+
+
+def test_migration_role_cannot_execute_and_lims_app_still_403(
+    migrated_engine, batch_world, lims_app_client
+):
+    """0100 removes an existing EXECUTE grant and does not put it back.
+
+    Downgrade is a no-op, so a grant planted at head is still there at 0099.
+    Upgrade revokes it. lims_app can still execute the probe, and a cross-client
+    batch read is still the F10 403.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    caller = batch_world["caller"]
+    owner = batch_world["owner"]
+    url = migrated_engine.url.render_as_string(hide_password=False)
+    ini = Path(__file__).resolve().parents[1] / "alembic.ini"
+    cfg = Config(str(ini))
+    cfg.set_main_option("sqlalchemy.url", url)
+    os.environ["DATABASE_URL"] = url
+    try:
+        with migrated_engine.connect() as conn:
+            defaults = conn.execute(
+                text(
+                    """
+                    SELECT count(*)
+                    FROM pg_default_acl d
+                    JOIN pg_namespace n ON n.oid = d.defaclnamespace
+                    CROSS JOIN LATERAL aclexplode(d.defaclacl) AS acl
+                    JOIN pg_roles r ON r.oid = acl.grantee
+                    WHERE n.nspname = 'public'
+                      AND d.defaclobjtype = 'f'
+                      AND r.rolname = :role
+                      AND acl.privilege_type = 'EXECUTE'
+                    """
+                ),
+                {"role": MIGRATION_ROLE},
+            ).scalar()
+            assert defaults == 0
+            conn.execute(
+                text(f"GRANT EXECUTE ON FUNCTION {FN} TO {MIGRATION_ROLE}")
+            )
+            conn.commit()
+            assert _privilege(conn, MIGRATION_ROLE) is True
+
+        command.downgrade(cfg, "0100_calendar_dates")
+        with migrated_engine.connect() as conn:
+            assert _privilege(conn, MIGRATION_ROLE) is True
+            assert _privilege(conn, "lims_app") is True
+            assert _privilege(conn, "public") is False
+
+        command.upgrade(cfg, "head")
+        with migrated_engine.connect() as conn:
+            assert _privilege(conn, MIGRATION_ROLE) is False
+            assert _privilege(conn, "lims_app") is True
+            assert _privilege(conn, "public") is False
+        with migrated_engine.connect() as conn:
+            trans = conn.begin()
+            try:
+                conn.execute(text(f"SET ROLE {MIGRATION_ROLE}"))
+                with pytest.raises(ProgrammingError, match="permission denied"):
+                    conn.execute(
+                        text(
+                            "SELECT public.batch_access_status(CAST(:batch_id AS uuid))"
+                        ),
+                        {"batch_id": str(owner["batch_id"])},
+                    )
+            finally:
+                trans.rollback()
+        with migrated_engine.connect() as conn:
+            assert _status(conn, caller["user_id"], owner["batch_id"]) == "forbidden"
+    finally:
+        command.upgrade(cfg, "head")
+        os.environ.pop("DATABASE_URL", None)
+
+    headers = _headers(caller["user_id"])
+    denied = lims_app_client.get(f"/batches/{owner['batch_id']}", headers=headers)
+    assert denied.status_code == 403, denied.text
+    assert denied.json()["detail"]["code"] == "batch_forbidden"
+    assert denied.json()["detail"]["message"] == "Access denied"
+    own = lims_app_client.get(f"/batches/{caller['batch_id']}", headers=headers)
+    assert own.status_code == 200, own.text

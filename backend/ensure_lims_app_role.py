@@ -100,6 +100,30 @@ def ensure_lims_app_role() -> None:
         conn.execute(
             text(f"GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO {APP_ROLE}")
         )
+        # Creating batch_access_status records the migration role's EXECUTE in
+        # the ACL. 0003's GRANT EXECUTE ON ALL FUNCTIONS ran before that
+        # function existed, and there is no default privilege for functions.
+        # This revoke runs after migrations so a later recreate does not leave
+        # the migration role able to execute it. Do not grant it here.
+        conn.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF to_regprocedure('public.batch_access_status(uuid)') IS NULL THEN
+                        RETURN;
+                    END IF;
+                    REVOKE ALL ON FUNCTION public.batch_access_status(uuid) FROM PUBLIC;
+                    IF EXISTS (
+                        SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'lims_user' -- pragma: allowlist secret
+                    ) THEN
+                        REVOKE EXECUTE ON FUNCTION public.batch_access_status(uuid)
+                            FROM lims_user; -- pragma: allowlist secret
+                    END IF;
+                END $$;
+                """
+            )
+        )
         # Name templates lazily CREATE SEQUENCE; lims_app must own/use those.
         conn.execute(
             text(

@@ -48,7 +48,23 @@ class TestEnsureLimsAppRole:
             n = conn.execute(text("SELECT count(*) FROM users")).scalar()
             assert n is not None and n >= 0
             conn.execute(text("RESET ROLE"))
+            conn.execute(
+                text(
+                    "GRANT EXECUTE ON FUNCTION public.batch_access_status(uuid) "
+                    "TO lims_user"  # pragma: allowlist secret
+                )
+            )
             conn.commit()
+
+        ensure_lims_app_role()
+        with migrated_engine.connect() as conn:
+            allowed = conn.execute(
+                text(
+                    "SELECT has_function_privilege("
+                    "'lims_user', 'public.batch_access_status(uuid)', 'EXECUTE')"  # pragma: allowlist secret
+                )
+            ).scalar()
+            assert allowed is False
 
     def test_rotate_flag_updates_password(self, migrated_engine, monkeypatch):
         from ensure_lims_app_role import ensure_lims_app_role, APP_ROLE
