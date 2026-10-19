@@ -64,7 +64,7 @@ This project uses a five-container Docker setup:
 4. **Login**
    - Username: `admin`
    - A fresh database locks `admin`, `lab-manager`, `lab-tech`, `client`, `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`. None of them can sign in until you run `docker compose exec backend python seed_dev_passwords.py --apply --secrets-out /tmp/uat-secrets.env`.
-   - If a `DEV_SEED_*` variable is unset, that command writes the generated password to the new `--secrets-out` file (mode `0600`) and prints only the path. UAT uses this mode only. To choose the password yourself, set the variable from `.env.example` before `--apply`. Do not commit the value. See [manuals/uat-artifacts.md](manuals/uat-artifacts.md).
+   - If a `DEV_SEED_*` variable is unset, that command writes the generated password to the new `--secrets-out` file (mode `0600`) as `KEY=<shlex.quote(value)>` and prints only the path. Load it with `set -a; . PATH; set +a`. UAT uses this mode only. To choose the password yourself, set the variable from `.env.example` before `--apply`. Do not commit the value. See [manuals/uat-artifacts.md](manuals/uat-artifacts.md).
    - An existing database keeps its current passwords. Run `--check` before `--apply` on a shared, UAT, or demo database. Pass `--defaults-file` on both when you need to detect an old bcrypt hash of a published default (the four biotech users are not flagged must-change).
    - **⚠️ IMPORTANT**: Production bootstrap uses `BOOTSTRAP_ADMIN_PASSWORD`, not a password stored in git.
    - **Forgot password?** on the sign-in page emails a one-time link. Local Compose sends it to Mailpit at http://localhost:8025. See [manuals/admin-setup.md](manuals/admin-setup.md).

@@ -12,11 +12,21 @@ UAT sets seed passwords only with:
 python backend/seed_dev_passwords.py --apply --secrets-out PATH
 ```
 
-`PATH` must not exist yet. The script creates that file exclusively (`O_CREAT|O_EXCL`) at mode `0600`. Stdout names the path and does not print a password. Do not use the local print-once path for UAT.
+`PATH` must not exist yet. The parent folder must exist. The script creates that file exclusively (`O_CREAT|O_EXCL`) at mode `0600`. Each key must match `^[A-Z_][A-Z0-9_]*$`. Each line is `KEY=<shlex.quote(value)>`. In `--secrets-out` mode, stdout is only the path line (`Generated passwords written to PATH`). Connect and status lines go to stderr. Do not use the local print-once path for UAT.
 
-Export the variables from that file into the shell that runs UAT. Keep the file out of evidence folders, tarballs, and `/workspace/.uat-backups/`.
+A second run at the same path without `--force` exits non-zero and leaves the file unchanged. `--force` overwrites that file and keeps mode `0600`. A missing parent folder exits non-zero with one error line and no traceback.
 
-If a captured log still has a `printed once` header, filter it before it goes into evidence:
+Load the file into the shell that runs UAT:
+
+```bash
+set -a
+. PATH
+set +a
+```
+
+Keep the file out of evidence folders, tarballs, and `/workspace/.uat-backups/` while the round is active. Never put secrets or backups in `/tmp`. That directory is shared by every agent on the box.
+
+If a captured log still has a `printed once` header (any case), filter it before it goes into evidence:
 
 ```bash
 python scripts/mask_printed_once.py < captured.log > filtered.log
@@ -27,10 +37,34 @@ The filter replaces the entire next line with `[redacted]`. It exits non-zero wh
 Scan every evidence folder or tarball before sharing:
 
 ```bash
-python scripts/scan_uat_evidence.py /path/to/evidence
+python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
 ```
 
-The scan refuses (exit 1, list of hits) on a `printed once` header, a 24-character password-pool token, a bcrypt marker (`$2a$`, `$2b$`, `$2y$`), or any `.dump` file. Hits name the file and line. They do not repeat the secret.
+`--secrets-file` is the `--secrets-out` file for the round. The scan also reads `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, `SECRET_KEY`, and `DEV_SEED_*` / `SLICE_*` password variables from the environment.
+
+The scan refuses (exit 1, list of hits) on:
+
+- a `printed once` header in any case
+- a 24-character password-pool window that contains upper, lower, digit, and a pool symbol
+- a configured compose or seed secret, matched literally and percent-encoded
+- a bcrypt marker (`$2a$`, `$2b$`, `$2y$`)
+- a `.dump` or `.dump.gz` name, or the `PGDMP` magic
+- gzip or zlib payloads (decompressed, then scanned), including nested tarballs
+- a binary file that is not gzip, zlib, tar, PGDMP, or UTF-8 text
+
+Hits name the file and line. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits.
+
+### After each round
+
+The `--secrets-out` file stays mode `0600` and stays outside evidence.
+
+One retirement procedure:
+
+1. Lock or rotate the seed accounts first, so the file is no longer the live login.
+2. Then allow exactly one logged `mv` of that file into `/workspace/.uat-quarantine/<date>/`.
+3. Do not `rm` the live file. Do not copy it. Do not move it into `RUN_DIR`.
+
+`<date>` is UTC `YYYYMMDD`. That quarantine directory is mode `0700` and is gitignored.
 
 ## Backups
 
@@ -40,8 +74,16 @@ Backups go in `/workspace/.uat-backups/<round>/`.
 - Files in it are mode `0600`.
 - The path is gitignored. Do not commit it.
 - Do not put this directory, or any file from it, inside an evidence folder or an evidence tarball.
+- Never write backups under `/tmp`.
 
 `<round>` is the UAT round name, usually the script stem (for example `password-reset`).
+
+For cleanup scripts, that directory is `RUN_DIR`:
+
+```bash
+RUN_DIR=/workspace/.uat-backups/<round>
+QUARANTINE_DIR=/workspace/.uat-quarantine/<date>
+```
 
 ### What is dumped
 
@@ -69,7 +111,28 @@ Example:
 
 Keep the round until the UAT verdict is recorded or the change merges to `main`, whichever is later, and then for 7 more days.
 
-After that window, deleting that round is allowed under this standing rule. Deleting a backup earlier, or deleting anything outside `/workspace/.uat-backups/`, needs Marc's approval. Leave deletion manual. Do not add an automatic deleter.
+After that window, cleaning that round is allowed under this standing rule. Cleaning a backup earlier, or touching anything outside the cleanup path allowlist, needs Marc's approval. Leave cleanup manual. Do not add an automatic deleter.
+
+## Cleanup
+
+Quarantine over delete. Use one convention everywhere: `/workspace/.uat-quarantine/<date>/` (mode `0700`). Move expired backups and the retired `--secrets-out` file there with `mv`. `rm` is allowed only after the retention window, only for paths already inside that quarantine directory, and only as a second step after the move. Never `rm` outside `QUARANTINE_DIR`.
+
+Cleanup scripts use `set -euo pipefail`.
+
+### Cleanup path allowlist
+
+A cleanup script may only `mv` or `rm` paths that resolve inside one of these locations:
+
+| Path | Use |
+|------|-----|
+| `$RUN_DIR` | The round backup directory, `/workspace/.uat-backups/<round>/`. `mv` out of here only. |
+| `/workspace/.uat-quarantine/<date>/` | The only quarantine. Backups and the one logged secrets-file move land here. `rm` only inside this directory after retention. |
+
+Refuse any other path, including `/workspace/.uat-backups/` itself (other rounds), `/tmp`, `$HOME`, the evidence folder, and the original `--secrets-out` path after the one logged move. The secrets file is moved once into `/workspace/.uat-quarantine/<date>/`; it is not moved into `RUN_DIR`.
+
+## Known limitations
+
+CI API tests connect as the testcontainer superuser, not as `lims_app`. Privilege and RLS checks still run as `lims_app` through the snapshot and role fixtures. A later change should make the request-path tests use `lims_app` as well.
 
 ## Postgres logging
 

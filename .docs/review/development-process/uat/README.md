@@ -51,7 +51,9 @@ Before sharing a folder or tarball:
 python scripts/scan_uat_evidence.py /path/to/evidence
 ```
 
-Share only when the scan exits 0. A non-zero exit lists hits (`printed once`, a 24-character password-pool token, `$2a$` / `$2b$` / `$2y$`, or a `.dump` file) and the pack is not shared.
+Share only when the scan exits 0. A non-zero exit lists hits (`printed once` in any case, a mixed 24-character pool window, a configured compose or seed secret, `$2[aby]$`, `.dump` / `.dump.gz` / `PGDMP`, nested gzip/zlib/tar, or a non-allowlisted binary) and the pack is not shared.
+
+Known limitation: CI API tests connect as the testcontainer superuser, not as `lims_app`.
 
 ## Exit criteria
 

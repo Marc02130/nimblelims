@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import stat
 import subprocess
 import sys
@@ -45,6 +46,41 @@ def _assert_absent(text: str, password: str) -> None:
         assert form not in text
 
 
+def _value_from_secrets_file(text: str, env_name: str) -> str:
+    for line in text.splitlines():
+        if line.startswith(f"{env_name}="):
+            parsed = shlex.split(line[len(env_name) + 1 :])
+            assert len(parsed) == 1
+            return parsed[0]
+    raise AssertionError(f"{env_name} missing from secrets file")
+
+
+def _quoted_assignment(env_name: str, password: str) -> str:
+    return f"{env_name}={shlex.quote(password)}"
+
+
+def _source_secrets_file(path: Path, names: list[str]) -> dict[str, str]:
+    quoted_names = " ".join(shlex.quote(name) for name in names)
+    script = (
+        "set -euo pipefail\n"
+        "set -a\n"
+        f". {shlex.quote(str(path))}\n"
+        "set +a\n"
+        "python3 -c "
+        "'import json, os, sys; "
+        "print(json.dumps({name: os.environ[name] for name in sys.argv[1:]}))' "
+        f"{quoted_names}\n"
+    )
+    proc = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)
+
+
 @pytest.mark.parametrize("symbol", list(DEV_PASSWORD_POOL))
 def test_secrets_out_streams_hide_every_pool_symbol(symbol, tmp_path, capsys):
     password = _password(symbol)
@@ -56,8 +92,10 @@ def test_secrets_out_streams_hide_every_pool_symbol(symbol, tmp_path, capsys):
     captured = capsys.readouterr()
     _assert_absent(captured.out, password)
     _assert_absent(captured.err, password)
-    assert f"Generated passwords written to {dest}" in captured.out
-    assert password in dest.read_text(encoding="utf-8")
+    assert captured.out == f"Generated passwords written to {dest}\n"
+    stored = dest.read_text(encoding="utf-8")
+    assert _quoted_assignment(ENV_NAME, password) in stored
+    assert _value_from_secrets_file(stored, ENV_NAME) == password
     assert stat.S_IMODE(dest.stat().st_mode) == 0o600
 
 
@@ -87,9 +125,11 @@ def test_secrets_file_is_0600_under_a_permissive_umask(tmp_path):
     finally:
         os.umask(previous)
     assert stat.S_IMODE(dest.stat().st_mode) == 0o600
+    stored = dest.read_text(encoding="utf-8")
+    assert _quoted_assignment(ENV_NAME, password) in stored
 
 
-def test_secrets_file_refuses_an_existing_path(tmp_path):
+def test_secrets_file_refuses_an_existing_path_without_force(tmp_path):
     dest = tmp_path / "secrets.env"
     dest.write_text("keep\n", encoding="utf-8")
     with pytest.raises(seed_dev_passwords.SeedPasswordError, match="Refusing to overwrite"):
@@ -99,9 +139,72 @@ def test_secrets_file_refuses_an_existing_path(tmp_path):
     assert dest.read_text(encoding="utf-8") == "keep\n"
 
 
-def test_main_secrets_out_does_not_print_the_password(
-    db_session, test_org, monkeypatch, capsys, tmp_path
-):
+def test_secrets_file_force_overwrites_at_0600(tmp_path):
+    dest = tmp_path / "secrets.env"
+    dest.write_text("keep\n", encoding="utf-8")
+    password = _password("*")
+    previous = os.umask(0)
+    try:
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", ENV_NAME, password)], force=True
+        )
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE(dest.stat().st_mode) == 0o600
+    stored = dest.read_text(encoding="utf-8")
+    assert stored != "keep\n"
+    assert _value_from_secrets_file(stored, ENV_NAME) == password
+
+
+def test_secrets_file_refuses_invalid_key_names(tmp_path):
+    dest = tmp_path / "secrets.env"
+    password = _password("!")
+    with pytest.raises(seed_dev_passwords.SeedPasswordError, match="Invalid secrets-file key"):
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", "dev-seed-password", password)]
+        )
+    assert not dest.exists()
+
+
+def test_secrets_file_missing_parent_is_a_one_line_error(tmp_path):
+    dest = tmp_path / "missing" / "secrets.env"
+    with pytest.raises(
+        seed_dev_passwords.SeedPasswordError,
+        match="Secrets file parent folder does not exist",
+    ):
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", ENV_NAME, _password("!"))]
+        )
+
+
+@pytest.mark.parametrize("symbol", list(DEV_PASSWORD_POOL))
+def test_secrets_file_round_trips_every_pool_symbol_through_bash(symbol, tmp_path):
+    password = _password(symbol)
+    dest = tmp_path / "secrets.env"
+    seed_dev_passwords.write_secrets_file(dest, [("admin", ENV_NAME, password)])
+    loaded = _source_secrets_file(dest, [ENV_NAME])
+    assert loaded == {ENV_NAME: password}
+
+
+def test_secrets_file_round_trips_special_chars_through_bash(tmp_path):
+    ampersand = chr(38)
+    dollar = chr(36)
+    generated = [
+        ("admin", "DEV_SEED_ADMIN_PASSWORD", f"amp{ampersand}and{dollar}sign"),
+        ("lab-tech", "DEV_SEED_LAB_TECH_PASSWORD", "has spaces and 'single' and \"double\""),
+        ("client", "DEV_SEED_CLIENT_PASSWORD", f"all of {ampersand} {dollar} ' \"  together"),
+    ]
+    dest = tmp_path / "secrets.env"
+    seed_dev_passwords.write_secrets_file(dest, generated)
+    expected = {env_name: password for _username, env_name, password in generated}
+    stored = dest.read_text(encoding="utf-8")
+    for env_name, password in expected.items():
+        assert _quoted_assignment(env_name, password) in stored
+    loaded = _source_secrets_file(dest, list(expected))
+    assert loaded == expected
+
+
+def _locked_client(db_session, test_org):
     from models.user import Role, User
 
     role = Role(name="role-client-secrets", description="seed secrets")
@@ -119,13 +222,23 @@ def test_main_secrets_out_does_not_print_the_password(
     )
     db_session.add(user)
     db_session.flush()
+    return user
 
+
+def _mock_connect(monkeypatch, db_session):
     class _Engine:
         def dispose(self) -> None:
             return None
 
     monkeypatch.setattr(seed_dev_passwords, "_connect", lambda: (db_session, _Engine()))
     monkeypatch.setattr(db_session, "close", lambda: None)
+
+
+def test_main_secrets_out_stdout_is_exactly_the_path_line(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
     monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
     dest = tmp_path / "uat.env"
     code = seed_dev_passwords.main(
@@ -133,21 +246,80 @@ def test_main_secrets_out_does_not_print_the_password(
     )
     captured = capsys.readouterr()
     assert code == 0
-    assert stat.S_IMODE(dest.stat().st_mode) == 0o600
-    stored = dest.read_text(encoding="utf-8")
-    password = stored.split("DEV_SEED_CLIENT_PASSWORD=", 1)[1].splitlines()[0]
+    assert captured.out == f"Generated passwords written to {dest}\n"
+    password = _value_from_secrets_file(dest.read_text(encoding="utf-8"), "DEV_SEED_CLIENT_PASSWORD")
     _assert_absent(captured.out, password)
     _assert_absent(captured.err, password)
-    assert "Generated passwords written to" in captured.out
+    assert "client\tupdated\tgenerated" in captured.err
+
+
+def test_main_secrets_out_existing_path_refuses_without_force(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    dest = tmp_path / "uat.env"
+    first = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
+    )
+    capsys.readouterr()
+    stored = dest.read_text(encoding="utf-8")
+    password = _value_from_secrets_file(stored, "DEV_SEED_CLIENT_PASSWORD")
+    assert first == 0
     code_again = seed_dev_passwords.main(
-        ["--apply", "--only", "client", "--force", "--secrets-out", str(dest)]
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
     )
     again = capsys.readouterr()
     assert code_again != 0
     assert "Refusing to overwrite" in again.err
+    assert again.out == ""
     _assert_absent(again.out, password)
     _assert_absent(again.err, password)
     assert dest.read_text(encoding="utf-8") == stored
+
+
+def test_main_secrets_out_force_overwrites_existing_file(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    dest = tmp_path / "uat.env"
+    assert seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
+    ) == 0
+    first = dest.read_text(encoding="utf-8")
+    capsys.readouterr()
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--force", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code == 0
+    assert captured.out == f"Generated passwords written to {dest}\n"
+    assert stat.S_IMODE(dest.stat().st_mode) == 0o600
+    second = dest.read_text(encoding="utf-8")
+    assert second != first
+    password = _value_from_secrets_file(second, "DEV_SEED_CLIENT_PASSWORD")
+    _assert_absent(captured.out, password)
+    _assert_absent(captured.err, password)
+
+
+def test_main_secrets_out_missing_parent_exits_nonzero(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    dest = tmp_path / "no-such-dir" / "uat.env"
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code != 0
+    assert captured.out == ""
+    assert captured.err.startswith("ERROR: Secrets file parent folder does not exist")
+    assert "Traceback" not in captured.err
 
 
 def test_missing_header_aborts(capsys):
