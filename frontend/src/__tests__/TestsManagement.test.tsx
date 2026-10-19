@@ -255,9 +255,10 @@ describe('TestsManagement', () => {
     expect(await screen.findByText('Edit Test: TEST-001')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Update test' }));
 
-    expect(await screen.findByText('Date cannot be in the future')).toBeInTheDocument();
+    expect((await screen.findAllByText('Date cannot be in the future')).length).toBeGreaterThan(0);
     expect(screen.getByText('Edit Test: TEST-001')).toBeInTheDocument();
     expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/test_date:/)).not.toBeInTheDocument();
   });
 });
 
