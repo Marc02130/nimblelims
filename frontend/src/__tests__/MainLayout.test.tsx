@@ -409,8 +409,14 @@ describe('MainLayout', () => {
       const mockUser = {
         user: null,
         loading: false,
+        mustChangePassword: false,
+        timezoneConfigured: false,
         login: jest.fn(),
+        changePassword: jest.fn(),
+        saveLabTimezone: jest.fn(),
         logout: jest.fn(),
+        isSystemClient: () => false,
+        isAdmin: () => false,
         hasPermission: jest.fn(() => false),
       };
 
