@@ -11,6 +11,7 @@ from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.exc import InternalError
 
+from app.core.lab_time import clock_date
 from models.lab_setting import LAB_SETTINGS_ID
 
 BEFORE = "0103_migration_role_owner"
@@ -19,12 +20,11 @@ REVISION = "0105_lab_timezone_required"
 BACKEND = Path(__file__).resolve().parents[1]
 MIGRATION_0104 = BACKEND / "db" / "migrations" / "versions" / "0104_current_lab_day.py"
 MIGRATION = BACKEND / "db" / "migrations" / "versions" / "0105_lab_timezone_required.py"
-CLOCK = "2026-10-20T01:00:00Z"
 PAST_CLOCK = "2020-01-15T12:00:00Z"
-NY_DAY = date(2026, 10, 19)
 PAST_DAY = date(2020, 1, 15)
 FN = "public.current_lab_day()"
 UNSET = "lab timezone not configured: set lab_settings.timezone"
+NY_ZONE = "America/New_York"
 
 
 def _config(url: str) -> Config:
@@ -54,14 +54,6 @@ def _restore_urls(url, previous_database, previous_migrate) -> None:
         os.environ.pop("MIGRATE_DATABASE_URL", None)
     else:
         os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
-
-
-def _set_clock(conn, clock: str = CLOCK) -> None:
-    conn.execute(text("SELECT set_config('lims.allow_as_of', 'on', true)"))
-    conn.execute(
-        text("SELECT set_config('lims.as_of', :clock, true)"),
-        {"clock": clock},
-    )
 
 
 def _seed_parents(conn):
@@ -135,10 +127,13 @@ def test_required_revision_follows_current_lab_day() -> None:
     assert "REVOKE" not in source
     assert "UPDATE " not in source
     assert "DELETE " not in source
-    assert "lims.allow_as_of" in source
+    assert "lims.allow_as_of" not in mig.CREATE_FUNCTION
+    assert "lims.as_of" not in mig.CREATE_FUNCTION
+    assert "now()" in mig.CREATE_FUNCTION
 
 
 def test_omitted_entry_date_stores_the_lab_day(migrated_engine) -> None:
+    expected = clock_date(NY_ZONE)
     with migrated_engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -146,7 +141,6 @@ def test_omitted_entry_date_stores_the_lab_day(migrated_engine) -> None:
                 text("UPDATE lab_settings SET timezone = 'America/New_York' WHERE id = :id"),
                 {"id": str(LAB_SETTINGS_ID)},
             )
-            _set_clock(conn)
             can_execute = conn.execute(
                 text("SELECT has_function_privilege('lims_app', :fn, 'EXECUTE')"),
                 {"fn": FN},
@@ -166,9 +160,9 @@ def test_omitted_entry_date_stores_the_lab_day(migrated_engine) -> None:
             conn.execute(text("SET ROLE lims_app"))
             seen = conn.execute(text("SELECT public.current_lab_day()")).scalar()
             conn.execute(text("RESET ROLE"))
-            assert seen == NY_DAY
+            assert seen == expected
             stored = _insert_omitting_entry_date(conn, _seed_parents(conn))
-            assert stored == NY_DAY
+            assert stored == expected
         finally:
             trans.rollback()
 
@@ -178,7 +172,6 @@ def test_blank_or_missing_lab_settings_use_utc(migrated_engine) -> None:
     with migrated_engine.connect() as conn:
         trans = conn.begin()
         try:
-            _set_clock(conn)
             conn.execute(
                 text("UPDATE lab_settings SET timezone = '' WHERE id = :id"),
                 {"id": str(LAB_SETTINGS_ID)},
@@ -199,6 +192,8 @@ def test_blank_or_missing_lab_settings_use_utc(migrated_engine) -> None:
 
 
 def test_as_of_is_ignored_without_the_test_guc(migrated_engine) -> None:
+    """The production function never reads lims.as_of, with or without allow_as_of."""
+    expected = clock_date("UTC")
     with migrated_engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -211,10 +206,35 @@ def test_as_of_is_ignored_without_the_test_guc(migrated_engine) -> None:
                 {"clock": PAST_CLOCK},
             )
             seen = conn.execute(text("SELECT public.current_lab_day()")).scalar()
+            assert seen == expected
             assert seen != PAST_DAY
             conn.execute(text("SELECT set_config('lims.allow_as_of', 'on', true)"))
-            honoured = conn.execute(text("SELECT public.current_lab_day()")).scalar()
-            assert honoured == PAST_DAY
+            still = conn.execute(text("SELECT public.current_lab_day()")).scalar()
+            assert still == expected
+            assert still != PAST_DAY
+        finally:
+            trans.rollback()
+
+
+def test_lims_app_set_gucs_do_not_change_lab_day(migrated_engine) -> None:
+    """lims_app can SET the old override GUCs. The lab day does not move."""
+    expected = clock_date("UTC")
+    with migrated_engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            conn.execute(
+                text("UPDATE lab_settings SET timezone = 'UTC' WHERE id = :id"),
+                {"id": str(LAB_SETTINGS_ID)},
+            )
+            conn.execute(text("SET ROLE lims_app"))
+            before = conn.execute(text("SELECT public.current_lab_day()")).scalar()
+            conn.execute(text("SET lims.allow_as_of = 'on'"))
+            conn.execute(text("SET lims.as_of = '2020-01-15T12:00:00Z'"))
+            after = conn.execute(text("SELECT public.current_lab_day()")).scalar()
+            conn.execute(text("RESET ROLE"))
+            assert before == expected
+            assert after == before
+            assert after != PAST_DAY
         finally:
             trans.rollback()
 

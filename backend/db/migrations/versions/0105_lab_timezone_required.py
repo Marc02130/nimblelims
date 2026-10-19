@@ -3,17 +3,18 @@
 Revision ID: 0105_lab_timezone_required
 Revises: 0104_current_lab_day
 
-0104 fell back to UTC when ``lab_settings.timezone`` was blank or missing.
-There is no timezone fallback. The function raises
-``lab timezone not configured: set lab_settings.timezone``.
+0104 fell back to UTC when ``lab_settings.timezone`` was blank or missing,
+and honoured ``lims.as_of`` for any session. There is no timezone fallback
+and no session time-override hook. The function raises
+``lab timezone not configured: set lab_settings.timezone``. The lab day is
+always ``now()`` in the saved zone.
 
 ``STABLE`` and ``SECURITY INVOKER``. No new privilege. Owner is
-``lims_migrate``. ``lims.as_of`` is ignored unless the test-only GUC
-``lims.allow_as_of`` is ``on``. Production never sets that GUC.
+``lims_migrate``.
 
 Existing rows are not updated. Nothing is deleted.
 
-Downgrade restores the 0104 function (UTC fallback).
+Downgrade restores the 0104 function (UTC fallback and ``lims.as_of``).
 """
 from __future__ import annotations
 
@@ -36,19 +37,8 @@ STABLE
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    allow text;
-    as_of text;
-    moment timestamptz;
     zone text;
 BEGIN
-    allow := NULLIF(current_setting('lims.allow_as_of', true), '');
-    as_of := NULLIF(current_setting('lims.as_of', true), '');
-    IF allow = 'on' AND as_of IS NOT NULL THEN
-        moment := as_of::timestamptz;
-    ELSE
-        moment := now();
-    END IF;
-
     BEGIN
         SELECT NULLIF(btrim(timezone), '')
           INTO zone
@@ -63,7 +53,7 @@ BEGIN
         RAISE EXCEPTION '{UNSET}';
     END IF;
 
-    RETURN (moment AT TIME ZONE zone)::date;
+    RETURN (now() AT TIME ZONE zone)::date;
 END;
 $$;
 """
