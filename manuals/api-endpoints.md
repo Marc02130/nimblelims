@@ -257,7 +257,7 @@ These are explicit later planning actions, not calls that Receive or asked-for c
 }
 ```
 
-**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. Eligible-sample and batch expiration day counts use that same lab calendar.
+**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. A `YYYY-MM-DD` value, and a stored naive midnight that was saved that way, is that calendar day and is not shifted by the zone. A value that carries an offset is still converted into the lab zone. Eligible-sample and batch expiration day counts use that same lab calendar, so a midnight due or expiry date counts as that day.
 
 **Response:** Sample with created tests
 
@@ -2383,7 +2383,7 @@ Soft-delete a name template (sets active=false).
 ### GET /admin/name-templates/preview
 Preview a generated name without consuming a sequence value.
 
-**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD). When `reference_date` is omitted, date placeholders use today in the lab timezone. A supplied `reference_date` is used as that calendar day.
+**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD). When `reference_date` is omitted, date placeholders use today in the lab timezone. A supplied `reference_date` is used as that calendar day. A saved timezone that is no longer a known IANA name is **503** `lab_timezone_invalid`, the same code as the other lab-date endpoints.
 
 **Response:** `{ preview: string }`
 

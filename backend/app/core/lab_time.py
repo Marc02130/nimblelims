@@ -138,9 +138,34 @@ def lab_today(db: Session, now: Optional[datetime] = None) -> date:
     return clock_date(resolve_lab_timezone(db), now)
 
 
+def is_naive_midnight(value: datetime) -> bool:
+    """True when ``value`` is a date-only calendar day stored as naive midnight.
+
+    The UI saves ``YYYY-MM-DD``. Pydantic parses that as a ``datetime`` at
+    00:00:00 with no timezone, and most stored sample dates are the same.
+    An aware midnight is a real instant and is not a date-only value.
+    ``datetime`` is a ``date`` subclass; callers must check ``datetime`` first.
+    """
+    if value.tzinfo is not None:
+        return False
+    return (
+        value.hour == 0
+        and value.minute == 0
+        and value.second == 0
+        and value.microsecond == 0
+    )
+
+
 def as_calendar_day(value: Union[date, datetime], zone_name: str) -> date:
-    """The calendar day of ``value`` in ``zone_name``. A naive datetime is UTC."""
+    """The calendar day of ``value`` in ``zone_name``.
+
+    A naive midnight is that calendar date and is not shifted by the zone.
+    Any other datetime, including one that carries an offset, is converted
+    into the lab zone. A plain ``date`` is already a calendar day.
+    """
     if isinstance(value, datetime):
+        if is_naive_midnight(value):
+            return value.date()
         return clock_date(zone_name, value)
     return value
 
