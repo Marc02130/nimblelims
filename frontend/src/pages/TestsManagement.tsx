@@ -14,7 +14,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import TestForm from '../components/tests/TestForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
 import { apiErrorText } from '../utils/apiErrorText';
-import { formatInstant } from '../utils/localDate';
+import { formatCalendarDay, formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
@@ -159,13 +159,13 @@ const TestsManagement: React.FC = () => {
       field: 'test_date', 
       headerName: 'Test Date', 
       width: 120,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      valueGetter: (value) => formatCalendarDay(value),
     },
     { 
       field: 'review_date', 
       headerName: 'Review Date', 
       width: 120,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      valueGetter: (value) => formatCalendarDay(value),
     },
     { 
       field: 'modified_at', 

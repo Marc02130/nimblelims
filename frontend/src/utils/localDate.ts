@@ -39,6 +39,13 @@ export const formatCalendarDate = (value: Date | null | undefined): string | nul
   return localDateString(value);
 };
 
+/** Locale label for a lab-day API value. A date-only string stays on that civil day. */
+export const formatCalendarDay = (value: unknown): string => {
+  const parsed = parseCalendarDate(value);
+  if (parsed === null) return '';
+  return parsed.toLocaleDateString();
+};
+
 const HAS_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;
 
 /**

@@ -1,4 +1,4 @@
-import { formatCalendarDate, localDateString, parseCalendarDate } from '../utils/localDate';
+import { formatCalendarDate, formatCalendarDay, localDateString, parseCalendarDate } from '../utils/localDate';
 
 describe('localDateString', () => {
   test.each([
@@ -34,5 +34,18 @@ describe('calendar form values', () => {
   test('submits the picker day without shifting through UTC', () => {
     const picked = new Date(2026, 9, 19, 0, 0, 0);
     expect(formatCalendarDate(picked)).toBe('2026-10-19');
+  });
+
+  test('displays a date-only lab day on that calendar day', () => {
+    const parsed = parseCalendarDate('2026-10-19');
+    expect(parsed?.getFullYear()).toBe(2026);
+    expect(parsed?.getMonth()).toBe(9);
+    expect(parsed?.getDate()).toBe(19);
+    expect(formatCalendarDay('2026-10-19')).toBe(parsed?.toLocaleDateString());
+    expect(formatCalendarDay('2026-10-19T00:00:00')).toBe(parsed?.toLocaleDateString());
+    const utcMidnight = new Date('2026-10-19T00:00:00Z').toLocaleDateString();
+    if (utcMidnight !== parsed?.toLocaleDateString()) {
+      expect(formatCalendarDay('2026-10-19')).not.toBe(utcMidnight);
+    }
   });
 });
