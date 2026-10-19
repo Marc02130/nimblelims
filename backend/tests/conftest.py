@@ -29,6 +29,14 @@ from testcontainers.postgres import PostgresContainer
 
 from app.main import app
 from app.database import get_db
+from app.core.bootstrap_roles import (
+    TEST_APP_PASSWORD,
+    TEST_MIGRATE_PASSWORD,
+    apply_init_extensions,
+    apply_zz_roles,
+    migrate_database_url,
+    run_privilege_snapshot,
+)
 from models.base import Base
 from models.user import User, Role, Permission, role_permissions
 from models.client import Client
@@ -117,9 +125,8 @@ def _install_access_functions(engine):
 def db_engine(pg_container):
     """Create engine and schema once per test session."""
     engine = create_engine(pg_container.get_connection_url())
-    with engine.connect() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        conn.commit()
+    apply_init_extensions(engine)
+    apply_zz_roles(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
     yield engine
@@ -145,43 +152,39 @@ def migrated_pg_container():
 
 @pytest.fixture(scope="session")
 def migrated_engine(migrated_pg_container):
-    """Engine with full Alembic migration chain applied (RLS policies active).
+    """Engine with the Alembic chain run as non-superuser ``lims_migrate``.
 
-    Unlike db_engine (which uses Base.metadata.create_all and skips migrations),
-    this fixture runs the real Alembic upgrade so RLS policies, SECURITY DEFINER
-    functions, and FORCE ROW LEVEL SECURITY are all in effect.
+    Roles match ``db/zz-roles.sh``. The privilege snapshot runs after upgrade
+    and fails the session if ``lims_app`` is a superuser or bypasses RLS.
 
-    A non-superuser role (app_test_role) is created so that RLS is enforced on
-    queries — PostgreSQL superusers bypass RLS regardless of FORCE settings.
-    Tests must SET ROLE app_test_role before querying to activate enforcement.
+    ``app_test_role`` is created so tests can enforce RLS. Superusers and
+    ``BYPASSRLS`` roles skip policies even with FORCE ROW LEVEL SECURITY.
     """
     from alembic import command
     from alembic.config import Config
 
-    url = migrated_pg_container.get_connection_url()
-    engine = create_engine(url)
+    engine = create_engine(migrated_pg_container.get_connection_url())
 
-    # Migration 0003 GRANTs privileges to lims_user. Create it in the testcontainer
-    # before running migrations so the GRANTs don't fail with "role does not exist".
-    with engine.connect() as conn:
-        conn.execute(text(
-            "CREATE ROLE lims_user NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD 'lims_password'"
-        ))
-        # start.sh creates this before Alembic. 0083 GRANTs to it with no IF EXISTS.
-        conn.execute(text(
-            "CREATE ROLE lims_app NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN PASSWORD 'lims_app_password'"
-        ))
-        conn.commit()
+    # Same order as Compose: init.sql extensions, zz-roles.sh, then Alembic
+    # as non-superuser lims_migrate. CI uses this fixture; no extra job.
+    apply_init_extensions(engine)
+    apply_zz_roles(
+        engine,
+        migrate_password=TEST_MIGRATE_PASSWORD,
+        app_password=TEST_APP_PASSWORD,
+    )
+    migrate_url = migrate_database_url(engine, TEST_MIGRATE_PASSWORD)
 
-    # env.py reads MIGRATE_DATABASE_URL. Point both variables at the
-    # testcontainer so a migration that also reads DATABASE_URL stays local.
+    # env.py reads MIGRATE_DATABASE_URL. Alembic must use lims_migrate, not
+    # the bootstrap superuser. DATABASE_URL is pointed at the same URL so a
+    # migration that also reads it stays on this testcontainer.
     previous_database = os.environ.get("DATABASE_URL")
     previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
-    os.environ["DATABASE_URL"] = url
-    os.environ["MIGRATE_DATABASE_URL"] = url
+    os.environ["DATABASE_URL"] = migrate_url
+    os.environ["MIGRATE_DATABASE_URL"] = migrate_url
     try:
         alembic_cfg = Config("alembic.ini")
-        alembic_cfg.set_main_option("sqlalchemy.url", url)
+        alembic_cfg.set_main_option("sqlalchemy.url", migrate_url)
         command.upgrade(alembic_cfg, "head")
     finally:
         if previous_database is None:
@@ -192,6 +195,8 @@ def migrated_engine(migrated_pg_container):
             os.environ.pop("MIGRATE_DATABASE_URL", None)
         else:
             os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
+
+    run_privilege_snapshot(engine)
 
     # Create a non-superuser role so RLS is actually enforced.
     # Superusers and roles with BYPASSRLS skip RLS even with FORCE ROW LEVEL SECURITY.
