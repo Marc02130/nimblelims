@@ -142,9 +142,9 @@ def db_engine(pg_container):
     _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
-    # Commit UTC so parallel connections see it. Do not query lab_settings
-    # from db_session setup: that would BEGIN a fixture transaction and
-    # fail idle-in-transaction checks in test_aliquots.py.
+    # Commit UTC so parallel connections see it. db_session also upserts
+    # UTC inside the test transaction because some tests commit a delete
+    # of this row (test_load_parallel) and later tests must still have a zone.
     with engine.begin() as conn:
         conn.execute(
             text(
@@ -274,12 +274,29 @@ def db_session(db_engine):
         join_transaction_mode="create_savepoint",
     )
     session = TestingSessionLocal()
+    _ensure_test_lab_timezone(session)
 
     yield session
 
     session.close()
     transaction.rollback()
     connection.close()
+
+
+def _ensure_test_lab_timezone(session) -> None:
+    """Tests that use the API client set UTC explicitly. There is no fallback.
+
+    A SELECT here begins the fixture transaction. Tests that check
+    idle-in-transaction must not request db_session or client.
+    """
+    from models.lab_setting import LAB_SETTINGS_ID, LabSetting
+
+    row = session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="UTC"))
+    elif not (row.timezone or "").strip():
+        row.timezone = "UTC"
+    session.flush()
 
 
 @pytest.fixture(scope="function")
