@@ -8,6 +8,8 @@ Every test in this module runs.
 """
 from __future__ import annotations
 
+import ast
+import importlib.util
 import os
 import re
 from datetime import date, datetime, timezone
@@ -28,16 +30,60 @@ from models.base import Base
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
+MIGRATION = BACKEND / "db" / "migrations" / "versions" / "0102_instant_timestamptz.py"
 BEFORE = "0101_revoke_probe_execute"
 NAIVE = datetime(2020, 1, 15, 19, 23)
 LAB_DAY = date(2020, 1, 15)
 _IDENT = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
-def test_model_datetimes_are_aware_or_calendar() -> None:
-    """A new naive DateTime column fails unless it is a known lab day."""
-    naive = set()
-    aware = set()
+def _imports_app(module_name: str) -> bool:
+    return (
+        module_name == "app"
+        or module_name.startswith("app.")
+        or module_name == "models"
+        or module_name.startswith("models.")
+    )
+
+
+def _frozen_migration():
+    """Load the revision without importing it as application code."""
+    spec = importlib.util.spec_from_file_location(
+        "migration_0102_instant_timestamptz",
+        MIGRATION,
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("0102_instant_timestamptz could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_migration_column_lists_are_frozen() -> None:
+    """The revision does not import app code. Its lists match the models."""
+    tree = ast.parse(MIGRATION.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if _imports_app(alias.name):
+                    raise AssertionError(f"migration imports {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            module_name = node.module or ""
+            if _imports_app(module_name):
+                raise AssertionError(f"migration imports {module_name}")
+    frozen = _frozen_migration()
+    assert set(frozen.INSTANT_TIMESTAMP_COLUMNS) == set(INSTANT_TIMESTAMP_COLUMNS)
+    assert set(frozen.SQL_DATE_COLUMNS) == set(SQL_DATE_COLUMNS)
+    assert set(frozen.CALENDAR_TIMESTAMP_COLUMNS) == set(CALENDAR_TIMESTAMP_COLUMNS)
+    naive, aware = _model_datetimes()
+    assert naive == set(frozen.CALENDAR_TIMESTAMP_COLUMNS)
+    assert set(frozen.INSTANT_TIMESTAMP_COLUMNS).isdisjoint(naive)
+    assert set(frozen.INSTANT_TIMESTAMP_COLUMNS) <= aware
+
+
+def _model_datetimes() -> tuple[set[str], set[str]]:
+    naive: set[str] = set()
+    aware: set[str] = set()
     for table in Base.metadata.tables.values():
         for column in table.columns:
             if not isinstance(column.type, DateTime):
@@ -47,6 +93,12 @@ def test_model_datetimes_are_aware_or_calendar() -> None:
                 aware.add(qualified)
             else:
                 naive.add(qualified)
+    return naive, aware
+
+
+def test_model_datetimes_are_aware_or_calendar() -> None:
+    """A new naive DateTime column fails unless it is a known lab day."""
+    naive, aware = _model_datetimes()
     assert naive == set(CALENDAR_TIMESTAMP_COLUMNS)
     assert INSTANT_TIMESTAMP_COLUMNS.isdisjoint(naive)
     assert INSTANT_TIMESTAMP_COLUMNS <= aware
