@@ -32,7 +32,7 @@ This implementation provides a complete authentication system for the NimbleLIMS
 - **Token Validation**: Secure token verification with expiration
 - **Bootstrap**: `BOOTSTRAP_ADMIN_PASSWORD` for production admin create; `ALLOW_DEV_SEED_USERS` for local/demo temporary seeds
 - **Password reset email** (production): sign-in shows **Forgot password?**. `SMTP_HOST`, `SMTP_FROM`, and `PUBLIC_APP_URL` must be set (`SMTP_PORT` default 587, `SMTP_TLS` default true, `SMTP_USER` / `SMTP_PASSWORD` when the server requires them, `SMTP_SSL=true` for implicit TLS). The link is `{PUBLIC_APP_URL}/reset-password#token=...` (the token is in the fragment, so it is not in the request line). Only the SHA-256 of the token is stored. Default life is 60 minutes (`PASSWORD_RESET_TTL_MINUTES`). A new link retires the previous one. More than 3 sends in an hour for one account (`PASSWORD_RESET_MAX_PER_HOUR`) stay quiet and do not send another message. The email never contains a password. Inactive accounts are not mailed. A failed send does not leave a usable token.
-- **DB roles (P0d)**: runtime `DATABASE_URL` → **`lims_app`** (non-superuser); migrations/ensure → **`MIGRATE_DATABASE_URL`** (owner `lims_user`). `start.sh` runs Alembic then `ensure_lims_app_role.py` (create-once password from `LIMS_APP_PASSWORD`; grants idempotent; rotate only with `ENSURE_LIMS_APP_PASSWORD_ROTATE=true`). RLS GUCs: `app.current_user_id` / `app.client_id` via `set_config(..., true)`
+- **DB roles (P0d)**: runtime `DATABASE_URL` is **`lims_app`** (`NOSUPERUSER`, `NOBYPASSRLS`). Alembic uses **`MIGRATE_DATABASE_URL`** as **`lims_migrate`** (`NOSUPERUSER`, `BYPASSRLS`), which owns application objects. The Compose `POSTGRES_USER` is only the bootstrap superuser. See [db-roles.md](db-roles.md). `start.sh` runs Alembic as `lims_migrate`, then `ensure_lims_app_role.py` (create-once password from `LIMS_APP_PASSWORD`; grants idempotent; rotate only with `ENSURE_LIMS_APP_PASSWORD_ROTATE=true`). RLS GUCs: `app.current_user_id` / `app.client_id` via `set_config(..., true)`
 
 ### 4. Core Permissions (17 total)
 ```
@@ -68,7 +68,8 @@ pip install -r requirements.txt
 ### 2. Environment Configuration
 Create `.env` file with:
 ```
-DATABASE_URL=postgresql://lims_user:lims_password@localhost:5432/lims_db
+DATABASE_URL=postgresql://lims_app:change-me@localhost:5432/lims_db
+MIGRATE_DATABASE_URL=postgresql://lims_migrate:change-me@localhost:5432/lims_db
 SECRET_KEY=your-secret-key-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
@@ -76,10 +77,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ### 3. Database Setup
 
 **Automatic (Recommended):**
-When using Docker Compose, migrations run automatically on backend startup via `backend/start.sh`. The script:
-1. Waits for the database to be ready
-2. Runs `python run_migrations.py` to execute all Alembic migrations
-3. Starts the FastAPI server
+When using Docker Compose, copy `.env.example` to `.env` first. Migrations run on backend startup via `backend/start.sh` as `lims_migrate`. The script:
+1. Waits for the database on `MIGRATE_DATABASE_URL`
+2. Ensures `lims_app`, runs Alembic as `lims_migrate`, then ensures grants again
+3. Starts the FastAPI server, which connects as `lims_app` (`DATABASE_URL`)
 
 **Manual (Development):**
 ```bash

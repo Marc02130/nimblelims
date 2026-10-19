@@ -264,8 +264,12 @@ Copyright (c) 2025 Marc Breneiser
 3. **Configure environment**
    ```bash
    cp env.example .env
-   # Edit .env with your database credentials and JWT secret
+   # Edit .env. Placeholders are change-me. Do not commit .env.
    ```
+
+   `DATABASE_URL` uses `lims_app`. `MIGRATE_DATABASE_URL` uses `lims_migrate`.
+   Copy the root `.env.example` as well before `docker compose up`. Role jobs
+   are in `manuals/db-roles.md`.
 
 4. **Run migrations**
    ```bash

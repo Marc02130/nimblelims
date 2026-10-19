@@ -28,7 +28,7 @@ from app.main import app
 CLIENT_ROLE = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 BATCH_READ = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
 FN = "public.batch_access_status(uuid)"
-MIGRATION_ROLE = "lims_user"  # pragma: allowlist secret
+MIGRATION_ROLE = "lims_migrate"  # pragma: allowlist secret
 
 
 def _scalar(conn, sql, **params):
@@ -535,6 +535,35 @@ def test_function_lockdown(migrated_engine, batch_world):
             text("SELECT has_function_privilege(:role, :fn, 'EXECUTE')"),
             {"role": MIGRATION_ROLE, "fn": FN},
         ).scalar() is False
+        if conn.execute(
+            text("SELECT 1 FROM pg_roles WHERE rolname = 'lims_user'")  # pragma: allowlist secret
+        ).scalar():
+            assert conn.execute(
+                text("SELECT has_function_privilege('lims_user', :fn, 'EXECUTE')"),  # pragma: allowlist secret
+                {"fn": FN},
+            ).scalar() is False
+        app_flags = conn.execute(
+            text(
+                """
+                SELECT rolsuper, rolbypassrls
+                FROM pg_roles
+                WHERE rolname = 'lims_app'
+                """
+            )
+        ).one()
+        assert app_flags[0] is False
+        assert app_flags[1] is False
+        migrate_flags = conn.execute(
+            text(
+                """
+                SELECT rolsuper, rolbypassrls
+                FROM pg_roles
+                WHERE rolname = 'lims_migrate'
+                """
+            )
+        ).one()
+        assert migrate_flags[0] is False
+        assert migrate_flags[1] is True
         assert conn.execute(
             text("SELECT has_function_privilege('app_test_role', :fn, 'EXECUTE')"),
             {"fn": FN},

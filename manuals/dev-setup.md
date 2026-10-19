@@ -109,16 +109,19 @@ Note: This venv is optional for pure Docker dev but aligns with your request.
 This step implements the Docker configuration from the Technical Document (Section 7.2), with three containers.
 
 #### Step 5: Configure Environment Variables
-- Create a `.env` file in the root directory (not committed to Git) for sensitive vars. Add placeholders based on the generated `docker-compose.yml`:
+- Copy `.env.example` to `.env` in the repo root (`.env` is not committed). Replace every `change-me` before `docker compose up`:
   ```
-  POSTGRES_USER=lims_user
-  POSTGRES_PASSWORD=securepassword123
-  POSTGRES_DB=lims_mvp
-  JWT_SECRET_KEY=supersecretkeychangeme
+  POSTGRES_USER=lims_bootstrap
+  POSTGRES_PASSWORD=change-me
+  POSTGRES_DB=lims_db
+  LIMS_MIGRATE_PASSWORD=change-me
+  LIMS_APP_PASSWORD=change-me
+  SECRET_KEY=change-me-to-a-long-random-string
   LAB_TIMEZONE=America/New_York
   ```
+- `POSTGRES_USER` only bootstraps the cluster. The API connects as `lims_app`. Alembic connects as `lims_migrate`. See `manuals/db-roles.md`.
 - `LAB_TIMEZONE` seeds `lab_settings` on first API start when that row is empty. A zone saved later wins. The API refuses to start when neither is a real IANA zone. There is no UTC default.
-- Update `docker-compose.yml` if needed to reference these (e.g., via `env_file: .env`).
+- Compose reads `.env` for `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${LIMS_MIGRATE_PASSWORD}`, and `${LIMS_APP_PASSWORD}`.
 
 #### Step 6: Start Docker and Verify the Environment
 - Ensure Docker Desktop is running on your Mac (open the app if not).
@@ -142,8 +145,8 @@ This step implements the Docker configuration from the Technical Document (Secti
 - Verify:
   - Check running containers: `docker ps` (should show four: lims-db, lims-backend, lims-frontend, lims-r-calculator).
   - Check migration logs: `docker logs lims-backend | grep -i migration`
-  - Verify admin user exists: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT username FROM users WHERE username = 'admin';"`
-  - Verify seed data: `docker exec lims-db psql -U lims_user -d lims_db -c "SELECT name FROM analyses WHERE active = true;"`
+  - Verify admin user exists: `docker exec lims-db psql -U lims_bootstrap -d lims_db -c "SELECT username FROM users WHERE username = 'admin';"`
+  - Verify seed data: `docker exec lims-db psql -U lims_bootstrap -d lims_db -c "SELECT name FROM analyses WHERE active = true;"`
   - Backend: Open browser to `http://localhost:8000/docs` (FastAPI Swagger UI).
   - Frontend: `http://localhost:3000` (React app).
   - Login: at http://localhost:3000 the seed users are locked. From the backend container run `python seed_dev_passwords.py --apply`. It reads `DEV_SEED_ADMIN_PASSWORD` (and the other `DEV_SEED_*` names in `.env.example`) or prints each password once. `must_change_password` is cleared by that command, matching the configuring-agent slice loader. Existing databases are unchanged until you run it; pass `--defaults-file` to see old published hashes that are already bcrypt.

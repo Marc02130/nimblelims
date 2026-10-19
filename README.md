@@ -35,10 +35,16 @@ This project uses a five-container Docker setup:
    cd nimblelims
    ```
 
-2. **Start the services**
+2. **Create `.env`, then start the services**
+
+   Copy the example and keep real passwords in the untracked `.env` only:
+
    ```bash
-   docker-compose up -d --build
+   cp .env.example .env
+   docker compose up -d --build
    ```
+
+   `.env.example` uses `change-me` placeholders. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
    
    This will automatically:
    - Start the database container

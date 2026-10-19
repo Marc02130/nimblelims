@@ -1,17 +1,13 @@
 # pgvector image so configuring-agent chunks can store vector(384).
 FROM pgvector/pgvector:pg15
 
-# Copy initialization scripts
-COPY init.sql /docker-entrypoint-initdb.d/
+# Extensions and the lims schema, then the bootstrap role script.
+# Credentials come from Compose, not from this image.
+COPY init.sql /docker-entrypoint-initdb.d/init.sql
+COPY zz-roles.sh /docker-entrypoint-initdb.d/zz-roles.sh
+RUN chmod 755 /docker-entrypoint-initdb.d/zz-roles.sh
 
-# Set environment variables for initialization
-ENV POSTGRES_DB=lims_db
-ENV POSTGRES_USER=lims_user
-ENV POSTGRES_PASSWORD=lims_password
-
-# Expose port
 EXPOSE 5432
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD pg_isready -U lims_user -d lims_db || exit 1
+    CMD pg_isready -d lims_db || exit 1
