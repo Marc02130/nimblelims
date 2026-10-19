@@ -2,8 +2,11 @@
 
 Instant columns are ``timestamptz``. A write must be timezone-aware
 (``datetime.now(timezone.utc)`` or a SQL ``now()`` default). ``datetime.utcnow``
-and ``datetime.now()`` with no timezone are naive. ``replace(tzinfo=None)``
-strips the offset before the value is stored.
+and ``datetime.now()`` with no timezone are naive. The same calls are naive
+when they are fully qualified (``datetime.datetime.now()``,
+``datetime.datetime.utcnow()``) or written through an alias
+(``from datetime import datetime as dt``, ``import datetime as d``).
+``replace(tzinfo=None)`` strips the offset before the value is stored.
 
 The scan covers ``backend/app``, ``backend/models``, top-level backend
 scripts, and ``backend/scripts``. It does not scan ``backend/tests``:
@@ -17,28 +20,86 @@ from __future__ import annotations
 import ast
 import sys
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 Finding = Tuple[str, int, str]
 
 
-def _datetime_attr(node: ast.AST, name: str) -> bool:
-    """True for ``datetime.utcnow`` / ``datetime.now``, not ``func.now``."""
-    return (
-        isinstance(node, ast.Attribute)
-        and node.attr == name
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "datetime"
-    )
+def _bindings(tree: ast.AST) -> Dict[str, str]:
+    """Map a local name to ``module`` or ``class``. The last binding wins."""
+    events: List[Tuple[int, int, str, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "datetime":
+                    events.append(
+                        (
+                            node.lineno or 0,
+                            node.col_offset or 0,
+                            alias.asname or alias.name,
+                            "module",
+                        )
+                    )
+        elif isinstance(node, ast.ImportFrom) and node.module == "datetime":
+            for alias in node.names:
+                if alias.name == "datetime":
+                    events.append(
+                        (
+                            node.lineno or 0,
+                            node.col_offset or 0,
+                            alias.asname or alias.name,
+                            "class",
+                        )
+                    )
+    bound: Dict[str, str] = {}
+    for _line, _col, name, kind in sorted(events):
+        bound[name] = kind
+    return bound
 
 
-def _utcnow(node: ast.AST) -> bool:
+def _attribute_chain(node: ast.AST) -> Optional[List[str]]:
+    parts: List[str] = []
+    current = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if not isinstance(current, ast.Name):
+        return None
+    parts.append(current.id)
+    parts.reverse()
+    return parts
+
+
+def _clock_kind(node: ast.AST, bound: Dict[str, str]) -> Optional[str]:
+    """Return ``now`` or ``utcnow`` when ``node`` is that datetime function."""
+    chain = _attribute_chain(node)
+    if chain is None or len(chain) < 2:
+        return None
+    attr = chain[-1]
+    if attr not in ("now", "utcnow"):
+        return None
+    root = chain[0]
+    middle = chain[1:-1]
+    kind = bound.get(root)
+    if kind is None and root == "datetime":
+        if middle == []:
+            kind = "class"
+        elif middle == ["datetime"]:
+            kind = "module"
+    if kind == "class" and middle == []:
+        return attr
+    if kind == "module" and middle == ["datetime"]:
+        return attr
+    return None
+
+
+def _utcnow(node: ast.AST, bound: Dict[str, str]) -> bool:
     target = node.func if isinstance(node, ast.Call) else node
-    return _datetime_attr(target, "utcnow")
+    return _clock_kind(target, bound) == "utcnow"
 
 
-def _naive_now(node: ast.AST) -> bool:
-    if not isinstance(node, ast.Call) or not _datetime_attr(node.func, "now"):
+def _naive_now(node: ast.AST, bound: Dict[str, str]) -> bool:
+    if not isinstance(node, ast.Call) or _clock_kind(node.func, bound) != "now":
         return False
     if node.args:
         return False
@@ -66,17 +127,18 @@ def find_python_source(source: str, filename: str) -> List[Finding]:
         tree = ast.parse(source)
     except SyntaxError as exc:
         return [(filename, exc.lineno or 1, f"could not parse: {exc.msg}")]
+    bound = _bindings(tree)
     called_funcs = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             called_funcs.add(id(node.func))
     findings: List[Finding] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and _utcnow(node):
+        if isinstance(node, ast.Call) and _utcnow(node, bound):
             findings.append((filename, node.lineno, "datetime.utcnow is naive"))
-        elif _datetime_attr(node, "utcnow") and id(node) not in called_funcs:
+        elif _clock_kind(node, bound) == "utcnow" and id(node) not in called_funcs:
             findings.append((filename, node.lineno, "datetime.utcnow is naive"))
-        elif _naive_now(node):
+        elif _naive_now(node, bound):
             findings.append((filename, node.lineno, "datetime.now() has no timezone"))
         elif _strips_timezone(node):
             findings.append((filename, node.lineno, "replace(tzinfo=None) drops the offset"))
