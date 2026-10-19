@@ -11,15 +11,13 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 import os
 from dotenv import load_dotenv
+from app.core.db_url import resolve_db_url
 from models import Base
 
 load_dotenv()
 
-# Runtime app URL — should be lims_app after P0d (owner URL is MIGRATE_DATABASE_URL)
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://lims_user:lims_password@localhost:5432/lims_db",
-)
+# Runtime URL is lims_app. Migrations call resolve_db_url(migrate=True).
+DATABASE_URL = resolve_db_url()
 
 
 

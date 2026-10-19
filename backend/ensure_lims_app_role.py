@@ -26,11 +26,13 @@ def _env_flag(name: str) -> bool:
 
 
 def _owner_url() -> str:
-    return (
-        os.getenv("MIGRATE_DATABASE_URL")
-        or os.getenv("DATABASE_URL")
-        or "postgresql://lims_user:lims_password@localhost:5432/lims_db"
-    )
+    url = os.getenv("MIGRATE_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if not url:
+        raise SystemExit(
+            "FATAL: MIGRATE_DATABASE_URL (lims_migrate) or DATABASE_URL is required "
+            "to ensure lims_app. The bootstrap superuser does not own app objects."
+        )
+    return url
 
 
 def _app_password() -> str:
@@ -67,7 +69,7 @@ def ensure_lims_app_role() -> None:
             # CREATE ROLE does not accept bind params for the role name in all drivers;
             # password is passed as a bound parameter via psycopg2 escaping.
             conn.execute(
-                text(f"CREATE ROLE {APP_ROLE} LOGIN PASSWORD :pwd NOSUPERUSER NOCREATEDB NOCREATEROLE"),
+                text(f"CREATE ROLE {APP_ROLE} LOGIN PASSWORD :pwd NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"),
                 {"pwd": password},
             )
             print(f"Created role {APP_ROLE}", flush=True)
@@ -115,10 +117,16 @@ def ensure_lims_app_role() -> None:
                     END IF;
                     REVOKE ALL ON FUNCTION public.batch_access_status(uuid) FROM PUBLIC;
                     IF EXISTS (
-                        SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'lims_user' -- pragma: allowlist secret
+                        SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'lims_migrate'
                     ) THEN
                         REVOKE EXECUTE ON FUNCTION public.batch_access_status(uuid)
-                            FROM lims_user; -- pragma: allowlist secret
+                            FROM lims_migrate;
+                    END IF;
+                    IF EXISTS (
+                        SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'lims_user'  -- pragma: allowlist secret
+                    ) THEN
+                        REVOKE EXECUTE ON FUNCTION public.batch_access_status(uuid)
+                            FROM lims_user;  -- pragma: allowlist secret
                     END IF;
                 END $$;
                 """
@@ -132,12 +140,13 @@ def ensure_lims_app_role() -> None:
             )
         )
 
-        # Future objects created by table owner (typical Docker lims_user)
-        for grantor in ("lims_user", "CURRENT_USER"):
+        # Future objects created by lims_migrate. CURRENT_USER covers a
+        # superuser ensure during tests. lims_user is not the owner.  # pragma: allowlist secret
+        for grantor in ("lims_migrate", "CURRENT_USER"):
             try:
                 prefix = (
-                    "ALTER DEFAULT PRIVILEGES FOR ROLE lims_user IN SCHEMA public"
-                    if grantor == "lims_user"
+                    "ALTER DEFAULT PRIVILEGES FOR ROLE lims_migrate IN SCHEMA public"
+                    if grantor == "lims_migrate"
                     else "ALTER DEFAULT PRIVILEGES IN SCHEMA public"
                 )
                 conn.execute(
@@ -151,8 +160,19 @@ def ensure_lims_app_role() -> None:
                     )
                 )
             except Exception as exc:
-                # lims_user may not exist outside Docker; CURRENT_USER path still applies
                 print(f"Note: default privileges ({grantor}): {exc}", flush=True)
+
+        row = conn.execute(
+            text(
+                "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = :r"
+            ),
+            {"r": APP_ROLE},
+        ).one()
+        if row[0] or row[1]:
+            raise SystemExit(
+                f"FATAL: {APP_ROLE} must be NOSUPERUSER and NOBYPASSRLS "
+                f"(rolsuper={row[0]} rolbypassrls={row[1]})"
+            )
 
         for fn in (
             "ui_schema_ensure_sequence(text)",

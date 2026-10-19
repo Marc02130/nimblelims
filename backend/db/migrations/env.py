@@ -2,7 +2,6 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-import os
 import sys
 from pathlib import Path
 
@@ -12,6 +11,7 @@ sys.path.append(str(backend_dir))
 
 # Import your models here
 from models import Base
+from app.core.db_url import resolve_db_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -33,14 +33,8 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    """Get database URL from environment variables or config.
-
-    Prefer MIGRATE_DATABASE_URL (owner) so Alembic never runs as lims_app (P0d).
-    """
-    return os.getenv("MIGRATE_DATABASE_URL") or os.getenv(
-        "DATABASE_URL",
-        "postgresql://lims_user:lims_password@localhost:5432/lims_db",
-    )
+    """Migration connection. MIGRATE_DATABASE_URL only."""
+    return resolve_db_url(migrate=True)
 
 
 def run_migrations_offline() -> None:

@@ -265,7 +265,10 @@ def test_seeded_grant_and_qualifier_move_round_trip(migrated_engine):
     ini = Path(__file__).resolve().parents[1] / "alembic.ini"
     cfg = Config(str(ini))
     cfg.set_main_option("sqlalchemy.url", url)
+    previous_database = os.environ.get("DATABASE_URL")
+    previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
+    os.environ["MIGRATE_DATABASE_URL"] = url
     try:
         with migrated_engine.connect() as conn:
             assert _roles_with_batch_update(conn) == list(GRANTED_ROLES)
@@ -311,7 +314,14 @@ def test_seeded_grant_and_qualifier_move_round_trip(migrated_engine):
             assert probe == 1
     finally:
         command.upgrade(cfg, "head")
-        os.environ.pop("DATABASE_URL", None)
+        if previous_database is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous_database
+        if previous_migrate is None:
+            os.environ.pop("MIGRATE_DATABASE_URL", None)
+        else:
+            os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
         with migrated_engine.connect() as conn:
             assert _roles_with_batch_update(conn) == list(GRANTED_ROLES)
             assert [row[0] for row in _entry_home(conn, "<LOD")] == ["result_qualifiers"]

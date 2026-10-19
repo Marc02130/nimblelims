@@ -14,6 +14,12 @@ os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
 # Tests pin UTC. lab_settings is seeded from this only while the row is empty.
 # ENVIRONMENT=test skips the process startup check, so import does not query.
 os.environ.setdefault("LAB_TIMEZONE", "UTC")
+# Import builds an engine immediately. Tests do not query that engine.
+# Fixtures pass the testcontainer URL through the environment. No password.
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql://lims_app@127.0.0.1:5432/lims_db",
+)
 
 import pytest
 from fastapi.testclient import TestClient
@@ -167,16 +173,25 @@ def migrated_engine(migrated_pg_container):
         ))
         conn.commit()
 
-    # env.py reads DATABASE_URL env var instead of config.get_main_option("sqlalchemy.url").
-    # Override it here so Alembic migrations hit the testcontainer, not the Docker DB.
-    # Use try/finally so DATABASE_URL is always cleared even if upgrade() raises.
+    # env.py reads MIGRATE_DATABASE_URL. Point both variables at the
+    # testcontainer so a migration that also reads DATABASE_URL stays local.
+    previous_database = os.environ.get("DATABASE_URL")
+    previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
+    os.environ["MIGRATE_DATABASE_URL"] = url
     try:
         alembic_cfg = Config("alembic.ini")
         alembic_cfg.set_main_option("sqlalchemy.url", url)
         command.upgrade(alembic_cfg, "head")
     finally:
-        os.environ.pop("DATABASE_URL", None)
+        if previous_database is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous_database
+        if previous_migrate is None:
+            os.environ.pop("MIGRATE_DATABASE_URL", None)
+        else:
+            os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
 
     # Create a non-superuser role so RLS is actually enforced.
     # Superusers and roles with BYPASSRLS skip RLS even with FORCE ROW LEVEL SECURITY.

@@ -5,6 +5,8 @@ import os
 import sys
 from dotenv import load_dotenv
 
+from app.core.db_url import resolve_db_url
+
 load_dotenv()
 
 # Known insecure / placeholder JWT secrets (S3)
@@ -74,11 +76,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
     or "30"
 )
 
-# Database Configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://lims_user:lims_password@localhost:5432/lims_db",
-)
+# Database Configuration. Required. No embedded default.
+DATABASE_URL = resolve_db_url()
 
 # CORS Configuration
 CORS_ORIGINS = [
