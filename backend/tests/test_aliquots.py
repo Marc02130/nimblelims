@@ -21,7 +21,9 @@ client = TestClient(app)
 # These tests were written against a since-removed conftest that provided
 # `sample_user` and `auth_headers`. Recreate them on top of the shared fixtures:
 # an Administrator (all permissions, passes client/project access checks).
-@pytest.fixture(autouse=True)
+# Not autouse: the parallel overdraw tests use db_engine only. Opening
+# db_session would BEGIN a fixture transaction and fail their idle check.
+@pytest.fixture
 def _route_through_test_db(client):
     """Install the conftest get_db override on the shared app for the
     module-level TestClient above."""
@@ -40,6 +42,7 @@ def auth_headers(client, test_admin_user):
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
+@pytest.mark.usefixtures("_route_through_test_db")
 class TestAliquotsAPI:
     """Test aliquots and derivatives API endpoints"""
     
@@ -897,6 +900,7 @@ def _tracked_parent(db_session, user, *, label, amount="10", temperature=None):
     }
 
 
+@pytest.mark.usefixtures("_route_through_test_db")
 class TestAliquotAmountConservation:
     """Amount stays conserved: debit the source, never insert free volume, never delete."""
 

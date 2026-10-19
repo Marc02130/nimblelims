@@ -250,6 +250,7 @@ def get_me(
     Get current authenticated user information (cookie or Bearer).
     """
     permissions = get_user_permissions(current_user, db)
+    from app.core.lab_time import lab_timezone_configured
 
     return {
         "id": str(current_user.id),
@@ -259,6 +260,7 @@ def get_me(
         "permissions": permissions,
         "client_id": str(current_user.client_id) if current_user.client_id else None,
         "must_change_password": bool(getattr(current_user, "must_change_password", False)),
+        "timezone_configured": lab_timezone_configured(db),
     }
 
 

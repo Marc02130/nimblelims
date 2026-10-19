@@ -101,9 +101,13 @@ def world(db_engine):
                 c.execute(text(sql), {"i": ids[key]})
             for pid in made_perms:
                 c.execute(text("DELETE FROM permissions WHERE id = :i"), {"i": pid})
-            c.execute(text(
-                "DELETE FROM lab_settings WHERE id = 'b1a16ae0-0000-4000-8000-000000000001'"
-            ))
+            c.execute(
+                text(
+                    "INSERT INTO lab_settings (id, timezone) "
+                    "VALUES ('b1a16ae0-0000-4000-8000-000000000001', 'UTC') "
+                    "ON CONFLICT (id) DO UPDATE SET timezone = 'UTC'"
+                )
+            )
         engine.dispose()
 
 

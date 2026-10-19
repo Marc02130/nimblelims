@@ -11,9 +11,8 @@ os.environ["ENVIRONMENT"] = "test"
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
 os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
-# Tests pin UTC. lab_settings is seeded from this only while the row is empty.
-# ENVIRONMENT=test skips the process startup check, so import does not query.
-os.environ.setdefault("LAB_TIMEZONE", "UTC")
+# The lab timezone is required and stored in lab_settings.timezone. Tests that
+# need a lab zone set that row. There is no environment fallback.
 # Import builds an engine immediately. Tests do not query that engine.
 # Fixtures pass the testcontainer URL through the environment. No password.
 os.environ.setdefault(
@@ -131,9 +130,9 @@ def _install_lab_day_function(engine) -> None:
         / "db"
         / "migrations"
         / "versions"
-        / "0104_current_lab_day.py"
+        / "0105_lab_timezone_required.py"
     )
-    spec = importlib.util.spec_from_file_location("_mig_0104_current_lab_day", path)
+    spec = importlib.util.spec_from_file_location("_mig_0105_lab_timezone_required", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     with engine.connect() as conn:
@@ -150,6 +149,17 @@ def db_engine(pg_container):
     _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
+    # Commit UTC so parallel connections see it. db_session also upserts
+    # UTC inside the test transaction because some tests commit a delete
+    # of this row (test_load_parallel) and later tests must still have a zone.
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO lab_settings (id, timezone) "
+                "VALUES ('b1a16ae0-0000-4000-8000-000000000001', 'UTC') "
+                "ON CONFLICT (id) DO UPDATE SET timezone = 'UTC'"
+            )
+        )
     yield engine
     # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs
     with engine.connect() as conn:
@@ -269,12 +279,29 @@ def db_session(db_engine):
         join_transaction_mode="create_savepoint",
     )
     session = TestingSessionLocal()
+    _ensure_test_lab_timezone(session)
 
     yield session
 
     session.close()
     transaction.rollback()
     connection.close()
+
+
+def _ensure_test_lab_timezone(session) -> None:
+    """Tests that use the API client set UTC explicitly. There is no fallback.
+
+    A SELECT here begins the fixture transaction. Tests that check
+    idle-in-transaction must not request db_session or client.
+    """
+    from models.lab_setting import LAB_SETTINGS_ID, LabSetting
+
+    row = session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="UTC"))
+    elif not (row.timezone or "").strip():
+        row.timezone = "UTC"
+    session.flush()
 
 
 @pytest.fixture(scope="function")

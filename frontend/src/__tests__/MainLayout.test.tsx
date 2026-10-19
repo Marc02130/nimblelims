@@ -54,8 +54,14 @@ const createMockUser = (permissions: string[] = [], role: string = 'Lab Technici
     client_id: null,
   },
   loading: false,
+  mustChangePassword: false,
+  timezoneConfigured: true,
   login: jest.fn(),
+  changePassword: jest.fn(),
+  saveLabTimezone: jest.fn(),
   logout: jest.fn(),
+  isSystemClient: () => false,
+  isAdmin: () => role === 'Administrator',
   // Plain function, not jest.fn: CRA's resetMocks would wipe the implementation.
   hasPermission: ((perm: string) => permissions.includes(perm) || role === 'Administrator'),
 });
@@ -403,8 +409,14 @@ describe('MainLayout', () => {
       const mockUser = {
         user: null,
         loading: false,
+        mustChangePassword: false,
+        timezoneConfigured: false,
         login: jest.fn(),
+        changePassword: jest.fn(),
+        saveLabTimezone: jest.fn(),
         logout: jest.fn(),
+        isSystemClient: () => false,
+        isAdmin: () => false,
         hasPermission: jest.fn(() => false),
       };
 

@@ -65,11 +65,11 @@ Default logins (development/UAT). Passwords are not stored in git:
 - **Lab Manager**: `lab-manager` / `DEV_SEED_LAB_MANAGER_PASSWORD`
 - **CRO Partner**: `client` / `DEV_SEED_CLIENT_PASSWORD`
 
-A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`, until `python backend/seed_dev_passwords.py --apply --secrets-out PATH`. That writes generated passwords to a new `0600` file as `KEY=<shlex.quote(value)>` and prints only the path. Load it with `set -a; . PATH; set +a`. UAT uses `--secrets-out` only. Do not write the value into this file. Every deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`. There is no fallback. A fresh compose database also needs `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY` (Compose `${VAR:?}`).
+A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`, until `python backend/seed_dev_passwords.py --apply --secrets-out PATH`. That writes generated passwords to a new `0600` file and prints only the path. UAT uses `--secrets-out` only. Do not write the value into this file. The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. A fresh compose database also needs `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY` (Compose `${VAR:?}`).
 
 ### Important Gotchas
 
-- **Backend tests (`pytest`)**: Tests use `from models.xxx import ...` + `import models` (with PYTHONPATH or cwd set to backend during pytest). The old `app.models` import bug appears fixed in current conftest.py. Use `pytest` with the testcontainer fixtures (they require Docker). Every deployment must set `LAB_TIMEZONE` or `lab_settings.timezone`. There is no fallback. `LAB_TIMEZONE` seeds that row only when it is empty; `tests/conftest.py` sets `UTC` before importing the app, and `ENVIRONMENT=test` skips the process startup check. Alembic, the seed scripts, and MCP do not read it. The API checks the zone after migrations.
+- **Backend tests (`pytest`)**: Tests use `from models.xxx import ...` + `import models` (with PYTHONPATH or cwd set to backend during pytest). The old `app.models` import bug appears fixed in current conftest.py. Use `pytest` with the testcontainer fixtures (they require Docker). The lab timezone is required and stored in `lab_settings.timezone`. There is no environment fallback. `current_lab_day()` raises until a test (or an administrator) sets that row. Tests set a timezone on `lab_settings` explicitly. Alembic, the seed scripts, and MCP do not seed a zone.
 - **Frontend ESLint**: The `.eslintrc.js` extends `@typescript-eslint/recommended` but the correct config path for eslint legacy config is `plugin:@typescript-eslint/recommended`. The `npm run lint` command fails due to this. The `package.json` eslintConfig (`react-app` preset) works fine with `react-scripts`. Use `DISABLE_ESLINT_PLUGIN=true npm run build` to bypass for CI/build verification.
 - **Frontend tests**: Some Jest tests fail due to MUI X DataGrid v8 compatibility issues with the Jest/JSDOM environment (hash module import errors). About 61 of 116 tests pass. CustomFieldsManagement.test.tsx needs ongoing updates as Field Management UI evolves (OOB fields, list-backed selects via source lists instead of inline options).
 - **Gitignore for frontend/public**: Was causing issues (legacy Gatsby 'public' entry); has been cleaned up to not ignore CRA public/ (index.html, etc.).
@@ -80,7 +80,7 @@ A fresh database locks these accounts, plus `alice-tech`, `bob-tech`, `carol-man
 For local backend development:
 ```
 cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-DATABASE_URL="<see docker-compose.yml for DB credentials>" LAB_TIMEZONE=America/New_York python run_server.py
+DATABASE_URL="<see docker-compose.yml for DB credentials>" python run_server.py
 ```
 
 For local frontend development:

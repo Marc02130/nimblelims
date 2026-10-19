@@ -45,10 +45,19 @@ def _entry(db_session, list_id, label: str) -> ListEntry:
     return row
 
 
+def _set_zone(db_session, admin):
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        db_session.add(
+            LabSetting(id=LAB_SETTINGS_ID, timezone="America/New_York", modified_by=admin.id)
+        )
+    else:
+        row.timezone = "America/New_York"
+        row.modified_by = admin.id
+
+
 def _seed(db_session, admin, org):
-    db_session.add(
-        LabSetting(id=LAB_SETTINGS_ID, timezone="America/New_York", modified_by=admin.id)
-    )
+    _set_zone(db_session, admin)
     catalog = List(name=f"lab-day-{uuid4().hex[:8]}")
     db_session.add(catalog)
     db_session.flush()
@@ -196,9 +205,7 @@ def test_lab_day_responses_are_date_only(client, db_session, test_admin_user, te
 
 
 def test_post_project_persists_due_date(client, db_session, test_admin_user, test_org, admin_token):
-    db_session.add(
-        LabSetting(id=LAB_SETTINGS_ID, timezone="America/New_York", modified_by=test_admin_user.id)
-    )
+    _set_zone(db_session, test_admin_user)
     catalog = List(name=f"project-due-{uuid4().hex[:8]}")
     db_session.add(catalog)
     db_session.flush()

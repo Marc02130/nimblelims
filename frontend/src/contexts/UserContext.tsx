@@ -9,6 +9,7 @@ export interface User {
   client_id?: string;
   permissions: string[];
   must_change_password?: boolean;
+  timezone_configured?: boolean;
 }
 
 // System client ID constant (matches backend)
@@ -18,8 +19,10 @@ interface UserContextType {
   user: User | null;
   loading: boolean;
   mustChangePassword: boolean;
+  timezoneConfigured: boolean;
   login: (username: string, password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  saveLabTimezone: (timezone: string) => Promise<void>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
   isSystemClient: () => boolean;
@@ -49,6 +52,7 @@ const mapUser = (userData: any, mustChange?: boolean): User => ({
   client_id: userData.client_id,
   must_change_password:
     mustChange ?? Boolean(userData.must_change_password),
+  timezone_configured: Boolean(userData.timezone_configured),
 });
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
@@ -82,6 +86,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             role: '',
             permissions: [],
             must_change_password: true,
+            timezone_configured: false,
           });
           return;
         }
@@ -107,6 +112,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         role: response.role,
         permissions: response.permissions || [],
         must_change_password: true,
+        timezone_configured: Boolean(response.timezone_configured),
       });
       return;
     }
@@ -122,6 +128,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const userData = await apiService.getCurrentUser();
     setUser(mapUser(userData, false));
     setMustChangePassword(false);
+  };
+
+  const saveLabTimezone = async (timezone: string) => {
+    await apiService.updateLabSettings({ timezone });
+    const userData = await apiService.getCurrentUser();
+    setUser(mapUser(userData, false));
   };
 
   const logout = () => {
@@ -154,8 +166,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     user,
     loading,
     mustChangePassword,
+    timezoneConfigured: Boolean(user?.timezone_configured),
     login,
     changePassword,
+    saveLabTimezone,
     logout,
     hasPermission,
     isSystemClient,

@@ -37,6 +37,7 @@ const renderWithProviders = (ui: React.ReactElement, userRole: string = 'Client'
     email: 'test@example.com',
     role: userRole,
     permissions: permissions,
+    timezone_configured: true,
   });
 
   return render(
