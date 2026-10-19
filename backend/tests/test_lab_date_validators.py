@@ -177,8 +177,8 @@ def test_each_validator_accepts_the_lab_today_and_refuses_tomorrow(utc_moment, l
     lab_time.remember_lab_zone("America/New_York")
     today = _noon_utc(lab_day)
     tomorrow = _noon_utc(lab_day + timedelta(days=1))
-    # 22:00 ET on the lab's today is already the next UTC date during the evening window.
-    same_evening = datetime(2026, 10, 19, 2, 0) if lab_day == date(2026, 10, 18) else today
+    # A naive clock on the lab day is that day. 02:00 UTC is not the previous evening.
+    same_evening = datetime(lab_day.year, lab_day.month, lab_day.day, 22, 0)
     for model, build in _CASES:
         model(**build(today))
         model(**build(same_evening))
@@ -258,8 +258,9 @@ def test_days_from_today_follows_the_lab_calendar(monkeypatch):
     monkeypatch.setattr(
         lab_time, "_utcnow", lambda: datetime(2026, 10, 19, 0, 30, tzinfo=timezone.utc)
     )
-    # 22:00 ET on Oct 18, which is already Oct 19 in UTC. Still the lab's today.
-    assert lab_time.days_from_today(datetime(2026, 10, 19, 2, 0), "America/New_York") == 0
+    # F12 reads 02:00 as the lab wall on Oct 19, so it is the next lab day.
+    # The old UTC-wall reading called this 22:00 on Oct 18 and expected 0.
+    assert lab_time.days_from_today(datetime(2026, 10, 19, 2, 0), "America/New_York") == 1
     assert lab_time.days_from_today(datetime(2026, 10, 19, 16, 0), "America/New_York") == 1
     monkeypatch.setattr(
         lab_time, "_utcnow", lambda: datetime(2026, 10, 19, 4, 0, tzinfo=timezone.utc)

@@ -14,8 +14,9 @@ import os
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+
+from app.core.lab_time import current_lab_day
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -403,9 +404,8 @@ class ResultPromotionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Authenticated user required to promote results",
             )
-        # entry_date is a naive UTC instant. The validator compares its calendar
-        # day in the lab zone, so utcnow() is today there.
-        now = datetime.utcnow()
+        # entry_date is the lab's calendar day, not the UTC date of utcnow().
+        now = current_lab_day()
         pending = 0
 
         for item in plan.items:
