@@ -70,7 +70,7 @@ Create `.env` file with:
 ```
 DATABASE_URL=postgresql://lims_app:change-me@localhost:5432/lims_db
 MIGRATE_DATABASE_URL=postgresql://lims_migrate:change-me@localhost:5432/lims_db
-SECRET_KEY=your-secret-key-change-in-production
+SECRET_KEY=change-me-to-a-long-random-string
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
@@ -78,7 +78,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 **Automatic (Recommended):**
 When using Docker Compose, copy `.env.example` to `.env` first. Migrations run on backend startup via `backend/start.sh` as `lims_migrate`. The script:
-1. Waits for the database on `MIGRATE_DATABASE_URL`
+1. Waits up to 60 seconds for the database on `MIGRATE_DATABASE_URL`, then exits non-zero if it is still down. `DATABASE_URL` and `MIGRATE_DATABASE_URL` are required. There is no default connection string.
 2. Ensures `lims_app`, runs Alembic as `lims_migrate`, then ensures grants again
 3. Starts the FastAPI server, which connects as `lims_app` (`DATABASE_URL`)
 

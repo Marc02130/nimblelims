@@ -13,15 +13,15 @@ def run_migrations():
     # Get the backend directory
     backend_dir = Path(__file__).parent
     os.chdir(backend_dir)
-    
+    if str(backend_dir) not in sys.path:
+        sys.path.insert(0, str(backend_dir))
+    from app.core.db_url import resolve_db_url
+
     # Set up Alembic configuration
     alembic_cfg = Config("alembic.ini")
     
-    # Prefer migrator/owner URL (P0d); fall back to DATABASE_URL for local scripts
-    database_url = os.getenv("MIGRATE_DATABASE_URL") or os.getenv(
-        "DATABASE_URL",
-        "postgresql://lims_user:lims_password@localhost:5432/lims_db",
-    )
+    # Alembic connects as lims_migrate. There is no default URL.
+    database_url = resolve_db_url(migrate=True)
     alembic_cfg.set_main_option("sqlalchemy.url", database_url)
     
     try:
