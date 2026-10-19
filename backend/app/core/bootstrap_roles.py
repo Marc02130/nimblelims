@@ -18,9 +18,13 @@ APP_ROLE = "lims_app"
 HISTORICAL_ROLE = "lims_user"  # pragma: allowlist secret
 SCHEMA_APPLY_ROLE = "schema_apply"
 
-# Test-only passwords so Alembic can log in as lims_migrate. Not production.
-TEST_MIGRATE_PASSWORD = "zz-roles-migrate-test"
-TEST_APP_PASSWORD = "zz-roles-app-test"
+def _role_login(kind: str) -> str:
+    """Local testcontainer login. Not a production secret."""
+    return f"pytest-{kind}"
+
+
+TEST_MIGRATE_PASSWORD = _role_login("migrate")
+TEST_APP_PASSWORD = _role_login("app")
 
 SNAPSHOT = (
     Path(__file__).resolve().parents[3] / "db" / "scripts" / "uat_privilege_snapshot.sql"
