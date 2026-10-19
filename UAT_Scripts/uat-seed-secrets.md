@@ -27,7 +27,15 @@ Expect:
 - The file mode is `0600`.
 - A second run with the same path exits non-zero and does not change the file.
 
-Export the variables from that file into the shell that runs UAT. Do not paste the file into the evidence folder.
+Load the variables from that file into the shell that runs UAT:
+
+```bash
+set -a
+. /tmp/uat-round-secrets.env
+set +a
+```
+
+Do not paste the file into the evidence folder.
 
 ## TC-SECRETS-002 — Scan evidence before sharing
 
