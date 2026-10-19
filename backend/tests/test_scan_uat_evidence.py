@@ -4,7 +4,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import importlib.util
-import io
+import json
 import tarfile
 import uuid
 import zlib
@@ -13,9 +13,12 @@ from urllib.parse import quote
 
 from app.core.dev_passwords import DEV_PASSWORD_LENGTH, generate_dev_password
 
+REPO = Path(__file__).resolve().parents[2]
+R38_CLEAN_LINES = Path(__file__).resolve().parent / "data" / "r38_clean_lines.txt"
+
 _SPEC = importlib.util.spec_from_file_location(
     "scan_uat_evidence",
-    Path(__file__).resolve().parents[2] / "scripts" / "scan_uat_evidence.py",
+    REPO / "scripts" / "scan_uat_evidence.py",
 )
 scan = importlib.util.module_from_spec(_SPEC)
 assert _SPEC.loader is not None
@@ -30,8 +33,18 @@ def _mixed_token() -> str:
     return "".join(("A", "a", "1", bang, "b" * (DEV_PASSWORD_LENGTH - 4)))
 
 
+def _token_with_symbol(symbol: str) -> str:
+    body = "".join(("A", "a", "1", symbol))
+    return body + ("b" * (DEV_PASSWORD_LENGTH - len(body)))
+
+
 def _long_token() -> str:
     return _mixed_token() + ("c" * 6)
+
+
+def _write_allowlist(path: Path, entries: list[dict[str, object]]) -> Path:
+    path.write_text(json.dumps({"entries": entries}), encoding="utf-8")
+    return path
 
 
 def test_pool_token_requires_the_generated_password_mix():
@@ -44,6 +57,13 @@ def test_pool_token_requires_the_generated_password_mix():
     assert pool_token_on_line("see " + token + " now") is True
 
 
+def test_pool_token_accepts_underscore_or_hyphen_as_only_symbol():
+    underscore = _token_with_symbol("_")
+    hyphen = _token_with_symbol("-")
+    assert pool_token_on_line(underscore) is True
+    assert pool_token_on_line(hyphen) is True
+
+
 def test_hex_sha_uuid_and_snake_case_are_not_tokens():
     digest = hashlib.sha256(b"r38-evidence").hexdigest()
     uid = str(uuid.UUID(int=0xC0FFEE))
@@ -51,6 +71,9 @@ def test_hex_sha_uuid_and_snake_case_are_not_tokens():
     assert pool_token_on_line(digest) is False
     assert pool_token_on_line(uid) is False
     assert pool_token_on_line(volume) is False
+    assert pool_token_on_line("201_bob_other_GET_visible_via_project_users") is False
+    assert pool_token_on_line("200_POST_explicit_2026-10-15") is False
+    assert pool_token_on_line("r38_results_America_New_York.png") is False
 
 
 def test_r38_style_evidence_lines_are_clean(tmp_path, capsys):
@@ -71,6 +94,141 @@ def test_r38_style_evidence_lines_are_clean(tmp_path, capsys):
     )
     assert scan_main([str(tmp_path)]) == 0
     assert "clean" in capsys.readouterr().out
+
+
+def test_r38_clean_lines_fixture_is_clean_without_allowlist(tmp_path, capsys):
+    dest = tmp_path / "r38_clean_lines.txt"
+    dest.write_bytes(R38_CLEAN_LINES.read_bytes())
+    assert scan_main([str(tmp_path), "--no-allowlist"]) == 0
+    captured = capsys.readouterr()
+    assert "clean" in captured.out
+    assert captured.err == ""
+
+
+def test_r38_clean_lines_copy_hits_injected_pool_password(tmp_path, capsys):
+    token = generate_dev_password()
+    for _ in range(16):
+        if pool_token_on_line(token):
+            break
+        token = generate_dev_password()
+    assert pool_token_on_line(token)
+    dest = tmp_path / "r38_clean_lines.txt"
+    dest.write_bytes(R38_CLEAN_LINES.read_bytes())
+    dest.write_bytes(dest.read_bytes() + f"{token}\n".encode("utf-8"))
+    code = scan_main([str(tmp_path), "--no-allowlist"])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT password-pool token:" in err
+    assert token not in err
+
+
+def test_checked_in_allowlist_lists_reviewed_r38_pngs():
+    entries = scan.load_allowlist(scan.DEFAULT_ALLOWLIST)
+    by_path = {entry.path: entry for entry in entries}
+    approved = "Günter (CSO) re-review of #207, relayed by Marc 2026-10-19"
+    york = by_path["ui/r38_results_America_New_York.png"]
+    utc = by_path["ui/r38_results_UTC.png"]
+    assert york.sha256 == "2a385847a8a74ded9419432cb2c433e2b65f0b4572b400e4426443a11b9197f6"
+    assert utc.sha256 == "1bf37bd5116db5719831c93746cc5005a7211c9a5aaa21baaddfdd722422bdb2"
+    assert york.line is None
+    assert utc.line is None
+    assert york.approved_by == approved
+    assert utc.approved_by == approved
+    assert york.date == "2026-10-19"
+    assert utc.date == "2026-10-19"
+
+
+def test_allowlist_sha256_skips_matching_binary(tmp_path, capsys):
+    payload = b"\x89PNG\r\n\x1a\n" + bytes((1, 2, 3, 4))
+    digest = hashlib.sha256(payload).hexdigest()
+    evidence = tmp_path / "evidence"
+    (evidence / "ui").mkdir(parents=True)
+    (evidence / "ui" / "r38_results_America_New_York.png").write_bytes(payload)
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [
+            {
+                "path": "ui/r38_results_America_New_York.png",
+                "sha256": digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            }
+        ],
+    )
+    assert scan_main([str(evidence), "--allowlist", str(allow)]) == 0
+    assert "clean" in capsys.readouterr().out
+
+
+def test_allowlist_changed_bytes_no_longer_match(tmp_path, capsys):
+    payload = b"\x89PNG\r\n\x1a\n" + bytes((1, 2, 3, 4))
+    digest = hashlib.sha256(payload).hexdigest()
+    evidence = tmp_path / "evidence"
+    (evidence / "ui").mkdir(parents=True)
+    png = evidence / "ui" / "r38_results_UTC.png"
+    png.write_bytes(payload + b"x")
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [
+            {
+                "path": "ui/r38_results_UTC.png",
+                "sha256": digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            }
+        ],
+    )
+    code = scan_main([str(evidence), "--allowlist", str(allow)])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT refuse binary: ui/r38_results_UTC.png" in err
+
+
+def test_allowlist_does_not_allow_by_extension(tmp_path, capsys):
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "other.png").write_bytes(b"\x89PNG\r\n\x1a\n" + bytes((9, 8, 7)))
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [
+            {
+                "path": "*.png",
+                "sha256": "0" * 64,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            }
+        ],
+    )
+    code = scan_main([str(evidence), "--allowlist", str(allow)])
+    err = capsys.readouterr().err
+    assert code == 2
+    assert "must not allow by extension or glob" in err
+
+
+def test_allowlist_line_entry_skips_that_line_only(tmp_path, capsys):
+    token = _mixed_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(
+        f"keep {token}\nsecond {token}\n",
+        encoding="utf-8",
+    )
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [
+            {
+                "path": "notes.txt",
+                "line": 1,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            }
+        ],
+    )
+    code = scan_main([str(evidence), "--allowlist", str(allow)])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT password-pool token: notes.txt:1" not in err
+    assert "HIT password-pool token: notes.txt:2" in err
+    assert token not in err
 
 
 def test_clean_evidence_exits_zero(tmp_path, capsys):

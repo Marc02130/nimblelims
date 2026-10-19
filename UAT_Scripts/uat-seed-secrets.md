@@ -26,6 +26,9 @@ Expect:
 - Stderr has connect/status lines and no password.
 - The file mode is `0600`.
 - A second run with the same path and no `--force` exits non-zero and does not change the file.
+- `--force` writes a same-directory temp file (`O_CREAT|O_EXCL|O_NOFOLLOW`, mode `0600`) and replaces the target only after the database commit. A failed commit leaves the target unchanged and removes the temp file.
+- `--force --only client` keeps other accounts' existing keys in that file and replaces only the selected ones.
+- An existing symlink, directory, or fifo at the `--secrets-out` path is refused.
 
 Load the variables from that file into the shell that runs UAT:
 
@@ -54,7 +57,16 @@ The filter replaces the entire next line with `[redacted]`. It exits non-zero wh
 python scripts/scan_uat_evidence.py /path/to/evidence
 ```
 
-Expect exit 0 and `evidence scan clean`. A non-zero exit lists hits and the folder is not shared. Hits are a `printed once` header in any case, a 24-character mixed pool-token window, a configured compose or seed secret, a bcrypt marker, a `.dump` / `.dump.gz` / `PGDMP` dump, nested gzip/zlib/tar payloads, or a non-allowlisted binary.
+Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scripts/uat_evidence_allowlist.json` (path plus line or SHA-256, never by extension). A non-zero exit lists hits and the folder is not shared. Hits are a `printed once` header in any case, a 24-character mixed pool-token window (`_` and `-` count as symbols), a configured compose or seed secret, a bcrypt marker, a `.dump` / `.dump.gz` / `PGDMP` dump, nested gzip/zlib/tar payloads, or a binary that is not on that allowlist.
+
+## TC-SECRETS-003 — Reviewed allowlist and r38 clean lines
+
+1. Scan `backend/tests/data/r38_clean_lines.txt` in a folder with `--no-allowlist`. Expect exit 0.
+2. Copy that file, inject a runtime-generated pool password, and scan again with `--no-allowlist`. Expect a pool-token hit. The password must not appear in the hit text.
+3. Confirm `scripts/uat_evidence_allowlist.json` lists these two SHA-256 entries, each with `approved_by` and `date`:
+   - `ui/r38_results_America_New_York.png`
+   - `ui/r38_results_UTC.png`
+4. Changing one byte of an allowlisted file must make the entry stop matching.
 
 ## Sign-off
 

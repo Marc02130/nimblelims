@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "path": "ui/r38_results_America_New_York.png",
+      "sha256": "2a385847a8a74ded9419432cb2c433e2b65f0b4572b400e4426443a11b9197f6",
+      "approved_by": "Günter (CSO) re-review of #207, relayed by Marc 2026-10-19",
+      "date": "2026-10-19"
+    },
+    {
+      "path": "ui/r38_results_UTC.png",
+      "sha256": "1bf37bd5116db5719831c93746cc5005a7211c9a5aaa21baaddfdd722422bdb2",
+      "approved_by": "Günter (CSO) re-review of #207, relayed by Marc 2026-10-19",
+      "date": "2026-10-19"
+    }
+  ]
+}

@@ -5,7 +5,9 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 
 - a ``printed once`` header in any case
 - a 24-character password-pool window that contains upper, lower, digit,
-  and a pool symbol (the mix ``generate_dev_password`` requires)
+  and a pool symbol (the mix ``generate_dev_password`` requires). ``_``
+  and ``-`` count as symbols. Mixed-case snake_case keys with three or
+  more ``_``/``-`` separators and no other pool symbol are not hits.
 - a configured compose or seed secret from the environment or
   ``--secrets-file``, matched literally and percent-encoded
 - a bcrypt hash marker (``$2a$``, ``$2b$``, ``$2y$``)
@@ -14,13 +16,20 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - nested tarballs
 - a binary file that is not gzip, zlib, tar, PGDMP, or UTF-8 text
 
+A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
+suppress a hit. Each entry is a concrete path plus either a line number
+or a file SHA-256, with ``approved_by`` and ``date``. Changed bytes no
+longer match. There is no allow-by-extension.
+
 Hits name the file and the line. They do not repeat the secret.
 """
 from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import io
+import json
 import os
 import re
 import shlex
@@ -47,16 +56,43 @@ GZIP_MAGIC = b"\x1f\x8b"
 ZLIB_MAGICS = (b"\x78\x01", b"\x78\x9c", b"\x78\xda")
 _POOL = set(DEV_PASSWORD_POOL)
 _SYMBOLS = set("!@#$%^&*-_")
+_SEPARATORS = set("_-")
+_OTHER_SYMBOLS = _SYMBOLS - _SEPARATORS
 MAX_NEST = 8
+DEFAULT_ALLOWLIST = Path(__file__).resolve().parent / "uat_evidence_allowlist.json"
+_SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+class AllowlistEntry:
+    """One reviewed path. Either ``sha256`` or ``line`` is set, never both."""
+
+    def __init__(
+        self,
+        path: str,
+        approved_by: str,
+        date: str,
+        sha256: str | None = None,
+        line: int | None = None,
+    ) -> None:
+        self.path = path
+        self.approved_by = approved_by
+        self.date = date
+        self.sha256 = sha256
+        self.line = line
 
 
 def _is_strong_window(window: str) -> bool:
-    return (
+    if not (
         any(char.isupper() for char in window)
         and any(char.islower() for char in window)
         and any(char.isdigit() for char in window)
         and any(char in _SYMBOLS for char in window)
-    )
+    ):
+        return False
+    separators = sum(char in _SEPARATORS for char in window)
+    if separators >= 3 and not any(char in _OTHER_SYMBOLS for char in window):
+        return False
+    return True
 
 
 def pool_token_on_line(line: str) -> bool:
@@ -142,6 +178,104 @@ def _read_secrets_file(path: Path) -> list[tuple[str, str]]:
     return pairs
 
 
+def load_allowlist(path: Path) -> list[AllowlistEntry]:
+    """Load a reviewed allowlist. Refuses extension/glob entries."""
+    if not path.is_file():
+        raise SystemExit(f"ERROR: allowlist not found: {path}")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"ERROR: allowlist is not valid JSON: {path}") from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
+        raise SystemExit(f"ERROR: allowlist must be an object with entries: {path}")
+    return [_parse_allowlist_entry(item, path) for item in raw["entries"]]
+
+
+def _parse_allowlist_entry(item: object, source: Path) -> AllowlistEntry:
+    if not isinstance(item, dict):
+        raise SystemExit(f"ERROR: allowlist entry must be an object: {source}")
+    if "extension" in item or "glob" in item:
+        raise SystemExit(
+            f"ERROR: allowlist must not allow by extension or glob: {source}"
+        )
+    rel = item.get("path")
+    if not isinstance(rel, str) or not rel.strip() or rel.startswith("/"):
+        raise SystemExit(f"ERROR: allowlist path must be a relative file path: {source}")
+    if any(part == ".." for part in Path(rel).parts) or any(
+        char in rel for char in "*?[]"
+    ):
+        raise SystemExit(
+            f"ERROR: allowlist must not allow by extension or glob: {source}"
+        )
+    approved = item.get("approved_by")
+    date = item.get("date")
+    if not isinstance(approved, str) or not approved.strip():
+        raise SystemExit(f"ERROR: allowlist entry needs approved_by: {source}")
+    if not isinstance(date, str) or not date.strip():
+        raise SystemExit(f"ERROR: allowlist entry needs date: {source}")
+    sha = item.get("sha256")
+    line = item.get("line")
+    has_sha = sha is not None
+    has_line = line is not None
+    if has_sha == has_line:
+        raise SystemExit(
+            f"ERROR: allowlist entry needs path plus either line or sha256: {source}"
+        )
+    if has_sha:
+        if not isinstance(sha, str) or not _SHA256_RE.fullmatch(sha):
+            raise SystemExit(
+                f"ERROR: allowlist sha256 must be 64 hex characters: {source}"
+            )
+        return AllowlistEntry(
+            path=rel,
+            approved_by=approved,
+            date=date,
+            sha256=sha.lower(),
+        )
+    if not isinstance(line, int) or isinstance(line, bool) or line < 1:
+        raise SystemExit(f"ERROR: allowlist line must be a positive integer: {source}")
+    return AllowlistEntry(
+        path=rel,
+        approved_by=approved,
+        date=date,
+        line=line,
+    )
+
+
+def _path_matches(candidate: str, allowed: str) -> bool:
+    base = candidate.split("|", 1)[0]
+    return base == allowed or base.endswith("/" + allowed)
+
+
+def filter_allowlist_hits(
+    hits: list[str],
+    entries: tuple[AllowlistEntry, ...] | list[AllowlistEntry],
+    digests: dict[str, str],
+) -> list[str]:
+    sha_ok: set[str] = set()
+    line_ok: set[tuple[str, int]] = set()
+    for entry in entries:
+        if entry.sha256:
+            for name, digest in digests.items():
+                if _path_matches(name, entry.path) and digest == entry.sha256:
+                    sha_ok.add(entry.path)
+        elif entry.line is not None:
+            line_ok.add((entry.path, entry.line))
+    kept: list[str] = []
+    for hit in hits:
+        loc = hit.split(": ", 1)[1]
+        path_part, _sep, rest = loc.partition(":")
+        file_path = path_part.split("|", 1)[0]
+        if any(_path_matches(file_path, allowed) for allowed in sha_ok):
+            continue
+        if rest.isdigit():
+            line_no = int(rest)
+            if (path_part, line_no) in line_ok or (file_path, line_no) in line_ok:
+                continue
+        kept.append(hit)
+    return kept
+
+
 def _is_dump_name(name: str) -> bool:
     lower = Path(name).name.lower()
     return lower.endswith(".dump") or lower.endswith(".dump.gz")
@@ -181,12 +315,27 @@ def _looks_text(data: bytes) -> bool:
     return True
 
 
+def _record_digest(digests: dict[str, str], name: str, data: bytes) -> None:
+    digest = hashlib.sha256(data).hexdigest()
+    digests[name] = digest
+    base = name.split("|", 1)[0]
+    if base and base not in digests:
+        digests[base] = digest
+    leaf = Path(base).name
+    if leaf and "/" in base:
+        # Nested tar prefixes keep the member's evidence-relative path too.
+        pass
+
+
 def _scan_payload(
     name: str,
     data: bytes,
     secrets: tuple[str, ...],
     depth: int = 0,
+    digests: dict[str, str] | None = None,
 ) -> list[str]:
+    if digests is not None and name:
+        _record_digest(digests, name, data)
     hits: list[str] = []
     if _is_dump_name(name) or _has_pgdmp_magic(data):
         hits.append(f"HIT dump file: {name}")
@@ -198,7 +347,7 @@ def _scan_payload(
         except OSError:
             hits.append(f"HIT refuse binary: {name}")
             return hits
-        hits.extend(_scan_payload(f"{name}|gunzip", inner, secrets, depth + 1))
+        hits.extend(_scan_payload(f"{name}|gunzip", inner, secrets, depth + 1, digests))
         return hits
     if _is_zlib(data):
         try:
@@ -206,10 +355,10 @@ def _scan_payload(
         except zlib.error:
             hits.append(f"HIT refuse binary: {name}")
             return hits
-        hits.extend(_scan_payload(f"{name}|inflate", inner, secrets, depth + 1))
+        hits.extend(_scan_payload(f"{name}|inflate", inner, secrets, depth + 1, digests))
         return hits
     if _is_tar_bytes(data):
-        hits.extend(_scan_tar_bytes(name, data, secrets, depth + 1))
+        hits.extend(_scan_tar_bytes(name, data, secrets, depth + 1, digests))
         return hits
     if _looks_text(data):
         hits.extend(scan_text(name, data.decode("utf-8"), secrets))
@@ -224,6 +373,7 @@ def _scan_tar_bytes(
     data: bytes,
     secrets: tuple[str, ...],
     depth: int,
+    digests: dict[str, str] | None = None,
 ) -> list[str]:
     hits: list[str] = []
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
@@ -234,27 +384,57 @@ def _scan_tar_bytes(
             if extracted is None:
                 continue
             inner_name = f"{name}/{member.name}" if name else member.name
-            hits.extend(_scan_payload(inner_name, extracted.read(), secrets, depth))
+            payload = extracted.read()
+            if digests is not None:
+                _record_digest(digests, member.name, payload)
+                _record_digest(digests, inner_name, payload)
+            hits.extend(_scan_payload(inner_name, payload, secrets, depth, digests))
     return hits
 
 
-def scan_path(path: Path, secrets: tuple[str, ...] = ()) -> list[str]:
+def scan_path(
+    path: Path,
+    secrets: tuple[str, ...] = (),
+    allowlist: tuple[AllowlistEntry, ...] | list[AllowlistEntry] = (),
+) -> list[str]:
+    digests: dict[str, str] = {}
     if path.is_dir():
-        return _scan_directory(path, secrets)
+        hits = _scan_directory(path, secrets, digests)
+        return filter_allowlist_hits(hits, allowlist, digests)
     data = path.read_bytes()
     if _is_tar_bytes(data) or tarfile.is_tarfile(path):
-        return _scan_payload(path.name, data, secrets)
+        hits = _scan_payload("", data, secrets, digests=digests)
+        return filter_allowlist_hits(hits, allowlist, digests)
     raise SystemExit(f"ERROR: {path} is not a directory or a tarball")
 
 
-def _scan_directory(root: Path, secrets: tuple[str, ...]) -> list[str]:
+def _scan_directory(
+    root: Path,
+    secrets: tuple[str, ...],
+    digests: dict[str, str],
+) -> list[str]:
     hits: list[str] = []
     for file_path in sorted(root.rglob("*")):
         if not file_path.is_file():
             continue
         relative = file_path.relative_to(root).as_posix()
-        hits.extend(_scan_payload(relative, file_path.read_bytes(), secrets))
+        data = file_path.read_bytes()
+        _record_digest(digests, relative, data)
+        hits.extend(_scan_payload(relative, data, secrets, digests=digests))
     return hits
+
+
+def _resolve_allowlist(args: argparse.Namespace) -> tuple[AllowlistEntry, ...]:
+    if args.no_allowlist:
+        return ()
+    allow_path = (
+        Path(args.allowlist).expanduser() if args.allowlist else DEFAULT_ALLOWLIST
+    )
+    if args.allowlist and not allow_path.is_file():
+        raise SystemExit(f"ERROR: allowlist not found: {allow_path}")
+    if not allow_path.is_file():
+        return ()
+    return tuple(load_allowlist(allow_path))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -271,6 +451,19 @@ def main(argv: list[str] | None = None) -> int:
             "Values are matched literally and percent-encoded."
         ),
     )
+    parser.add_argument(
+        "--allowlist",
+        default="",
+        help=(
+            "Reviewed allowlist JSON (path plus line or sha256, with "
+            "approved_by and date). Defaults to scripts/uat_evidence_allowlist.json."
+        ),
+    )
+    parser.add_argument(
+        "--no-allowlist",
+        action="store_true",
+        help="Scan with no reviewed allowlist.",
+    )
     args = parser.parse_args(argv)
     target = Path(args.evidence)
     if not target.exists():
@@ -279,10 +472,13 @@ def main(argv: list[str] | None = None) -> int:
     secrets_path = Path(args.secrets_file).expanduser() if args.secrets_file else None
     try:
         secrets = load_scan_secrets(secrets_file=secrets_path)
+        allowlist = _resolve_allowlist(args)
+        hits = scan_path(target, secrets, allowlist)
     except SystemExit as exc:
-        print(str(exc), file=sys.stderr)
+        message = str(exc)
+        if message:
+            print(message, file=sys.stderr)
         return 2
-    hits = scan_path(target, secrets)
     if hits:
         for hit in hits:
             print(hit, file=sys.stderr)

@@ -12,9 +12,9 @@ UAT sets seed passwords only with:
 python backend/seed_dev_passwords.py --apply --secrets-out PATH
 ```
 
-`PATH` must not exist yet. The parent folder must exist. The script creates that file exclusively (`O_CREAT|O_EXCL`) at mode `0600`. Each key must match `^[A-Z_][A-Z0-9_]*$`. Each line is `KEY=<shlex.quote(value)>`. In `--secrets-out` mode, stdout is only the path line (`Generated passwords written to PATH`). Connect and status lines go to stderr. Do not use the local print-once path for UAT.
+`PATH` must not exist yet unless you pass `--force`. The parent folder must exist. The script writes a temp file in that same directory (`O_CREAT|O_EXCL|O_NOFOLLOW`, mode `0600`) and `os.replace`s it over `PATH` only after the database commit succeeds. A failed apply removes the temp file and leaves `PATH` unchanged. Each key must match `^[A-Z_][A-Z0-9_]*$`. Each line is `KEY=<shlex.quote(value)>`. In `--secrets-out` mode, stdout is only the path line (`Generated passwords written to PATH`). Connect and status lines go to stderr. Do not use the local print-once path for UAT.
 
-A second run at the same path without `--force` exits non-zero and leaves the file unchanged. `--force` overwrites that file and keeps mode `0600`. A missing parent folder exits non-zero with one error line and no traceback.
+A second run at the same path without `--force` exits non-zero and leaves the file unchanged. `--force` replaces a regular file after commit and keeps mode `0600`. `--only` keeps other accounts' existing keys and replaces only the selected ones. The script refuses an existing symlink, directory, or fifo. A missing parent folder exits non-zero with one error line and no traceback.
 
 Load the file into the shell that runs UAT:
 
@@ -42,17 +42,19 @@ python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
 
 `--secrets-file` is the `--secrets-out` file for the round. The scan also reads `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, `SECRET_KEY`, and `DEV_SEED_*` / `SLICE_*` password variables from the environment.
 
+The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is a concrete path plus either a line number or a file SHA-256, with `approved_by` and `date`. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
+
 The scan refuses (exit 1, list of hits) on:
 
 - a `printed once` header in any case
-- a 24-character password-pool window that contains upper, lower, digit, and a pool symbol
+- a 24-character password-pool window that contains upper, lower, digit, and a pool symbol (`_` and `-` count; mixed-case snake_case keys with three or more `_`/`-` separators and no other pool symbol are not hits)
 - a configured compose or seed secret, matched literally and percent-encoded
 - a bcrypt marker (`$2a$`, `$2b$`, `$2y$`)
 - a `.dump` or `.dump.gz` name, or the `PGDMP` magic
 - gzip or zlib payloads (decompressed, then scanned), including nested tarballs
-- a binary file that is not gzip, zlib, tar, PGDMP, or UTF-8 text
+- a binary file that is not gzip, zlib, tar, PGDMP, UTF-8 text, or an allowlisted SHA-256
 
-Hits name the file and line. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits.
+Hits name the file and line. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
 
 ### After each round
 

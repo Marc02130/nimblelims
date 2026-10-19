@@ -19,6 +19,7 @@ import seed_dev_passwords
 REPO = Path(__file__).resolve().parents[2]
 MASK_CLI = REPO / "scripts" / "mask_printed_once.py"
 ENV_NAME = "DEV_SEED_ADMIN_PASSWORD"
+CLIENT_ENV = "DEV_SEED_CLIENT_PASSWORD"
 
 
 def _password(symbol: str) -> str:
@@ -79,6 +80,10 @@ def _source_secrets_file(path: Path, names: list[str]) -> dict[str, str]:
     )
     assert proc.returncode == 0, proc.stderr
     return json.loads(proc.stdout)
+
+
+def _leftover_temps(directory: Path, name: str) -> list[Path]:
+    return list(directory.glob(f".{name}.*.tmp"))
 
 
 @pytest.mark.parametrize("symbol", list(DEV_PASSWORD_POOL))
@@ -154,6 +159,74 @@ def test_secrets_file_force_overwrites_at_0600(tmp_path):
     stored = dest.read_text(encoding="utf-8")
     assert stored != "keep\n"
     assert _value_from_secrets_file(stored, ENV_NAME) == password
+    assert _leftover_temps(tmp_path, dest.name) == []
+
+
+def test_secrets_file_refuses_a_symlink(tmp_path):
+    real = tmp_path / "real.env"
+    real.write_text("keep\n", encoding="utf-8")
+    dest = tmp_path / "secrets.env"
+    dest.symlink_to(real)
+    with pytest.raises(
+        seed_dev_passwords.SeedPasswordError,
+        match="not a regular file",
+    ):
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", ENV_NAME, _password("!"))], force=True
+        )
+    assert dest.is_symlink()
+    assert real.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_secrets_file_refuses_a_directory(tmp_path):
+    dest = tmp_path / "secrets.env"
+    dest.mkdir()
+    with pytest.raises(
+        seed_dev_passwords.SeedPasswordError,
+        match="not a regular file",
+    ):
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", ENV_NAME, _password("!"))], force=True
+        )
+    assert dest.is_dir()
+    assert list(dest.iterdir()) == []
+
+
+def test_secrets_file_refuses_a_fifo(tmp_path):
+    dest = tmp_path / "secrets.env"
+    os.mkfifo(dest)
+    with pytest.raises(
+        seed_dev_passwords.SeedPasswordError,
+        match="not a regular file",
+    ):
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", ENV_NAME, _password("!"))], force=True
+        )
+    assert stat.S_ISFIFO(os.lstat(dest).st_mode)
+
+
+def test_secrets_file_force_only_keeps_other_accounts(tmp_path):
+    dest = tmp_path / "secrets.env"
+    admin_password = _password("!")
+    old_client = _password("#")
+    new_client = _password("*")
+    seed_dev_passwords.write_secrets_file(
+        dest,
+        [
+            ("admin", ENV_NAME, admin_password),
+            ("client", CLIENT_ENV, old_client),
+        ],
+    )
+    seed_dev_passwords.write_secrets_file(
+        dest,
+        [("client", CLIENT_ENV, new_client)],
+        force=True,
+        keep_others=True,
+    )
+    stored = dest.read_text(encoding="utf-8")
+    assert _value_from_secrets_file(stored, ENV_NAME) == admin_password
+    assert _value_from_secrets_file(stored, CLIENT_ENV) == new_client
+    assert old_client not in stored
 
 
 def test_secrets_file_refuses_invalid_key_names(tmp_path):
@@ -303,6 +376,63 @@ def test_main_secrets_out_force_overwrites_existing_file(
     password = _value_from_secrets_file(second, "DEV_SEED_CLIENT_PASSWORD")
     _assert_absent(captured.out, password)
     _assert_absent(captured.err, password)
+    assert _leftover_temps(tmp_path, dest.name) == []
+
+
+def test_main_secrets_out_force_only_keeps_other_accounts(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    dest = tmp_path / "uat.env"
+    admin_password = _password("_")
+    old_client = _password("-")
+    seed_dev_passwords.write_secrets_file(
+        dest,
+        [
+            ("admin", ENV_NAME, admin_password),
+            ("client", CLIENT_ENV, old_client),
+        ],
+    )
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--force", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code == 0
+    stored = dest.read_text(encoding="utf-8")
+    assert _value_from_secrets_file(stored, ENV_NAME) == admin_password
+    new_client = _value_from_secrets_file(stored, CLIENT_ENV)
+    assert new_client != old_client
+    _assert_absent(captured.out, new_client)
+    _assert_absent(captured.err, new_client)
+    _assert_absent(captured.out, admin_password)
+    _assert_absent(captured.err, admin_password)
+
+
+def test_main_commit_failure_leaves_existing_secrets_unchanged(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    dest = tmp_path / "uat.env"
+    assert seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
+    ) == 0
+    stored = dest.read_text(encoding="utf-8")
+    capsys.readouterr()
+
+    def _boom() -> None:
+        raise RuntimeError("commit failed")
+
+    monkeypatch.setattr(db_session, "commit", _boom)
+    with pytest.raises(RuntimeError, match="commit failed"):
+        seed_dev_passwords.main(
+            ["--apply", "--only", "client", "--force", "--secrets-out", str(dest)]
+        )
+    assert dest.read_text(encoding="utf-8") == stored
+    assert _leftover_temps(tmp_path, dest.name) == []
 
 
 def test_main_secrets_out_missing_parent_exits_nonzero(
@@ -320,6 +450,26 @@ def test_main_secrets_out_missing_parent_exits_nonzero(
     assert captured.out == ""
     assert captured.err.startswith("ERROR: Secrets file parent folder does not exist")
     assert "Traceback" not in captured.err
+
+
+def test_main_secrets_out_refuses_symlink(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    real = tmp_path / "real.env"
+    real.write_text("keep\n", encoding="utf-8")
+    dest = tmp_path / "uat.env"
+    dest.symlink_to(real)
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--force", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code != 0
+    assert "not a regular file" in captured.err
+    assert dest.is_symlink()
+    assert real.read_text(encoding="utf-8") == "keep\n"
 
 
 def test_missing_header_aborts(capsys):
