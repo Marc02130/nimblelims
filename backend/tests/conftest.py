@@ -142,7 +142,10 @@ def db_engine(pg_container):
     _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
-    with engine.connect() as conn:
+    # Commit UTC so parallel connections see it. Do not query lab_settings
+    # from db_session setup: that would BEGIN a fixture transaction and
+    # fail idle-in-transaction checks in test_aliquots.py.
+    with engine.begin() as conn:
         conn.execute(
             text(
                 "INSERT INTO lab_settings (id, timezone) "
@@ -150,7 +153,6 @@ def db_engine(pg_container):
                 "ON CONFLICT (id) DO UPDATE SET timezone = 'UTC'"
             )
         )
-        conn.commit()
     yield engine
     # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs
     with engine.connect() as conn:
@@ -272,25 +274,12 @@ def db_session(db_engine):
         join_transaction_mode="create_savepoint",
     )
     session = TestingSessionLocal()
-    _ensure_test_lab_timezone(session)
 
     yield session
 
     session.close()
     transaction.rollback()
     connection.close()
-
-
-def _ensure_test_lab_timezone(session) -> None:
-    """Tests that use the API client set UTC explicitly. There is no fallback."""
-    from models.lab_setting import LAB_SETTINGS_ID, LabSetting
-
-    row = session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
-    if row is None:
-        session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="UTC"))
-    elif not (row.timezone or "").strip():
-        row.timezone = "UTC"
-    session.flush()
 
 
 @pytest.fixture(scope="function")
