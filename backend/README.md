@@ -268,7 +268,11 @@ Copyright (c) 2025 Marc Breneiser
    ```
 
    `DATABASE_URL` uses `lims_app`. `MIGRATE_DATABASE_URL` uses `lims_migrate`.
-   Copy the root `.env.example` as well before `docker compose up`. Role jobs
+   Copy the root `.env.example` as well before `docker compose up`. Every
+   deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`.
+   There is no fallback. A fresh compose database also needs
+   `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`,
+   `LIMS_APP_PASSWORD`, and `SECRET_KEY` (Compose `${VAR:?}`). Role jobs
    are in `manuals/db-roles.md`.
 
 4. **Run migrations**
@@ -290,7 +294,7 @@ Required environment variables (see `env.example`):
 - `JWT_SECRET_KEY` - Secret key for JWT token signing
 - `JWT_ALGORITHM` - JWT algorithm (default: HS256)
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
-- `LAB_TIMEZONE` - IANA time zone that seeds `lab_settings` when that row is empty (for example `America/New_York`). A saved zone wins after that. The API refuses to start when neither this nor the saved row is a real zone. There is no UTC default. The check runs after migrations, so importing the app and running Alembic do not need the table yet. `create_admin.py` and the seed scripts do not read it. An administrator updates the saved zone with `PATCH /v1/lab-settings`. A lab manager can read it with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
+- `LAB_TIMEZONE` - required for every deployment unless `lab_settings.timezone` is already saved. There is no fallback. IANA name that seeds `lab_settings` when that row is empty (for example `America/New_York`). A saved zone wins after that. The API refuses to start when neither this nor the saved row is a real zone. The API check runs after migrations, so importing the app and running Alembic do not need the table yet. `create_admin.py` and the seed scripts do not read it. An administrator updates the saved zone with `PATCH /v1/lab-settings`. A lab manager can read it with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
 
 Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples

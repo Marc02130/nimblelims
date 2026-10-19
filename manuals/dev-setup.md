@@ -120,8 +120,8 @@ This step implements the Docker configuration from the Technical Document (Secti
   LAB_TIMEZONE=America/New_York
   ```
 - `POSTGRES_USER` only bootstraps the cluster. The API connects as `lims_app`. Alembic connects as `lims_migrate`. See `manuals/db-roles.md`.
-- `LAB_TIMEZONE` seeds `lab_settings` on first API start when that row is empty. A zone saved later wins. The API refuses to start when neither is a real IANA zone. There is no UTC default.
-- Compose reads `.env` for `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${LIMS_MIGRATE_PASSWORD}`, `${LIMS_APP_PASSWORD}`, and `${SECRET_KEY}`. Each of those is required. `docker compose up` exits before it starts a container when one is missing.
+- Every deployment must set `LAB_TIMEZONE` or save `lab_settings.timezone`. There is no fallback. `LAB_TIMEZONE` seeds `lab_settings` on first API start when that row is empty. A zone saved later wins. The API refuses to start when neither is a real IANA zone.
+- A fresh database also needs the five required `${VAR:?}` secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose exits before it starts a container when one of the five is missing.
 
 #### Step 6: Start Docker and Verify the Environment
 - Ensure Docker Desktop is running on your Mac (open the app if not).
@@ -134,7 +134,7 @@ This step implements the Docker configuration from the Technical Document (Secti
   - **Alembic migrations run automatically** when the backend starts:
     - Creates all database tables
     - Creates initial roles and permissions (17 total: `sample:create`, `sample:read`, `sample:update`, `test:assign`, `test:update`, `result:enter`, `result:review`, `result:update`, `result:delete`, `batch:manage`, `batch:read`, `batch:update`, `batch:delete`, `project:manage`, `user:manage`, `role:manage`, `config:edit`)
-    - Creates admin user (username: `admin`). The account is locked until `python backend/seed_dev_passwords.py --apply`
+    - Creates admin user (username: `admin`). The account is locked until `python backend/seed_dev_passwords.py --apply --secrets-out PATH`
     - Populates initial lists and list entries (normalized to lowercase slug format like `sample_status`)
     - Migration `0006` adds additional permissions: `result:update`, `result:delete`, `batch:update`, `batch:delete`
     - Migration `0008` adds `batch:read` permission if needed
@@ -149,7 +149,7 @@ This step implements the Docker configuration from the Technical Document (Secti
   - Verify seed data: `docker exec lims-db psql -U lims_bootstrap -d lims_db -c "SELECT name FROM analyses WHERE active = true;"`
   - Backend: Open browser to `http://localhost:8000/docs` (FastAPI Swagger UI).
   - Frontend: `http://localhost:3000` (React app).
-  - Login: at http://localhost:3000 the seed users are locked. From the backend container run `python seed_dev_passwords.py --apply`. It reads `DEV_SEED_ADMIN_PASSWORD` (and the other `DEV_SEED_*` names in `.env.example`) or prints each password once. `must_change_password` is cleared by that command, matching the configuring-agent slice loader. Existing databases are unchanged until you run it; pass `--defaults-file` to see old published hashes that are already bcrypt.
+  - Login: at http://localhost:3000 the seed users are locked. From the backend container run `python seed_dev_passwords.py --apply --secrets-out /tmp/uat-secrets.env`. It reads `DEV_SEED_ADMIN_PASSWORD` (and the other `DEV_SEED_*` names in `.env.example`) or writes generated passwords to that new `0600` file and prints only the path. UAT uses `--secrets-out` only. `must_change_password` is cleared by that command, matching the configuring-agent slice loader. Existing databases are unchanged until you run it; pass `--defaults-file` to see old published hashes that are already bcrypt. See [uat-artifacts.md](uat-artifacts.md).
 - Logs: `docker-compose logs -f` to monitor all services.
 - Stop: `docker-compose down` (add `-v` to remove volumes if you want a fresh start).
 
