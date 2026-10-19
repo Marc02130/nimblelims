@@ -108,8 +108,12 @@ def test_missing_env_and_empty_row_refuse(monkeypatch, db_session):
 
 def test_corrupt_saved_zone_is_not_replaced(monkeypatch, db_session):
     monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
-    row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
-    db_session.add(row)
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
+        db_session.add(row)
+    else:
+        row.timezone = "Not/AZone"
     db_session.flush()
     with pytest.raises(lab_time.LabTimezoneInvalid) as caught:
         lab_time.resolve_lab_timezone(db_session)

@@ -142,6 +142,15 @@ def db_engine(pg_container):
     _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO lab_settings (id, timezone) "
+                "VALUES ('b1a16ae0-0000-4000-8000-000000000001', 'UTC') "
+                "ON CONFLICT (id) DO UPDATE SET timezone = 'UTC'"
+            )
+        )
+        conn.commit()
     yield engine
     # Drop via raw SQL to avoid CircularDependencyError from clients↔roles↔users FKs
     with engine.connect() as conn:
