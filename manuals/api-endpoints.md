@@ -35,7 +35,7 @@
 
 ## Timestamps
 
-Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, and the other audit clocks) are UTC and end in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `used_on`, `start_date`, `end_date`) are lab days and are not given a timezone. Most instant columns are still `timestamp without time zone`; the value stored is UTC wall time.
+Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, and the other audit clocks) are `timestamptz`. The API sends them as UTC and the value ends in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `start_date`, `end_date`) stay `timestamp without time zone` lab days and are not given a timezone. `used_on` and the reagent lot dates stay SQL `date`. Custom-attribute JSON is not rewritten.
 
 ## Authentication
 

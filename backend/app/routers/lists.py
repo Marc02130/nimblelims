@@ -11,7 +11,7 @@ from app.schemas.list import ListEntryResponse, ListResponse, ListEntryCreate, L
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_config_edit
 from app.core.patch_fields import explicit_updates
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 router = APIRouter()
@@ -166,7 +166,7 @@ def update_list(
         setattr(list_obj, field, value)
     
     list_obj.modified_by = current_user.id
-    list_obj.modified_at = datetime.utcnow()
+    list_obj.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(list_obj)
@@ -207,7 +207,7 @@ def delete_list(
     # Soft delete
     list_obj.active = False
     list_obj.modified_by = current_user.id
-    list_obj.modified_at = datetime.utcnow()
+    list_obj.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     
@@ -334,7 +334,7 @@ def update_list_entry(
         setattr(entry, field, value)
     
     entry.modified_by = current_user.id
-    entry.modified_at = datetime.utcnow()
+    entry.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(entry)
@@ -370,7 +370,7 @@ def delete_list_entry(
     # Soft delete
     entry.active = False
     entry.modified_by = current_user.id
-    entry.modified_at = datetime.utcnow()
+    entry.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     

@@ -1,9 +1,9 @@
 """Serialize instants as UTC with a Z suffix.
 
-Audit columns are ``timestamp without time zone``. Writers store UTC wall
-time (``datetime.utcnow()`` / ``func.now()`` in a UTC session) and SQLAlchemy
-returns a naive datetime. Pydantic's default JSON encoding omits the offset,
-so a browser reads ``2026-10-18T23:23:00`` as local time and shows 11:23 PM
+Instant columns are ``timestamptz``. Writers use ``datetime.now(timezone.utc)``
+or ``func.now()``. A naive value is still read as UTC so an older payload
+does not shift. Pydantic's default JSON encoding omits the offset, so a
+browser would read ``2026-10-18T23:23:00`` as local time and show 11:23 PM
 in US Eastern for a 7:23 PM instant.
 
 Calendar fields (received_date, due_date, used_on, and the other lab days)

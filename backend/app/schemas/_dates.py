@@ -1,9 +1,9 @@
 """Shared 'not in the future' check for schema validators.
 
-Timestamps in this app are stored as naive UTC (``datetime.utcnow()`` /
-Postgres ``now()`` in a UTC session). A future check compares calendar days
-in the lab timezone. A naive datetime is read as UTC, then converted to that
-zone, so a sample received this evening still serializes after UTC has rolled
+Lab-day columns stay ``timestamp without time zone``. Instant columns are
+``timestamptz``. A future check compares calendar days in the lab timezone.
+A naive datetime is read as UTC, then converted to that zone, so a sample
+received this evening still counts as the lab's today after UTC has rolled
 to the next day.
 """
 from datetime import date, datetime

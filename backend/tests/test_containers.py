@@ -12,7 +12,7 @@ from models.client import Client
 from models.list import ListEntry
 from models.unit import Unit
 from app.core.security import create_access_token
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 
@@ -632,7 +632,7 @@ class TestContainerEditRBAC:
         db_session.add(container_type)
         db_session.flush()
         
-        original_modified_at = datetime.utcnow() - timedelta(hours=1)
+        original_modified_at = datetime.now(timezone.utc) - timedelta(hours=1)
         container = Container(
             name="CONTAINER-AUDIT-001",
             description="Test container for audit",

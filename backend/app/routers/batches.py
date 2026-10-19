@@ -26,7 +26,7 @@ from app.core.rbac import (
 )
 from app.core.security import get_current_user
 from app.core.patch_fields import explicit_updates
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.lab_time import days_from_today, resolve_lab_timezone
 from uuid import UUID
@@ -809,7 +809,7 @@ def create_batch(
                 name=qc_sample_name,
                 description=f"QC sample ({qc_type_entry.name})" + (f": {qc_addition.notes}" if qc_addition.notes else ""),
                 due_date=qc_due_date,
-                received_date=datetime.utcnow(),
+                received_date=datetime.now(timezone.utc),
                 sample_type=qc_sample_type,  # Use inherited or default sample type
                 status=received_status.id,
                 matrix=qc_matrix,  # Use inherited or default matrix
@@ -1109,7 +1109,7 @@ def update_batch(
         setattr(batch, field, value)
     
     batch.modified_by = current_user.id
-    batch.modified_at = datetime.utcnow()
+    batch.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(batch)
@@ -1160,12 +1160,12 @@ def update_batch_status(
     # Update status and dates
     batch.status = status_id
     if status_id == "in_process":  # Assuming this is the "In Process" status
-        batch.start_date = datetime.utcnow()
+        batch.start_date = datetime.now(timezone.utc)
     elif status_id == "completed":  # Assuming this is the "Completed" status
-        batch.end_date = datetime.utcnow()
+        batch.end_date = datetime.now(timezone.utc)
     
     batch.modified_by = current_user.id
-    batch.modified_at = datetime.utcnow()
+    batch.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(batch)
@@ -1202,7 +1202,7 @@ def delete_batch(
     # Soft delete
     batch.active = False
     batch.modified_by = current_user.id
-    batch.modified_at = datetime.utcnow()
+    batch.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     

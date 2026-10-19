@@ -18,7 +18,7 @@ from app.core.rbac import (
 )
 from app.core.security import get_current_user, get_user_permissions
 from app.core.patch_fields import explicit_updates
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 router = APIRouter()
@@ -104,7 +104,7 @@ def update_container_type(
         setattr(container_type, field, value)
     
     container_type.modified_by = current_user.id
-    container_type.modified_at = datetime.utcnow()
+    container_type.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(container_type)
@@ -416,7 +416,7 @@ def update_container(
         setattr(container, field, value)
     
     container.modified_by = current_user.id
-    container.modified_at = datetime.utcnow()
+    container.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(container)

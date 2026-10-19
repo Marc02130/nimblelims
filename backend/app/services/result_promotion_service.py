@@ -14,7 +14,7 @@ import os
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
@@ -403,9 +403,11 @@ class ResultPromotionService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Authenticated user required to promote results",
             )
-        # entry_date is a naive UTC instant. The validator compares its calendar
-        # day in the lab zone, so utcnow() is today there.
-        now = datetime.utcnow()
+        # entry_date is a lab day stored as a naive timestamp. The validator
+        # compares its calendar day in the lab zone. The write is an aware UTC
+        # instant, and the session time zone is UTC, so the stored wall time
+        # is still today in that zone.
+        now = datetime.now(timezone.utc)
         pending = 0
 
         for item in plan.items:
