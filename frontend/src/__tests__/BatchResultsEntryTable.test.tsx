@@ -95,7 +95,7 @@ describe('BatchResultsEntryTable', () => {
     expect(dateInput).toHaveAttribute('max', localDateString());
     fireEvent.change(dateInput, { target: { value: '2099-01-01' } });
     await user.click(screen.getByText('Submit Results'));
-    expect(await screen.findByText('Entry date cannot be in the future')).toBeInTheDocument();
+    expect(await screen.findAllByText('Entry date cannot be in the future')).toHaveLength(1);
     expect(screen.queryByText('Confirm Submission')).not.toBeInTheDocument();
     expect(mockApiService.enterBatchResults).not.toHaveBeenCalled();
   });

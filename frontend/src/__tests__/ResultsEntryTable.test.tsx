@@ -238,11 +238,9 @@ describe('ResultsEntryTable', () => {
     expect(await screen.findByLabelText('Entry date')).toHaveAttribute('max', localDateString());
     await user.click(screen.getByText('Save Results'));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Entry date cannot be in the future');
-    expect(alert.textContent?.match(/Entry date cannot be in the future/g)).toHaveLength(1);
-    expect(alert).not.toHaveTextContent('results.0.entry_date');
-    expect(alert).not.toHaveTextContent('Value error');
+    expect(await screen.findAllByText('Entry date cannot be in the future')).toHaveLength(1);
+    expect(screen.queryByText(/results\.0\.entry_date/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Value error/)).not.toBeInTheDocument();
   });
 
   it('refuses a typed entry date after today without posting', async () => {
@@ -253,7 +251,7 @@ describe('ResultsEntryTable', () => {
     fireEvent.change(dateInput, { target: { value: '2099-01-01' } });
     await user.click(screen.getByText('Save Results'));
 
-    expect(await screen.findByText('Entry date cannot be in the future')).toBeInTheDocument();
+    expect(await screen.findAllByText('Entry date cannot be in the future')).toHaveLength(1);
     expect(mockApiService.enterBatchResults).not.toHaveBeenCalled();
   });
 

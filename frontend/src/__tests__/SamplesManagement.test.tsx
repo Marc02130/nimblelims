@@ -156,10 +156,11 @@ describe('SamplesManagement', () => {
     expect(await screen.findByText('Edit Sample: SAMPLE-001')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Update sample' }));
 
-    expect((await screen.findAllByText('Date cannot be in the future')).length).toBeGreaterThan(0);
+    expect(await screen.findAllByText('Date cannot be in the future')).toHaveLength(1);
     expect(screen.getByText('Edit Sample: SAMPLE-001')).toBeInTheDocument();
     expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
     expect(screen.queryByText(/received_date:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Value error/)).not.toBeInTheDocument();
   });
 });
 

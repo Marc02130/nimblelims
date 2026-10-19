@@ -279,15 +279,12 @@ const SamplesManagement: React.FC = () => {
 
   const handleUpdateSample = async (sampleData: any) => {
     if (!selectedSample) return;
-    try {
-      await apiService.updateSample(selectedSample.id, sampleData);
-      await loadData(); // Reload data
-      setShowForm(false);
-      setSelectedSample(null);
-    } catch (err: any) {
-      setError(apiErrorText(err, 'Failed to update sample'));
-      throw err;
-    }
+    // The open form renders the refusal. Setting the page alert as well showed
+    // the same sentence twice.
+    await apiService.updateSample(selectedSample.id, sampleData);
+    await loadData();
+    setShowForm(false);
+    setSelectedSample(null);
   };
 
   const openAssignDialog = async () => {

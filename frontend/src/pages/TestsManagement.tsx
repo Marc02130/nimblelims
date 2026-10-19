@@ -125,15 +125,12 @@ const TestsManagement: React.FC = () => {
 
   const handleUpdateTest = async (testData: any) => {
     if (!selectedTest) return;
-    try {
-      await apiService.updateTest(selectedTest.id, testData);
-      await loadData(); // Reload data
-      setShowForm(false);
-      setSelectedTest(null);
-    } catch (err: any) {
-      setError(apiErrorText(err, 'Failed to update test'));
-      throw err;
-    }
+    // The open form renders the refusal. Setting the page alert as well showed
+    // the same sentence twice.
+    await apiService.updateTest(selectedTest.id, testData);
+    await loadData();
+    setShowForm(false);
+    setSelectedTest(null);
   };
 
   const columns: GridColDef[] = [
