@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import App from './App';
@@ -13,6 +13,7 @@ jest.mock('./services/apiService', () => ({
     logout: jest.fn().mockResolvedValue(undefined),
     requestPasswordReset: jest.fn(),
     confirmPasswordReset: jest.fn(),
+    updateLabSettings: jest.fn(),
   },
 }));
 
@@ -51,11 +52,87 @@ describe('App', () => {
       email: 'test@example.com',
       role: 'Lab Technician',
       permissions: ['sample:read'],
+      timezone_configured: true,
     });
     
     renderWithProviders(<App />);
     
     // "Dashboard" is both the page heading and a sidebar item.
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+  });
+
+  test('blocks a non-admin when the lab timezone is not set', async () => {
+    const { apiService } = require('./services/apiService');
+    apiService.getCurrentUser.mockResolvedValue({
+      id: '1',
+      username: 'tech',
+      email: 'tech@example.com',
+      role: 'Lab Technician',
+      permissions: ['sample:read'],
+      timezone_configured: false,
+    });
+
+    renderWithProviders(<App />);
+
+    expect(
+      await screen.findByText(/The lab timezone hasn't been set/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument();
+  });
+
+  test('sends an admin to timezone setup when the zone is not set', async () => {
+    const { apiService } = require('./services/apiService');
+    apiService.getCurrentUser.mockResolvedValue({
+      id: '1',
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'Administrator',
+      permissions: ['config:edit'],
+      timezone_configured: false,
+    });
+
+    renderWithProviders(<App />);
+
+    expect(await screen.findByText('Set the lab timezone')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument();
+  });
+
+  test('admin setup saves a timezone and then opens the app', async () => {
+    const { apiService } = require('./services/apiService');
+    apiService.getCurrentUser.mockResolvedValue({
+      id: '1',
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'Administrator',
+      permissions: ['sample:read', 'config:edit'],
+      timezone_configured: false,
+    });
+    apiService.updateLabSettings.mockResolvedValue({
+      timezone: 'America/New_York',
+      timezone_configured: true,
+    });
+
+    renderWithProviders(<App />);
+    expect(await screen.findByText('Set the lab timezone')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/IANA timezone/i), {
+      target: { value: 'America/New_York' },
+    });
+    apiService.getCurrentUser.mockResolvedValue({
+      id: '1',
+      username: 'admin',
+      email: 'admin@example.com',
+      role: 'Administrator',
+      permissions: ['sample:read', 'config:edit'],
+      timezone_configured: true,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save timezone' }));
+
+    await waitFor(() => {
+      expect(apiService.updateLabSettings).toHaveBeenCalledWith({
+        timezone: 'America/New_York',
+      });
+    });
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 });

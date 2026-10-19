@@ -51,6 +51,8 @@ import LimsRunDetail from './pages/LimsRunDetail';
 import CurveCurator from './pages/DoseResponse/CurveCurator';
 import HelpPage from './pages/HelpPage';
 import { useUser } from './contexts/UserContext';
+import LabTimezoneSetup from './pages/LabTimezoneSetup';
+import LabTimezoneBlocked from './pages/LabTimezoneBlocked';
 
 function AppRoutes() {
   const { user, hasPermission } = useUser();
@@ -560,7 +562,7 @@ function AppRoutes() {
 }
 
 function App() {
-  const { user, loading, mustChangePassword } = useUser();
+  const { user, loading, mustChangePassword, timezoneConfigured, isAdmin } = useUser();
   const location = useLocation();
 
   // These pages stay reachable with no session. A reset link must not bounce to login.
@@ -581,6 +583,13 @@ function App() {
 
   if (mustChangePassword) {
     return <ChangePassword />;
+  }
+
+  if (!timezoneConfigured) {
+    if (isAdmin()) {
+      return <LabTimezoneSetup />;
+    }
+    return <LabTimezoneBlocked />;
   }
 
   return <AppRoutes />;

@@ -54,6 +54,7 @@ describe('Login', () => {
       role: 'Lab Technician',
       permissions: ['sample:create'],
       must_change_password: false,
+      timezone_configured: true,
     });
   });
 
