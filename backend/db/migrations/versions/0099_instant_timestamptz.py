@@ -1,7 +1,7 @@
 """Convert naive UTC instant columns to timestamptz.
 
-Revision ID: 0097_instant_timestamptz
-Revises: 0096_lab_tz_fk_restrict
+Revision ID: 0099_instant_timestamptz
+Revises: 0098_batch_access_status
 
 Each converted column is ``timestamp without time zone`` holding a UTC wall
 time. ``USING col AT TIME ZONE 'UTC'`` reads that wall time as UTC, so the
@@ -30,8 +30,8 @@ from app.core.instant_columns import (
     SQL_DATE_COLUMNS,
 )
 
-revision = "0097_instant_timestamptz"
-down_revision = "0096_lab_tz_fk_restrict"
+revision = "0099_instant_timestamptz"
+down_revision = "0098_batch_access_status"
 branch_labels = None
 depends_on = None
 
@@ -87,7 +87,7 @@ def _require_expected_types(conn, source: str) -> None:
         problems.append("SQL date columns changed: " + ", ".join(dates_moved))
     if problems:
         raise RuntimeError(
-            "0097_instant_timestamptz refused to change types. "
+            "0099_instant_timestamptz refused to change types. "
             + " ".join(problems)
         )
 
@@ -190,7 +190,7 @@ def _refuse_unsafe_dependents(conn) -> None:
 
     if blockers:
         raise RuntimeError(
-            "0097_instant_timestamptz stopped. A dependent object would have "
+            "0099_instant_timestamptz stopped. A dependent object would have "
             "to be dropped, and this migration does not drop schema objects: "
             + "; ".join(sorted(blockers))
         )
