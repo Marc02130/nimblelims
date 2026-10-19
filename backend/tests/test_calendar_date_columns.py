@@ -62,8 +62,9 @@ def test_calendar_backfill_keeps_the_naive_date_part(migrated_engine):
     cfg.set_main_option("script_location", "db/migrations")
     cfg.set_main_option("sqlalchemy.url", url)
     previous = os.environ.get("DATABASE_URL")
+    previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
-    os.environ.pop("MIGRATE_DATABASE_URL", None)
+    os.environ["MIGRATE_DATABASE_URL"] = url
     try:
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
@@ -120,3 +121,7 @@ def test_calendar_backfill_keeps_the_naive_date_part(migrated_engine):
             os.environ.pop("DATABASE_URL", None)
         else:
             os.environ["DATABASE_URL"] = previous
+        if previous_migrate is None:
+            os.environ.pop("MIGRATE_DATABASE_URL", None)
+        else:
+            os.environ["MIGRATE_DATABASE_URL"] = previous_migrate

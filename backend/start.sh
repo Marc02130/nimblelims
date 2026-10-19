@@ -1,11 +1,21 @@
 #!/bin/bash
 set -e
 
-# Owner/migrator URL (superuser/table owner). Runtime app uses DATABASE_URL (lims_app).
-export MIGRATE_DATABASE_URL="${MIGRATE_DATABASE_URL:-postgresql://lims_user:lims_password@db:5432/lims_db}"
+# Alembic runs as lims_migrate (MIGRATE_DATABASE_URL). The Compose bootstrap
+# superuser does not migrate and does not own application objects.
+# Runtime uvicorn uses DATABASE_URL (lims_app).
+if [ -z "${MIGRATE_DATABASE_URL:-}" ]; then
+  echo "FATAL: MIGRATE_DATABASE_URL is required. Point it at lims_migrate, not the bootstrap superuser." >&2
+  exit 1
+fi
 
 echo "Waiting for database to be ready..."
+deadline=$((SECONDS + 60))
 until python -c "import os, psycopg2; psycopg2.connect(os.environ['MIGRATE_DATABASE_URL'])" 2>/dev/null; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    echo "FATAL: timed out after 60s waiting for the database on MIGRATE_DATABASE_URL." >&2
+    exit 1
+  fi
   echo "Database is unavailable - sleeping"
   sleep 1
 done
@@ -15,8 +25,7 @@ echo "Database is ready - ensuring lims_app role before migrations..."
 # The second call below grants on tables the migrations have just created.
 python ensure_lims_app_role.py
 
-echo "Running migrations (owner)..."
-# Alembic must use owner credentials, not lims_app
+echo "Running migrations (lims_migrate)..."
 DATABASE_URL="${MIGRATE_DATABASE_URL}" python run_migrations.py
 
 echo "Ensuring lims_app grants after migrations..."

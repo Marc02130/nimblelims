@@ -94,9 +94,11 @@ class TestS12ProdCompose:
                 cwd=str(root),
                 env={
                     **os.environ,
+                    "POSTGRES_USER": "lims_bootstrap",
                     "POSTGRES_PASSWORD": "test-only",
                     "SECRET_KEY": "test-only-secret-key-not-prod",
                     "LIMS_APP_PASSWORD": "test-only",
+                    "LIMS_MIGRATE_PASSWORD": "test-only",
                 },
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):

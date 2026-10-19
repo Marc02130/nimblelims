@@ -9,18 +9,21 @@ services:
     container_name: lims-db
     environment:
       POSTGRES_DB: lims_db
-      POSTGRES_USER: lims_user
-      POSTGRES_PASSWORD: lims_password
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+      LIMS_MIGRATE_PASSWORD: ${LIMS_MIGRATE_PASSWORD:?Set LIMS_MIGRATE_PASSWORD}
+      LIMS_APP_PASSWORD: ${LIMS_APP_PASSWORD:?Set LIMS_APP_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/zz-roles.sh:/docker-entrypoint-initdb.d/zz-roles.sh
     ports:
       - "5432:5432"
     networks:
       - lims-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lims_user -d lims_db"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d lims_db"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -62,19 +65,19 @@ services:
       dockerfile: Dockerfile
     container_name: lims-backend
     environment:
-      # P0d: runtime app uses lims_app; migrations/ensure use owner lims_user
-      DATABASE_URL: postgresql://lims_app:lims_app_password@db:5432/lims_db
-      MIGRATE_DATABASE_URL: postgresql://lims_user:lims_password@db:5432/lims_db
-      LIMS_APP_PASSWORD: lims_app_password
+      # Runtime app uses lims_app. Alembic uses lims_migrate.
+      DATABASE_URL: postgresql://lims_app:${LIMS_APP_PASSWORD:?Set LIMS_APP_PASSWORD}@db:5432/lims_db
+      MIGRATE_DATABASE_URL: postgresql://lims_migrate:${LIMS_MIGRATE_PASSWORD:?Set LIMS_MIGRATE_PASSWORD}@db:5432/lims_db
+      LIMS_APP_PASSWORD: ${LIMS_APP_PASSWORD:?Set LIMS_APP_PASSWORD}
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: lims_db
       DB_USER: lims_app
-      DB_PASSWORD: lims_app_password
-      # S3: app reads SECRET_KEY (JWT_SECRET_KEY accepted as alias). Local compose
-      # allows the placeholder only because ALLOW_INSECURE_DEFAULTS=true.
-      SECRET_KEY: your-secret-key-change-in-production
-      JWT_SECRET_KEY: your-secret-key-change-in-production
+      DB_PASSWORD: ${LIMS_APP_PASSWORD:?Set LIMS_APP_PASSWORD}
+      # S3: app reads SECRET_KEY (JWT_SECRET_KEY is the alias). Compose refuses
+      # to start when it is missing. The value lives in the untracked .env.
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      JWT_SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
       JWT_ALGORITHM: HS256
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
       DEBUG: "True"

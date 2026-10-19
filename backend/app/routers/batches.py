@@ -382,7 +382,7 @@ def validate_batch_compatibility(
     if inaccessible_projects:
         return {
             "compatible": False,
-            "error": f"Access denied: insufficient permissions for projects: {inaccessible_projects}"
+            "error": "Access denied"
         }
     
     # Validate compatibility: check if samples share a common analysis
@@ -591,7 +591,7 @@ def create_batch(
         if inaccessible_projects:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied: insufficient permissions for projects: {inaccessible_projects}"
+                detail=_BATCH_FORBIDDEN,
             )
         
         # Additional client isolation check: validate user has access to all projects' client_ids
@@ -602,7 +602,7 @@ def create_batch(
             except HTTPException:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: insufficient client permissions for project {project.id}"
+                    detail=_BATCH_FORBIDDEN,
                 )
         
         # Validate compatibility: check if samples share a common analysis
@@ -1173,7 +1173,7 @@ def update_batch(
                 except HTTPException:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Access denied: insufficient client permissions for batch"
+                        detail=_BATCH_FORBIDDEN,
                     )
     
     update_data = explicit_updates(batch_data, batch, refuse_null={"active"})

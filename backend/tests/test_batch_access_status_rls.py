@@ -28,7 +28,7 @@ from app.main import app
 CLIENT_ROLE = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 BATCH_READ = "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
 FN = "public.batch_access_status(uuid)"
-MIGRATION_ROLE = "lims_user"  # pragma: allowlist secret
+MIGRATION_ROLE = "lims_migrate"  # pragma: allowlist secret
 
 
 def _scalar(conn, sql, **params):
@@ -535,6 +535,36 @@ def test_function_lockdown(migrated_engine, batch_world):
             text("SELECT has_function_privilege(:role, :fn, 'EXECUTE')"),
             {"role": MIGRATION_ROLE, "fn": FN},
         ).scalar() is False
+        if conn.execute(
+            text("SELECT 1 FROM pg_roles WHERE rolname = 'lims_user'")  # pragma: allowlist secret
+        ).scalar():
+            assert conn.execute(
+                text("SELECT has_function_privilege('lims_user', :fn, 'EXECUTE')"),  # pragma: allowlist secret
+                {"fn": FN},
+            ).scalar() is False
+        app_flags = conn.execute(
+            text(
+                """
+                SELECT rolsuper, rolbypassrls
+                FROM pg_roles
+                WHERE rolname = 'lims_app'
+                """
+            )
+        ).one()
+        assert app_flags[0] is False
+        assert app_flags[1] is False
+        migrate_flags = conn.execute(
+            text(
+                """
+                SELECT rolsuper, rolbypassrls, rolcanlogin
+                FROM pg_roles
+                WHERE rolname = 'lims_migrate'
+                """
+            )
+        ).one()
+        assert migrate_flags[0] is False
+        assert migrate_flags[1] is True
+        assert migrate_flags[2] is True
         assert conn.execute(
             text("SELECT has_function_privilege('app_test_role', :fn, 'EXECUTE')"),
             {"fn": FN},
@@ -597,7 +627,10 @@ def test_downgrade_drops_the_function(migrated_engine, batch_world):
     ini = Path(__file__).resolve().parents[1] / "alembic.ini"
     cfg = Config(str(ini))
     cfg.set_main_option("sqlalchemy.url", url)
+    previous_database = os.environ.get("DATABASE_URL")
+    previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
+    os.environ["MIGRATE_DATABASE_URL"] = url
     try:
         command.downgrade(cfg, "0097_list_entry_code")
         with migrated_engine.connect() as conn:
@@ -615,7 +648,14 @@ def test_downgrade_drops_the_function(migrated_engine, batch_world):
         assert present is None
     finally:
         command.upgrade(cfg, "head")
-        os.environ.pop("DATABASE_URL", None)
+        if previous_database is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous_database
+        if previous_migrate is None:
+            os.environ.pop("MIGRATE_DATABASE_URL", None)
+        else:
+            os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
         with migrated_engine.connect() as conn:
             restored = conn.execute(
                 text("SELECT has_function_privilege('lims_app', :fn, 'EXECUTE')"),
@@ -784,7 +824,10 @@ def test_migration_role_cannot_execute_and_lims_app_still_403(
     ini = Path(__file__).resolve().parents[1] / "alembic.ini"
     cfg = Config(str(ini))
     cfg.set_main_option("sqlalchemy.url", url)
+    previous_database = os.environ.get("DATABASE_URL")
+    previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
+    os.environ["MIGRATE_DATABASE_URL"] = url
     try:
         with migrated_engine.connect() as conn:
             defaults = conn.execute(
@@ -838,7 +881,14 @@ def test_migration_role_cannot_execute_and_lims_app_still_403(
             assert _status(conn, caller["user_id"], owner["batch_id"]) == "forbidden"
     finally:
         command.upgrade(cfg, "head")
-        os.environ.pop("DATABASE_URL", None)
+        if previous_database is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous_database
+        if previous_migrate is None:
+            os.environ.pop("MIGRATE_DATABASE_URL", None)
+        else:
+            os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
 
     headers = _headers(caller["user_id"])
     denied = lims_app_client.get(f"/batches/{owner['batch_id']}", headers=headers)

@@ -27,7 +27,8 @@ services:
       JWT_SECRET_KEY: ${SECRET_KEY}
       LIMS_APP_PASSWORD: ${LIMS_APP_PASSWORD:?Set LIMS_APP_PASSWORD}
       DATABASE_URL: postgresql://lims_app:${LIMS_APP_PASSWORD}@db:5432/lims_db
-      MIGRATE_DATABASE_URL: postgresql://lims_user:${POSTGRES_PASSWORD}@db:5432/lims_db
+      MIGRATE_DATABASE_URL: postgresql://lims_migrate:${LIMS_MIGRATE_PASSWORD}@db:5432/lims_db
+      LIMS_MIGRATE_PASSWORD: ${LIMS_MIGRATE_PASSWORD:?Set LIMS_MIGRATE_PASSWORD}
       DB_PASSWORD: ${LIMS_APP_PASSWORD}
       DEBUG: "False"
       # Password reset. Empty SMTP_HOST keeps the API up and reports mail unavailable.

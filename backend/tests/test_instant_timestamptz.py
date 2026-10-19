@@ -118,7 +118,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     previous_database = os.environ.get("DATABASE_URL")
     previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
-    os.environ.pop("MIGRATE_DATABASE_URL", None)
+    os.environ["MIGRATE_DATABASE_URL"] = url
     try:
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
@@ -165,7 +165,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
             _assert_upgraded_values(conn, targets)
     finally:
         os.environ["DATABASE_URL"] = url
-        os.environ.pop("MIGRATE_DATABASE_URL", None)
+        os.environ["MIGRATE_DATABASE_URL"] = url
         command.upgrade(cfg, "head")
         if previous_database is None:
             os.environ.pop("DATABASE_URL", None)

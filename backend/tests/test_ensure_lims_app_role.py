@@ -83,9 +83,10 @@ class TestEnsureLimsAppRole:
         with migrated_engine.connect() as conn:
             row = conn.execute(
                 text(
-                    "SELECT rolcanlogin, rolsuper FROM pg_roles WHERE rolname = :r"
+                    "SELECT rolcanlogin, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = :r"
                 ),
                 {"r": APP_ROLE},
             ).one()
             assert row[0] is True
             assert row[1] is False
+            assert row[2] is False
