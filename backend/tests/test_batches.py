@@ -1170,7 +1170,10 @@ class TestBatchesAPI:
 
         response = client.post("/batches", json=batch_data, headers=limited_headers)
         assert response.status_code == 403, response.text
-        assert "access denied" in response.json()["detail"].lower() or "permissions" in response.json()["detail"].lower()
+        assert response.json()["detail"] == {
+            "code": "batch_forbidden",
+            "message": "Access denied",
+        }
     
     def test_create_batch_with_qc_samples(self, db_session, auth_headers, sample_user):
         """Test creating a batch with QC samples (US-27)"""
