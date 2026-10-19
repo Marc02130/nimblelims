@@ -501,9 +501,7 @@ def _assert_lab_midnight(stored, fetched, field):
     assert lab_time.days_from_today(stored, "America/New_York") == 0
     assert fetched.status_code == 200, fetched.text
     text = fetched.json()[field]
-    assert text.startswith("2026-10-19"), text
-    assert not text.endswith("Z")
-    assert "+" not in text
+    assert text == "2026-10-19", text
 
 
 @pytest.mark.parametrize("path", PATHS)
@@ -593,7 +591,7 @@ def test_due_and_sampled_offsets_count_as_the_lab_day(
     assert row["days_until_expiration"] == 1, row
     detail = client.get(f"/samples/{sample.id}", headers=headers)
     assert detail.status_code == 200, detail.text
-    assert detail.json()["due_date"].startswith("2026-10-19")
+    assert detail.json()["due_date"] == "2026-10-19"
 
 
 def test_batch_dates_store_the_lab_day_and_allow_a_later_day(
@@ -616,8 +614,8 @@ def test_batch_dates_store_the_lab_day_and_allow_a_later_day(
     assert lab_time.days_from_today(batch.start_date, "America/New_York") == 0
     detail = client.get(f"/batches/{batch_id}", headers=headers)
     assert detail.status_code == 200, detail.text
-    assert detail.json()["start_date"].startswith("2026-10-19")
-    assert detail.json()["end_date"].startswith("2026-10-19")
+    assert detail.json()["start_date"] == "2026-10-19"
+    assert detail.json()["end_date"] == "2026-10-19"
     later = client.patch(
         f"/batches/{batch_id}",
         json={"start_date": "2026-10-21T00:00:00Z", "end_date": "2026-11-01"},

@@ -5,7 +5,7 @@ from pydantic import Field, validator
 from app.schemas._dates import store_calendar_day
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -71,8 +71,8 @@ class ProjectResponse(BaseModel):
     modified_at: datetime
     created_by: Optional[UUID] = None
     modified_by: Optional[UUID] = None
-    start_date: datetime
-    due_date: Optional[datetime] = Field(None, description="Project-level turnaround; samples inherit if their due_date is null")
+    start_date: date
+    due_date: Optional[date] = Field(None, description="Project-level turnaround; samples inherit if their due_date is null")
     client_id: UUID
     client_project_id: Optional[UUID] = None
     status: UUID

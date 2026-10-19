@@ -1,6 +1,6 @@
 """Instant fields leave the API with a UTC offset. Calendar dates do not."""
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -59,9 +59,9 @@ def test_sample_calendar_dates_do_not_gain_an_offset():
     sample = SampleResponse.model_construct(
         name="S-1",
         description=None,
-        received_date=datetime(2026, 10, 18, 0, 0, 0),
+        received_date=date(2026, 10, 18),
         report_date=None,
-        due_date=datetime(2026, 10, 25, 0, 0, 0),
+        due_date=date(2026, 10, 25),
         date_sampled=None,
         sample_type=uid,
         status=uid,
@@ -85,8 +85,8 @@ def test_sample_calendar_dates_do_not_gain_an_offset():
     data = sample.model_dump(mode="json")
     assert data["created_at"] == "2026-10-18T23:23:00Z"
     assert data["modified_at"] == "2026-10-18T23:23:00Z"
-    assert data["received_date"] == "2026-10-18T00:00:00"
-    assert data["due_date"] == "2026-10-25T00:00:00"
+    assert data["received_date"] == "2026-10-18"
+    assert data["due_date"] == "2026-10-25"
     assert data["report_date"] is None
     assert _OFFSET.search(data["received_date"]) is None
     assert _OFFSET.search(data["due_date"]) is None

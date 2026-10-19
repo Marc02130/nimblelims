@@ -5,7 +5,7 @@ from app.schemas._dates import is_future, store_calendar_day
 from pydantic import ConfigDict, Field, validator, model_validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -250,7 +250,11 @@ class BulkSampleAccessioningRequest(BaseModel):
 
 
 class SampleResponse(SampleBase):
-    """Schema for sample response"""
+    """Schema for sample response. Lab days are SQL date, sent as YYYY-MM-DD."""
+    due_date: Optional[date] = None
+    received_date: Optional[date] = None
+    report_date: Optional[date] = None
+    date_sampled: Optional[date] = None
     id: UUID
     active: bool
     created_at: datetime
@@ -293,9 +297,9 @@ class EligibleSampleResponse(BaseModel):
     id: UUID
     name: str
     description: Optional[str] = None
-    due_date: Optional[datetime] = None
-    received_date: Optional[datetime] = None
-    date_sampled: Optional[datetime] = Field(None, description="When sample was collected")
+    due_date: Optional[date] = None
+    received_date: Optional[date] = None
+    date_sampled: Optional[date] = Field(None, description="When sample was collected")
     sample_type: UUID
     status: UUID
     matrix: UUID
@@ -311,8 +315,8 @@ class EligibleSampleResponse(BaseModel):
     shelf_life: Optional[int] = Field(None, description="Shelf life in days from analysis (minimum across all assigned analyses)")
     # Project context
     project_name: Optional[str] = Field(None, description="Project name")
-    project_due_date: Optional[datetime] = Field(None, description="Project-level due date")
-    effective_due_date: Optional[datetime] = Field(None, description="Effective due date (sample or project)")
+    project_due_date: Optional[date] = Field(None, description="Project-level due date")
+    effective_due_date: Optional[date] = Field(None, description="Effective due date (sample or project)")
 
     class Config:
         from_attributes = True
@@ -536,7 +540,7 @@ class SampleReceiveResponse(BaseModel):
     sample_name: str
     status: UUID
     project_id: UUID
-    received_date: Optional[datetime] = None
+    received_date: Optional[date] = None
     containers: List[ReceivedContainerInfo]
     tests: List[ReceivedTestInfo] = Field(default_factory=list)
 
