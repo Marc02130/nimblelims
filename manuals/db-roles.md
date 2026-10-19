@@ -21,4 +21,4 @@ Copy `.env.example` to `.env` before `docker compose up`. Passwords live only in
 
 Check the runtime role with `db/scripts/uat_privilege_snapshot.sql`. It raises if `lims_app.rolsuper` or `lims_app.rolbypassrls` is not false. UAT steps are in `UAT_Scripts/uat-db-roles.md`.
 
-An existing data directory that was initialized with `lims_user` as `POSTGRES_USER` is a different cluster. Init scripts do not re-run there. Recreate the volume so the bootstrap superuser is not `lims_user`. Migration `0103_migration_role_owner` moves ownership when it is applied by a superuser, and it does not drop objects.  <!-- pragma: allowlist secret -->
+An existing data directory that was initialized with the historical role as `POSTGRES_USER` is a different cluster. Init scripts do not re-run there. Recreate it with `docker compose down -v`. There is no in-place upgrade script. Migration `0103_migration_role_owner` moves ownership when it is applied by a superuser, creates `lims_migrate` with `LOGIN`, and alters an existing `NOLOGIN` `lims_migrate` to `LOGIN`. It does not drop objects.

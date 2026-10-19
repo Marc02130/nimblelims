@@ -4,7 +4,8 @@ Revision ID: 0103_migration_role_owner
 Revises: 0102_instant_timestamptz
 
 ``lims_migrate`` owns the application objects and is the role that runs
-Alembic. It is not a superuser. It has ``BYPASSRLS`` because it owns
+Alembic. It is not a superuser. It is created with ``LOGIN``. An existing
+``NOLOGIN`` role is altered to ``LOGIN``. It has ``BYPASSRLS`` because it owns
 ``SECURITY DEFINER`` functions (including ``batch_access_status``) and
 because migration seeds write tables that have ``FORCE ROW LEVEL SECURITY``.
 A table owner does not bypass forced row security.
@@ -56,9 +57,9 @@ def upgrade() -> None:
                             'lims_migrate must be created by the bootstrap superuser before migrations';
                     END IF;
                     CREATE ROLE lims_migrate
-                        NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOLOGIN BYPASSRLS;
+                        NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT LOGIN BYPASSRLS;
                 ELSIF actor_super IS TRUE THEN
-                    ALTER ROLE lims_migrate NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+                    ALTER ROLE lims_migrate NOSUPERUSER NOCREATEDB NOCREATEROLE LOGIN BYPASSRLS;
                 END IF;
 
                 IF NOT EXISTS (

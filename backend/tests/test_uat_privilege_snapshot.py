@@ -39,6 +39,18 @@ def test_snapshot_requires_lims_app_nosuperuser_and_nobypassrls(migrated_engine)
             )
         ).scalar()
         assert owner == "lims_migrate"
+        migrate = conn.execute(
+            text(
+                """
+                SELECT rolcanlogin, rolsuper, rolbypassrls
+                FROM pg_roles
+                WHERE rolname = 'lims_migrate'
+                """
+            )
+        ).one()
+        assert migrate[0] is True
+        assert migrate[1] is False
+        assert migrate[2] is True
         ddl_owner = conn.execute(
             text(
                 """
