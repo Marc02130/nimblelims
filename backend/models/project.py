@@ -36,5 +36,5 @@ class ProjectUser(Base):
     project_id = Column(PostgresUUID(as_uuid=True), ForeignKey('projects.id'), primary_key=True)
     user_id = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), primary_key=True)
     access_level = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'))
-    granted_at = Column(DateTime, default=func.now())
+    granted_at = Column(DateTime(timezone=True), default=func.now())
     granted_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))

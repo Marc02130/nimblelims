@@ -26,7 +26,7 @@ from app.core.rbac import (
 )
 from app.core.security import get_current_user, set_current_user_id
 from app.core.patch_fields import explicit_updates
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.core.db_errors import commit_or_409, constraint_name, is_unique_violation
@@ -1293,7 +1293,7 @@ def update_sample(
         UiSchemaService(db, current_user).write_extra_fields(sample, sample_data.extra_fields)
     
     sample.modified_by = current_user.id
-    sample.modified_at = datetime.utcnow()
+    sample.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(sample)
@@ -1342,7 +1342,7 @@ def delete_sample(
     # Soft delete
     sample.active = False
     sample.modified_by = current_user.id
-    sample.modified_at = datetime.utcnow()
+    sample.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     
@@ -1400,7 +1400,7 @@ def update_sample_status(
     # Update status
     sample.status = status_id
     sample.modified_by = current_user.id
-    sample.modified_at = datetime.utcnow()
+    sample.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(sample)

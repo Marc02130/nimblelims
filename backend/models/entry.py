@@ -271,12 +271,12 @@ class Entry(Base):
     config = Column(JSONB, nullable=True, server_default="{}")
     active = Column(Boolean, nullable=False, server_default="true", default=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     modified_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     modified_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -384,12 +384,12 @@ class EntryFieldValue(Base):
     write_back_at = Column(DateTime(timezone=True), nullable=True)
     write_back_previous = Column(JSONB, nullable=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     modified_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     modified_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -531,12 +531,12 @@ class ELNProcessDefinitionStep(Base):
     )
     name = Column(String(255), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     modified_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     modified_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -654,12 +654,12 @@ class ELNProcessStep(Base):
     )
     name = Column(String(255), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     modified_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     modified_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -695,7 +695,7 @@ class ELNProcessStepLimsRun(Base):
         nullable=False,
         index=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
@@ -759,12 +759,12 @@ class ELNProcessSample(Base):
         index=True,
     )
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     modified_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     modified_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True

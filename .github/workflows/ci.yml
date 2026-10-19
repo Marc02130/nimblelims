@@ -31,6 +31,10 @@ jobs:
       # including strings. This check is limited to named numeric fields.
       - name: numeric truthiness
         run: python backend/checks/numeric_truthiness.py
+      # Instant columns are timestamptz. utcnow() and naive now() are rejected
+      # in server code. Tests and already-applied migrations are outside this scan.
+      - name: naive instant writes
+        run: python backend/checks/naive_instants.py
 
   backend-tests:
     name: Backend tests (pytest)

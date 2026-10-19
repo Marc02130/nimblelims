@@ -33,14 +33,16 @@ def _ms(name: str, default: int) -> int:
 def _engine_kwargs(url: str) -> dict:
     """Bound every wait so one stuck request can't wedge the pool (UAT RT-7).
 
-    Server-side: lock_timeout, statement_timeout and
+    Server-side: timezone UTC, lock_timeout, statement_timeout and
     idle_in_transaction_session_timeout (ms; 0 disables). Client-side:
     pool_timeout (s) so a request waiting for a connection fails instead of
     hanging forever; pool_pre_ping drops connections the server closed.
+    timezone=UTC keeps a lab-day write of an aware UTC datetime on a
+    ``timestamp without time zone`` column from shifting to the server zone.
     """
     kwargs: dict = {"pool_pre_ping": True, "pool_timeout": _ms("DB_POOL_TIMEOUT_S", 10)}
     if url.startswith("postgresql"):
-        opts = " ".join(
+        opts = "-c timezone=UTC " + " ".join(
             f"-c {guc}={_ms(env, default)}"
             for guc, env, default in (
                 ("lock_timeout", "DB_LOCK_TIMEOUT_MS", 5000),

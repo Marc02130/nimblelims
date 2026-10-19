@@ -21,7 +21,7 @@ from app.core.rbac import (
 )
 from app.core.security import get_current_user
 from app.core.patch_fields import explicit_updates
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app.core.db_errors import commit_or_409
@@ -353,7 +353,7 @@ def update_test(
         setattr(test, field, value)
     
     test.modified_by = current_user.id
-    test.modified_at = datetime.utcnow()
+    test.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(test)
@@ -414,7 +414,7 @@ def update_test_status(
         test.technician_id = status_data.technician_id
     
     test.modified_by = current_user.id
-    test.modified_at = datetime.utcnow()
+    test.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(test)
@@ -470,7 +470,7 @@ def review_test(
     test.status = complete_status.id
     test.review_date = review_data.review_date
     test.modified_by = current_user.id
-    test.modified_at = datetime.utcnow()
+    test.modified_at = datetime.now(timezone.utc)
     
     # Update sample status to "Reviewed" if all tests are complete
     from models.list import ListEntry, List as ListModel
@@ -491,7 +491,7 @@ def review_test(
         if incomplete_tests == 0:
             test.sample.status = reviewed_status.id
             test.sample.modified_by = current_user.id
-            test.sample.modified_at = datetime.utcnow()
+            test.sample.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(test)
@@ -549,7 +549,7 @@ def delete_test(
     # Soft delete
     test.active = False
     test.modified_by = current_user.id
-    test.modified_at = datetime.utcnow()
+    test.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     

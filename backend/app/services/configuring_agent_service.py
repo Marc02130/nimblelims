@@ -765,7 +765,9 @@ def expire_stale(db: Session, run: ConfigurationRun) -> ConfigurationRun:
     if run.status != "reading_inputs" or run.created_at is None:
         return run
     created = run.created_at
-    now = datetime.now(timezone.utc) if created.tzinfo else datetime.utcnow()
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
     if (now - created).total_seconds() > model_timeout() + 120:
         run.status = "failed"
         run.error_message = STALE_MESSAGE

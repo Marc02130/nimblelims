@@ -95,7 +95,7 @@ class LimsRunChecklistStepRepository:
         new_status: LimsRunChecklistStepStatus,
         modified_by: Optional[uuid.UUID] = None,
     ) -> None:
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(timezone.utc)
         step.status = new_status
         step.modified_by = modified_by
         if new_status == LimsRunChecklistStepStatus.in_process:
