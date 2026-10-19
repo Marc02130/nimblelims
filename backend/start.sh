@@ -10,7 +10,12 @@ if [ -z "${MIGRATE_DATABASE_URL:-}" ]; then
 fi
 
 echo "Waiting for database to be ready..."
+deadline=$((SECONDS + 60))
 until python -c "import os, psycopg2; psycopg2.connect(os.environ['MIGRATE_DATABASE_URL'])" 2>/dev/null; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    echo "FATAL: timed out after 60s waiting for the database on MIGRATE_DATABASE_URL." >&2
+    exit 1
+  fi
   echo "Database is unavailable - sleeping"
   sleep 1
 done
