@@ -197,10 +197,17 @@ def test_each_validator_accepts_the_lab_today_and_refuses_tomorrow(utc_moment, l
 def test_response_models_accept_a_stored_future_date(utc_moment, lab_day, monkeypatch):
     monkeypatch.setattr(lab_time, "_utcnow", lambda: utc_moment)
     lab_time.remember_lab_zone("America/New_York")
-    tomorrow = _noon_utc(lab_day + timedelta(days=1))
+    tomorrow = lab_day + timedelta(days=1)
+    # A stored SQL date is that calendar day. Noon is not a date column value.
+    stored = datetime(tomorrow.year, tomorrow.month, tomorrow.day)
     for model, build in _RESPONSE_CASES:
-        parsed = model(**build(tomorrow))
+        parsed = model(**build(stored))
         assert parsed is not None
+        for name in ("received_date", "report_date", "test_date", "review_date", "entry_date"):
+            value = getattr(parsed, name, None)
+            if value is None:
+                continue
+            assert value == tomorrow, (model.__name__, name, value)
 
 
 def test_offset_input_is_stored_as_lab_midnight_on_every_input_model(monkeypatch):
@@ -235,8 +242,8 @@ def test_offset_input_is_stored_as_lab_midnight_on_every_input_model(monkeypatch
             value = getattr(parsed, name, None)
             if value is None:
                 continue
-            assert value == aware, (model.__name__, name, value)
-            assert value.tzinfo is not None
+            # The response is the calendar date of the stored value, not a lab-zone rewrite.
+            assert value == aware.date(), (model.__name__, name, value)
     later = datetime(2026, 10, 21, 0, 0, tzinfo=timezone.utc)
     for model in (BatchCreate, BatchUpdate, BatchCreateWithContainersRequest):
         if model is BatchUpdate:
