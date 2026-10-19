@@ -18,14 +18,18 @@ _SPEC.loader.exec_module(scan)
 scan_main = scan.main
 pool_token_on_line = scan.pool_token_on_line
 TOKEN = "Aa1!" + ("b" * (DEV_PASSWORD_LENGTH - 4))
+LONG_TOKEN = TOKEN + ("c" * 6)
 
 
-def test_exact_pool_length_is_a_token_and_other_lengths_are_not():
+def test_pool_token_is_twenty_four_or_more():
     assert len(TOKEN) == DEV_PASSWORD_LENGTH
+    assert len(LONG_TOKEN) == 30
     assert pool_token_on_line(TOKEN) is True
+    assert pool_token_on_line(LONG_TOKEN) is True
     assert pool_token_on_line("a" * (DEV_PASSWORD_LENGTH - 1)) is False
-    assert pool_token_on_line("ab" * 32) is False
+    assert pool_token_on_line("ab" * 32) is True
     assert pool_token_on_line("see " + TOKEN + " now") is True
+    assert pool_token_on_line("see " + LONG_TOKEN + " now") is True
 
 
 def test_clean_evidence_exits_zero(tmp_path, capsys):
@@ -54,20 +58,49 @@ def test_directory_lists_header_token_bcrypt_and_dump(tmp_path, capsys):
     assert TOKEN not in err
 
 
-def test_tarball_lists_bcrypt_and_dump(tmp_path, capsys):
+def test_thirty_char_pool_token_is_a_hit(tmp_path, capsys):
+    (tmp_path / "long-token.txt").write_text(f"prefix {LONG_TOKEN} suffix\n", encoding="utf-8")
+    code = scan_main([str(tmp_path)])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT password-pool token: long-token.txt:1" in err
+    assert LONG_TOKEN not in err
+
+
+def test_pgdmp_magic_hits_a_renamed_dump(tmp_path, capsys):
+    (tmp_path / "renamed-backup.bin").write_bytes(b"PGDMP\x00custom-format")
+    code = scan_main([str(tmp_path)])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT dump file: renamed-backup.bin" in err
+
+
+def test_dump_extension_hits_without_pgdmp_magic(tmp_path, capsys):
+    (tmp_path / "users.dump").write_text("not a real dump\n", encoding="utf-8")
+    code = scan_main([str(tmp_path)])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT dump file: users.dump" in err
+
+
+def test_tarball_lists_bcrypt_dump_and_pgdmp(tmp_path, capsys):
     notes = tmp_path / "notes.txt"
     notes.write_text("prefix $2b$12$abcdefghijklmnopqrstuv suffix\n", encoding="utf-8")
     dump = tmp_path / "users.dump"
     dump.write_text("users\n", encoding="utf-8")
+    renamed = tmp_path / "renamed-backup.bin"
+    renamed.write_bytes(b"PGDMP\x00custom-format")
     archive = tmp_path / "evidence.tar.gz"
     with tarfile.open(archive, "w:gz") as bundle:
         bundle.add(notes, arcname="notes.txt")
         bundle.add(dump, arcname="round/users.dump")
+        bundle.add(renamed, arcname="round/renamed-backup.bin")
     code = scan_main([str(archive)])
     err = capsys.readouterr().err
     assert code == 1
     assert "HIT bcrypt hash: notes.txt:1" in err
     assert "HIT dump file: round/users.dump" in err
+    assert "HIT dump file: round/renamed-backup.bin" in err
     assert "abcdefghijklmnopqrstuv" not in err
 
 

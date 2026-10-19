@@ -4,9 +4,10 @@
 Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 
 - a ``printed once`` header
-- a 24-character token drawn from the dev password pool
+- a run of 24 or more characters drawn from the dev password pool
 - a bcrypt hash marker (``$2a$``, ``$2b$``, ``$2y$``)
 - a file whose name ends in ``.dump``
+- a file that starts with the ``PGDMP`` pg_dump magic signature
 
 Hits name the file and the line. They do not repeat the secret.
 """
@@ -26,20 +27,21 @@ from app.core.dev_passwords import DEV_PASSWORD_LENGTH, DEV_PASSWORD_POOL  # noq
 
 PRINTED_ONCE_HEADER = "printed once"
 BCRYPT_RE = re.compile(r"\$2[aby]\$")
+PGDMP_MAGIC = b"PGDMP"
 _POOL = set(DEV_PASSWORD_POOL)
 
 
 def pool_token_on_line(line: str) -> bool:
-    """True when a run of pool characters is exactly one generated password."""
+    """True when a run of pool characters is at least one generated password."""
     length = 0
     for char in line:
         if char in _POOL:
             length += 1
+            if length >= DEV_PASSWORD_LENGTH:
+                return True
             continue
-        if length == DEV_PASSWORD_LENGTH:
-            return True
         length = 0
-    return length == DEV_PASSWORD_LENGTH
+    return length >= DEV_PASSWORD_LENGTH
 
 
 def scan_text(name: str, text: str) -> list[str]:
@@ -54,8 +56,18 @@ def scan_text(name: str, text: str) -> list[str]:
     return hits
 
 
-def _is_dump(name: str) -> bool:
+def _is_dump_name(name: str) -> bool:
     return Path(name).name.lower().endswith(".dump")
+
+
+def _has_pgdmp_magic(data: bytes) -> bool:
+    return data.startswith(PGDMP_MAGIC)
+
+
+def _dump_hit(name: str, data: bytes) -> str | None:
+    if _is_dump_name(name) or _has_pgdmp_magic(data):
+        return f"HIT dump file: {name}"
+    return None
 
 
 def scan_path(path: Path) -> list[str]:
@@ -72,9 +84,11 @@ def _scan_directory(root: Path) -> list[str]:
         if not file_path.is_file():
             continue
         relative = file_path.relative_to(root).as_posix()
-        if _is_dump(relative):
-            hits.append(f"HIT dump file: {relative}")
-        hits.extend(scan_text(relative, _read_text(file_path)))
+        data = file_path.read_bytes()
+        dump_hit = _dump_hit(relative, data)
+        if dump_hit:
+            hits.append(dump_hit)
+        hits.extend(scan_text(relative, data.decode("utf-8", errors="replace")))
     return hits
 
 
@@ -85,20 +99,15 @@ def _scan_tar(path: Path) -> list[str]:
             name = member.name
             if member.isdir():
                 continue
-            if _is_dump(name):
-                hits.append(f"HIT dump file: {name}")
-            if not member.isfile():
-                continue
-            extracted = archive.extractfile(member)
+            extracted = archive.extractfile(member) if member.isfile() else None
+            data = extracted.read() if extracted is not None else b""
+            dump_hit = _dump_hit(name, data)
+            if dump_hit:
+                hits.append(dump_hit)
             if extracted is None:
                 continue
-            text = extracted.read().decode("utf-8", errors="replace")
-            hits.extend(scan_text(name, text))
+            hits.extend(scan_text(name, data.decode("utf-8", errors="replace")))
     return hits
-
-
-def _read_text(path: Path) -> str:
-    return path.read_bytes().decode("utf-8", errors="replace")
 
 
 def main(argv: list[str] | None = None) -> int:
