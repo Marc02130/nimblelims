@@ -318,8 +318,13 @@ def test_a_request_publishes_the_saved_zone(client, test_admin_user, monkeypatch
 
 def test_corrupt_zone_reaches_validators_and_patch_repairs_it(client, db_session, test_admin_user, monkeypatch):
     monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
-    db_session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone"))
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        db_session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone"))
+    else:
+        row.timezone = "Not/AZone"
     db_session.flush()
+    lab_time.clear_published_lab_zone()
     headers = _login(client)
     got = client.get("/v1/lab-settings", headers=headers)
     assert got.status_code == 503, got.text

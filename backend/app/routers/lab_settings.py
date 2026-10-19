@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.lab_time import (
     INVALID_TIMEZONE,
+    LabTimezoneUnset,
     ensure_lab_setting,
     known_zone,
     remember_lab_zone,
@@ -36,8 +37,12 @@ def read_lab_timezone(
     current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
-    """The zone the API uses for today's date. Seeds from LAB_TIMEZONE when empty."""
-    return LabTimezoneResponse(timezone=resolve_lab_timezone(db))
+    """The zone the API uses for today's date. Empty until an admin saves one."""
+    try:
+        name = resolve_lab_timezone(db)
+    except LabTimezoneUnset:
+        return LabTimezoneResponse(timezone=None, timezone_configured=False)
+    return LabTimezoneResponse(timezone=name, timezone_configured=True)
 
 
 @router.patch("", response_model=LabTimezoneResponse)
@@ -64,4 +69,4 @@ def update_lab_timezone(
     db.refresh(row)
     saved = row.timezone or name
     remember_lab_zone(saved)
-    return LabTimezoneResponse(timezone=saved)
+    return LabTimezoneResponse(timezone=saved, timezone_configured=True)

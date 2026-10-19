@@ -1,8 +1,8 @@
 """Lab timezone stored on lab_settings.
 
-LAB_TIMEZONE seeds the row only when it is empty. After that the saved value
-wins. An administrator changes it. A lab manager may read it. A lab manager,
-lab technician, client, or configuration editor cannot change it.
+There is no environment fallback. An empty row fails until an administrator
+saves a real IANA zone. A lab manager may read it. A lab manager, lab
+technician, client, or configuration editor cannot change it.
 """
 import importlib.util
 import inspect
@@ -57,10 +57,12 @@ def test_migration_only_adds_lab_settings():
 
 
 def test_env_seeds_an_empty_setting(monkeypatch, db_session):
+    """LAB_TIMEZONE does not seed. An empty row stays empty and fails loudly."""
     monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
-    assert lab_time.resolve_lab_timezone(db_session) == "America/New_York"
-    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).one()
-    assert row.timezone == "America/New_York"
+    with pytest.raises(lab_time.LabTimezoneUnset, match="lab timezone not configured"):
+        lab_time.resolve_lab_timezone(db_session)
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    assert row is None or not (row.timezone or "").strip()
 
 
 def test_saved_zone_wins_over_the_environment(monkeypatch, db_session):
@@ -74,30 +76,26 @@ def test_saved_zone_wins_over_the_environment(monkeypatch, db_session):
 
 def test_invalid_env_does_not_seed(monkeypatch, db_session):
     monkeypatch.setenv("LAB_TIMEZONE", "Mars/Olympus_Mons")
-    with pytest.raises(RuntimeError) as caught:
+    with pytest.raises(lab_time.LabTimezoneUnset) as caught:
         lab_time.resolve_lab_timezone(db_session)
     assert not isinstance(caught.value, lab_time.LabTimezoneInvalid)
     message = str(caught.value)
-    assert "LAB_TIMEZONE 'Mars/Olympus_Mons' is not a known IANA time zone" in message
-    assert "LAB_TIMEZONE=America/New_York" in message
-    assert "UPDATE lab_settings SET timezone" not in message
+    assert "lab timezone not configured: set lab_settings.timezone" in message
     row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
     assert row is None or row.timezone is None
 
 
 def test_missing_env_and_empty_row_refuse(monkeypatch, db_session):
     monkeypatch.delenv("LAB_TIMEZONE", raising=False)
-    with pytest.raises(RuntimeError) as missing:
+    with pytest.raises(lab_time.LabTimezoneUnset) as missing:
         lab_time.resolve_lab_timezone(db_session)
     assert not isinstance(missing.value, lab_time.LabTimezoneInvalid)
     message = str(missing.value)
-    assert "LAB_TIMEZONE is required until a lab timezone is saved" in message
-    assert "LAB_TIMEZONE=America/New_York" in message
-    assert "UPDATE lab_settings SET timezone" not in message
+    assert "lab timezone not configured: set lab_settings.timezone" in message
     row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).one()
     row.timezone = "   "
     db_session.flush()
-    with pytest.raises(RuntimeError, match=r"LAB_TIMEZONE is required"):
+    with pytest.raises(lab_time.LabTimezoneUnset, match="lab timezone not configured"):
         lab_time.resolve_lab_timezone(db_session)
 
 
@@ -114,7 +112,6 @@ def test_corrupt_saved_zone_is_not_replaced(monkeypatch, db_session):
     assert "UPDATE lab_settings SET timezone = 'America/New_York'" in message
     assert "PATCH /v1/lab-settings" in message
     assert "administrator" in message
-    assert "LAB_TIMEZONE does not replace a saved value" in message
     assert "Set LAB_TIMEZONE=" not in message
     db_session.refresh(row)
     assert row.timezone == "Not/AZone"
@@ -141,24 +138,17 @@ def test_startup_skips_the_database_during_tests(monkeypatch):
 
 
 def test_startup_resolves_and_commits_the_seed_outside_tests(monkeypatch):
+    """Startup does not seed and does not require a zone."""
     monkeypatch.setenv("ENVIRONMENT", "development")
     seen = {}
 
-    class Dummy:
-        def close(self):
-            seen["closed"] = True
-
     def fake_resolve(_db, commit_seed=False):
-        seen["commit_seed"] = commit_seed
-        return "America/New_York"
+        seen["called"] = True
+        raise AssertionError("startup must not seed or require a zone")
 
-    import app.database as database
-
-    monkeypatch.setattr(database, "SessionLocal", lambda: Dummy())
     monkeypatch.setattr(lab_time, "resolve_lab_timezone", fake_resolve)
     lab_time.require_lab_timezone_on_startup()
-    assert seen["commit_seed"] is True
-    assert seen["closed"] is True
+    assert "called" not in seen
 
 
 def test_agent_cannot_change_the_lab_timezone():
@@ -279,9 +269,14 @@ def test_evening_expiry_and_usable_lots_follow_the_lab_date(client, test_admin_u
 
 def test_corrupt_saved_zone_is_503_and_patch_repairs_it(client, db_session, test_admin_user, monkeypatch):
     monkeypatch.setenv("LAB_TIMEZONE", "America/New_York")
-    row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
-    db_session.add(row)
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        row = LabSetting(id=LAB_SETTINGS_ID, timezone="Not/AZone")
+        db_session.add(row)
+    else:
+        row.timezone = "Not/AZone"
     db_session.flush()
+    lab_time.clear_published_lab_zone()
     admin = _login(client, "admin", "adminpassword")
     got = client.get("/v1/lab-settings", headers=admin)
     assert got.status_code == 503, got.text
@@ -299,3 +294,51 @@ def test_corrupt_saved_zone_is_503_and_patch_repairs_it(client, db_session, test
     again = client.get("/v1/lab-settings", headers=admin)
     assert again.status_code == 200, again.text
     assert again.json()["timezone"] == "America/Chicago"
+
+
+def _clear_lab_timezone(db_session) -> None:
+    row = db_session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        db_session.add(LabSetting(id=LAB_SETTINGS_ID, timezone=None))
+    else:
+        row.timezone = None
+    db_session.flush()
+    lab_time.clear_published_lab_zone()
+
+
+def test_me_reports_timezone_configured_false_when_unset(client, db_session, test_admin_user):
+    _clear_lab_timezone(db_session)
+    headers = _login(client, "admin", "adminpassword")
+    me = client.get("/auth/me", headers=headers)
+    assert me.status_code == 200, me.text
+    assert me.json()["timezone_configured"] is False
+    settings = client.get("/v1/lab-settings", headers=headers)
+    assert settings.status_code == 200, settings.text
+    assert settings.json()["timezone_configured"] is False
+    assert settings.json()["timezone"] is None
+
+
+def test_me_reports_timezone_configured_true_when_set(client, test_admin_user):
+    headers = _login(client, "admin", "adminpassword")
+    me = client.get("/auth/me", headers=headers)
+    assert me.status_code == 200, me.text
+    assert me.json()["timezone_configured"] is True
+    saved = client.patch("/v1/lab-settings", headers=headers, json={"timezone": "America/Chicago"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["timezone"] == "America/Chicago"
+    assert saved.json()["timezone_configured"] is True
+    invalid = client.patch("/v1/lab-settings", headers=headers, json={"timezone": "Not/AZone"})
+    assert invalid.status_code == 422, invalid.text
+    assert invalid.json()["detail"]["code"] == "invalid_timezone"
+
+
+def test_non_admin_sees_unset_and_cannot_set_the_zone(client, db_session, test_org, test_admin_user):
+    _person(db_session, test_org, "lab-tech-tz", "Lab Technician", ["sample:read"])
+    _clear_lab_timezone(db_session)
+    headers = _login(client, "lab-tech-tz", "pass-word-1")
+    me = client.get("/auth/me", headers=headers)
+    assert me.status_code == 200, me.text
+    assert me.json()["timezone_configured"] is False
+    denied = client.patch("/v1/lab-settings", headers=headers, json={"timezone": "UTC"})
+    assert denied.status_code == 403, denied.text
+    assert "Administrator" in denied.json()["detail"]

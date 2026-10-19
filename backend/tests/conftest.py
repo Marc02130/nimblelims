@@ -11,8 +11,7 @@ os.environ["ENVIRONMENT"] = "test"
 os.environ.setdefault("ALLOW_INSECURE_DEFAULTS", "true")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
 os.environ.setdefault("EMBEDDING_PROVIDER", "stub")
-# Tests pin UTC. lab_settings is seeded from this only while the row is empty.
-# ENVIRONMENT=test skips the process startup check, so import does not query.
+# Tests that need a lab zone set it on lab_settings. There is no env fallback.
 os.environ.setdefault("LAB_TIMEZONE", "UTC")
 # Import builds an engine immediately. Tests do not query that engine.
 # Fixtures pass the testcontainer URL through the environment. No password.
@@ -123,9 +122,9 @@ def _install_lab_day_function(engine) -> None:
         / "db"
         / "migrations"
         / "versions"
-        / "0104_current_lab_day.py"
+        / "0105_lab_timezone_required.py"
     )
-    spec = importlib.util.spec_from_file_location("_mig_0104_current_lab_day", path)
+    spec = importlib.util.spec_from_file_location("_mig_0105_lab_timezone_required", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     with engine.connect() as conn:
@@ -272,9 +271,23 @@ def db_session(db_engine):
     connection.close()
 
 
+def _ensure_test_lab_timezone(session) -> None:
+    """Tests that use the API client set UTC explicitly. There is no fallback."""
+    from models.lab_setting import LAB_SETTINGS_ID, LabSetting
+
+    row = session.query(LabSetting).filter(LabSetting.id == LAB_SETTINGS_ID).first()
+    if row is None:
+        session.add(LabSetting(id=LAB_SETTINGS_ID, timezone="UTC"))
+    elif not (row.timezone or "").strip():
+        row.timezone = "UTC"
+    session.flush()
+
+
 @pytest.fixture(scope="function")
 def client(db_session):
     """FastAPI test client with DB session override."""
+    _ensure_test_lab_timezone(db_session)
+
     def override_get_db():
         from app.core.lab_time import publish_lab_zone
 
