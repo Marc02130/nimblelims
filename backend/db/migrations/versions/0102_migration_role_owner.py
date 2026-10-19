@@ -139,6 +139,16 @@ def upgrade() -> None:
                           AND d.objid = c.oid
                           AND d.deptype = 'e'
                    )
+                   AND NOT (
+                       c.relkind = 'S'
+                       AND EXISTS (
+                           SELECT 1
+                             FROM pg_depend d
+                            WHERE d.classid = 'pg_class'::regclass
+                              AND d.objid = c.oid
+                              AND d.deptype IN ('a', 'i')
+                       )
+                   )
             LOOP
                 IF rec.relkind = 'S' THEN
                     EXECUTE format(
