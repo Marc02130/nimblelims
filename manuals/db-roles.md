@@ -9,6 +9,8 @@ Three jobs, three roles. The Compose bootstrap superuser is not one of the runti
 | `lims_app` | `db/zz-roles.sh` and `ensure_lims_app_role.py` | `LOGIN`, `NOSUPERUSER`, `NOBYPASSRLS` | The only role the API uses (`DATABASE_URL`). Row security applies, including forced policies. |
 | `lims_user` | `db/zz-roles.sh` on a new volume | `NOLOGIN`, `NOSUPERUSER`, `NOBYPASSRLS` | Historical grant target from early migrations. It is not a login and it does not own objects. `EXECUTE` on `batch_access_status(uuid)` is revoked. |  <!-- pragma: allowlist secret -->
 
+`backend/start.sh` writes on every boot: it ensures `lims_app` (GRANTs; password rotate only when `ENSURE_LIMS_APP_PASSWORD_ROTATE` is set), runs Alembic as `lims_migrate`, and replays the UI-schema DDL log. `db/zz-roles.sh` runs only on first volume init. That first-init script can create roles and reset their passwords. Later boots do not re-run it.
+
 `schema_apply` is a `NOLOGIN` role with no bypass. It owns the UI schema `SECURITY DEFINER` functions. The bootstrap script creates it and grants it to `lims_migrate` so Alembic can `ALTER ... OWNER TO schema_apply` without `CREATEROLE`. Those functions stay owned by `schema_apply` when a superuser runs the ownership migration.
 
 `BYPASSRLS` on `lims_migrate` is required. Tables such as `batches` use `FORCE ROW LEVEL SECURITY`, so the owner does not skip policies. `batch_access_status` is `SECURITY DEFINER` and has to see every batch to answer `not_found`, `forbidden`, or `visible`. Migration seeds also write those tables without an `app.current_user_id` setting. `lims_app` does not get `BYPASSRLS`.

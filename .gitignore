@@ -67,6 +67,7 @@ Thumbs.db
 
 # --- Local dumps ---
 .uat-backups/
+.uat-quarantine/
 TestData/
 *.db
 *.sqlite
