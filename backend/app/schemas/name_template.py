@@ -1,7 +1,8 @@
 """
 Pydantic schemas for name templates
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import Field, validator
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional
 from uuid import UUID
 from datetime import datetime

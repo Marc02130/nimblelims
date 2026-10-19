@@ -2,7 +2,8 @@
 Pydantic schemas for samples
 """
 from app.schemas._dates import is_future
-from pydantic import BaseModel, ConfigDict, Field, validator, model_validator
+from pydantic import ConfigDict, Field, validator, model_validator
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID

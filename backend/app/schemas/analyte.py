@@ -1,7 +1,8 @@
 """
 Pydantic schemas for analytes
 """
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID

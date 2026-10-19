@@ -34,6 +34,7 @@ import {
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import { apiService } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 
 interface ContainerDetailsProps {
   container: any;
@@ -151,7 +152,7 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = ({
                 <ListItem>
                   <ListItemText
                     primary="Created"
-                    secondary={new Date(container.created_at).toLocaleString()}
+                    secondary={formatInstant(container.created_at)}
                   />
                 </ListItem>
               </List>

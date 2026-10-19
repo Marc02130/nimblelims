@@ -1,6 +1,7 @@
 """Read and update the lab's IANA timezone."""
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 
 
 class LabTimezoneResponse(BaseModel):

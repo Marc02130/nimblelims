@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
+from app.schemas._instants import APIModel as BaseModel
 
 
 class StepAcceptedSampleTypesPut(BaseModel):

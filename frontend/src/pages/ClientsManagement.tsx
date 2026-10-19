@@ -28,6 +28,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import ClientDialog from '../components/clients/ClientDialog';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
@@ -141,9 +142,9 @@ const ClientsManagement: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+  const formatDate = (dateString?: string | null) => {
+    if (dateString === undefined || dateString === null || dateString === '') return 'N/A';
+    return formatInstant(dateString);
   };
 
   const columns: GridColDef[] = [
@@ -183,7 +184,7 @@ const ClientsManagement: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created At',
-      width: 180,
+      width: 200,
       valueGetter: (value, row) => formatDate((row as Client).created_at),
     },
     {

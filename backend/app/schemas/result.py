@@ -2,7 +2,8 @@
 Pydantic schemas for results
 """
 from app.schemas._dates import is_future
-from pydantic import BaseModel, Field, validator
+from pydantic import Field, validator
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID

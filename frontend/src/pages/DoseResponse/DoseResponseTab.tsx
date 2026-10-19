@@ -14,6 +14,7 @@ import ScienceIcon from '@mui/icons-material/Science';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 
 /** Safely convert a FastAPI/Pydantic error to a display string. */
 const apiErrorMsg = (err: any, fallback: string): string => {
@@ -172,7 +173,7 @@ const DoseResponseTab: React.FC<Props> = ({ runId, runStatus }) => {
       {summary && summary.total > 0 ? (
         <>
           <Typography variant="subtitle2" sx={{ mb: 1 }} color="text.secondary">
-            Last fit: {summary.last_fit_at ? new Date(summary.last_fit_at).toLocaleString() : '—'}
+            Last fit: {summary.last_fit_at ? formatInstant(summary.last_fit_at) : '—'}
           </Typography>
 
           {(summary.by_category['CANNOT_FIT'] ?? 0) > 0 && (

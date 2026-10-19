@@ -34,6 +34,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 import {
   appendAliquotPair,
@@ -982,8 +983,8 @@ const ExperimentTemplatesManagement: React.FC = () => {
     {
       field: 'modified_at',
       headerName: 'Last Modified',
-      width: 160,
-      valueFormatter: (value: unknown) => (value ? new Date(value as string).toLocaleString() : '—'),
+      width: 200,
+      valueFormatter: (value: unknown) => (value ? formatInstant(value) : '—'),
     },
     {
       field: 'modified_by',

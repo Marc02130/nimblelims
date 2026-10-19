@@ -20,6 +20,7 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
@@ -152,14 +153,14 @@ const RunsManagement: React.FC = () => {
     {
       field: 'started_at',
       headerName: 'Started',
-      width: 120,
-      valueGetter: (v) => (v ? new Date(v as string).toLocaleDateString() : '—'),
+      width: 190,
+      valueGetter: (v) => (v ? formatInstant(v) : '—'),
     },
     {
       field: 'created_at',
       headerName: 'Created',
-      width: 120,
-      valueGetter: (v) => new Date(v as string).toLocaleDateString(),
+      width: 190,
+      valueGetter: (v) => formatInstant(v),
     },
     {
       field: 'actions',

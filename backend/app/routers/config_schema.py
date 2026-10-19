@@ -3,7 +3,8 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+from app.schemas._instants import APIModel as BaseModel
 
 from app.core.rbac import require_any_permission
 from app.services.config_schema import (

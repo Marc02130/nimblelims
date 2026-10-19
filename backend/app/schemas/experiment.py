@@ -3,7 +3,8 @@ Pydantic schemas for experiments and experiment templates.
 
 JSONB fields: custom_attributes, template_definition, content, processing_conditions.
 """
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID

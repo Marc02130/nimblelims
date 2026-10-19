@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import BatchResultsView from './BatchResultsView';
 import { apiService, addClientFilterIfNeeded } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 import { useUser } from '../../contexts/UserContext';
 
 interface Batch {
@@ -177,7 +178,7 @@ const ResultsManagement: React.FC<ResultsManagementProps> = ({ onBack }) => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return formatInstant(dateString);
   };
 
   if (loading) {

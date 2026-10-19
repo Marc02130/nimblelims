@@ -8,7 +8,8 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel, stamp_instants
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, get_user_permissions
@@ -85,7 +86,8 @@ def require_configuring_agent(
 
 
 def _json(payload, code: int = 200) -> JSONResponse:
-    return JSONResponse(status_code=code, content=jsonable_encoder(payload))
+    encoded = jsonable_encoder(payload)
+    return JSONResponse(status_code=code, content=stamp_instants(encoded))
 
 
 @router.get("/settings")

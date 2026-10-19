@@ -3,7 +3,8 @@
 from enum import Enum
 from typing import Optional, List, Any, Dict
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 
 
 class AliquotMethod(str, Enum):
