@@ -27,6 +27,14 @@ class CustomAttributeConfigBase(BaseModel):
     description: Optional[str] = Field(None, description="Description of the attribute")
     active: bool = Field(True, description="Whether the attribute is active")
 
+
+class CustomAttributeConfigCreate(CustomAttributeConfigBase):
+    """Schema for creating a custom attribute configuration.
+
+    Allow-list and rule checks are input rules. The response model reads
+    whatever is already stored.
+    """
+
     @validator('entity_type')
     def validate_entity_type(cls, v):
         """Validate entity type is one of the supported types"""
@@ -47,12 +55,11 @@ class CustomAttributeConfigBase(BaseModel):
         """Validate validation rules based on data type"""
         if not isinstance(v, dict):
             raise ValueError("validation_rules must be a dictionary")
-        
+
         data_type = values.get('data_type')
-        if not data_type:
+        if data_type is None:
             return v
-        
-        # Validate rules based on data type
+
         if data_type == DataType.NUMBER:
             if 'min' in v and 'max' in v:
                 if v['min'] > v['max']:
@@ -71,13 +78,8 @@ class CustomAttributeConfigBase(BaseModel):
                 raise ValueError("select data type requires 'options' list in validation_rules")
             if not v['options']:
                 raise ValueError("options list cannot be empty")
-        
+
         return v
-
-
-class CustomAttributeConfigCreate(CustomAttributeConfigBase):
-    """Schema for creating a custom attribute configuration"""
-    pass
 
 
 class CustomAttributeConfigUpdate(BaseModel):

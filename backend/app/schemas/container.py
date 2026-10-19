@@ -54,23 +54,28 @@ class ContainerBase(BaseModel):
     description: Optional[str] = None
     row: int = Field(1, ge=1, description="Row position (1-based)")
     column: int = Field(1, ge=1, description="Column position (1-based)")
-    concentration: Optional[float] = Field(None, ge=0, description="Concentration value")
+    concentration: Optional[float] = Field(None, description="Concentration value")
     concentration_units: Optional[UUID] = Field(None, description="ID of concentration units")
-    amount: Optional[float] = Field(None, ge=0, description="Amount value")
+    amount: Optional[float] = Field(None, description="Amount value")
     amount_units: Optional[UUID] = Field(None, description="ID of amount units")
     type_id: UUID = Field(..., description="ID of container type")
     parent_container_id: Optional[UUID] = Field(None, description="ID of parent container for hierarchy")
+
+
+class ContainerCreate(ContainerBase):
+    """Schema for creating a new container.
+
+    Sign checks are input rules. ContainerResponse does not re-run them.
+    """
+
+    concentration: Optional[float] = Field(None, ge=0, description="Concentration value")
+    amount: Optional[float] = Field(None, ge=0, description="Amount value")
 
     @validator('concentration', 'amount')
     def validate_positive_values(cls, v):
         if v is not None and v < 0:
             raise ValueError('Value must be non-negative')
         return v
-
-
-class ContainerCreate(ContainerBase):
-    """Schema for creating a new container"""
-    pass
 
 
 class ContainerUpdate(BaseModel):
@@ -110,21 +115,26 @@ class ContentsBase(BaseModel):
     """Base schema for contents data"""
     container_id: UUID = Field(..., description="ID of container")
     sample_id: UUID = Field(..., description="ID of sample")
-    concentration: Optional[float] = Field(None, ge=0, description="Concentration value")
+    concentration: Optional[float] = Field(None, description="Concentration value")
     concentration_units: Optional[UUID] = Field(None, description="ID of concentration units")
-    amount: Optional[float] = Field(None, ge=0, description="Amount value")
+    amount: Optional[float] = Field(None, description="Amount value")
     amount_units: Optional[UUID] = Field(None, description="ID of amount units")
+
+
+class ContentsCreate(ContentsBase):
+    """Schema for creating new contents.
+
+    Sign checks are input rules. ContentsResponse does not re-run them.
+    """
+
+    concentration: Optional[float] = Field(None, ge=0, description="Concentration value")
+    amount: Optional[float] = Field(None, ge=0, description="Amount value")
 
     @validator('concentration', 'amount')
     def validate_positive_values(cls, v):
         if v is not None and v < 0:
             raise ValueError('Value must be non-negative')
         return v
-
-
-class ContentsCreate(ContentsBase):
-    """Schema for creating new contents"""
-    pass
 
 
 class ContentsUpdate(BaseModel):

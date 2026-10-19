@@ -29,18 +29,6 @@ class SampleBase(BaseModel):
     client_sample_id: Optional[str] = Field(None, max_length=255, description="Client-provided sample ID")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
-    @validator('received_date', 'report_date')
-    def validate_dates(cls, v):
-        if v is not None and is_future(v):
-            raise ValueError('Date cannot be in the future')
-        return v
-
-    @validator('temperature')
-    def validate_temperature(cls, v):
-        if v is not None and (v < -273.15 or v > 1000):
-            raise ValueError('Temperature must be between -273.15°C and 1000°C')
-        return v
-
 
 class BulkSampleUnique(BaseModel):
     """Schema for unique fields per sample in bulk accessioning"""
@@ -116,8 +104,23 @@ class BulkSampleAccessioningRequest(BaseModel):
 
 
 class SampleCreate(SampleBase):
-    """Schema for creating a new sample"""
-    pass
+    """Schema for creating a new sample.
+
+    Future-day and temperature checks belong on input only. SampleResponse
+    reads rows that were stored under a different lab zone.
+    """
+
+    @validator('received_date', 'report_date')
+    def validate_dates(cls, v):
+        if v is not None and is_future(v):
+            raise ValueError('Date cannot be in the future')
+        return v
+
+    @validator('temperature')
+    def validate_temperature(cls, v):
+        if v is not None and (v < -273.15 or v > 1000):
+            raise ValueError('Temperature must be between -273.15°C and 1000°C')
+        return v
 
 
 class SampleUpdate(BaseModel):

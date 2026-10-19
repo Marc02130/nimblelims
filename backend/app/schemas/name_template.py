@@ -19,6 +19,13 @@ class NameTemplateBase(BaseModel):
     active: bool = Field(True, description="Whether the template is active")
     seq_padding_digits: int = Field(1, ge=1, description="Number of digits for {SEQ} padding (1 = no padding)")
 
+
+class NameTemplateCreate(NameTemplateBase):
+    """Schema for creating a new name template.
+
+    Placeholder checks are input rules. NameTemplateResponse does not re-run them.
+    """
+
     @validator('entity_type')
     def validate_entity_type(cls, v):
         """Validate entity type is one of the supported types"""
@@ -31,23 +38,16 @@ class NameTemplateBase(BaseModel):
     def validate_template(cls, v):
         """Validate template contains valid placeholders"""
         valid_placeholders = VALID_PLACEHOLDERS
-        # Check if template contains at least one valid placeholder or is a simple string
         if not any(ph in v for ph in valid_placeholders) and '{' in v:
-            # Contains invalid placeholder
-            invalid_placeholders = []
             import re
             matches = re.findall(r'\{[^}]+\}', v)
-            for match in matches:
-                if match not in valid_placeholders:
-                    invalid_placeholders.append(match)
+            invalid_placeholders = [match for match in matches if match not in valid_placeholders]
             if invalid_placeholders:
-                raise ValueError(f"Invalid placeholders found: {', '.join(invalid_placeholders)}. Valid placeholders: {', '.join(valid_placeholders)}")
+                raise ValueError(
+                    f"Invalid placeholders found: {', '.join(invalid_placeholders)}. "
+                    f"Valid placeholders: {', '.join(valid_placeholders)}"
+                )
         return v
-
-
-class NameTemplateCreate(NameTemplateBase):
-    """Schema for creating a new name template"""
-    pass
 
 
 class NameTemplateUpdate(BaseModel):

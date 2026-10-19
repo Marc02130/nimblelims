@@ -132,3 +132,25 @@ class BatchCreateWithContainersRequest(BaseModel):
 
     # Removed date validation - dates can be in the future for scheduling
     # End dates are typically set when batch is completed, not during creation
+
+
+class BatchContentSample(BaseModel):
+    """Sample fields Enter Results reads off a container content."""
+    qc_type: Optional[UUID] = None
+
+
+class BatchContainerContentRead(BaseModel):
+    """One sample sitting in a batch container."""
+    sample_id: UUID
+    sample_name: Optional[str] = None
+    qc_type: Optional[UUID] = None
+    sample: Optional[BatchContentSample] = None
+
+
+class BatchContainerRead(BaseModel):
+    """Container plus contents for GET /batches/{id}/containers."""
+    id: UUID
+    name: Optional[str] = None
+    row: Optional[int] = None
+    column: Optional[int] = None
+    contents: List[BatchContainerContentRead] = Field(default_factory=list)

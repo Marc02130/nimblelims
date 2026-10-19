@@ -111,6 +111,7 @@ class DoseResponseSummary(BaseModel):
     ic50_range:      Optional[dict] = None
     mean_r_squared:  Optional[float] = None
     fit_in_progress: bool
+    last_fit_at:     Optional[datetime] = None
 
 
 class ExclusionRead(BaseModel):

@@ -26,16 +26,18 @@ class ResultBase(BaseModel):
         description="Source LimsRun when created via promote-on-publish",
     )
 
-    @validator('entry_date')
-    def validate_entry_date(cls, v):
-        if is_future(v):
-            raise ValueError('Entry date cannot be in the future')
-        return v
-
 
 class ResultCreate(ResultBase):
-    """Schema for creating a new result"""
-    pass
+    """Schema for creating a new result.
+
+    Entry-date checks run on create, update, and batch entry, not on read.
+    """
+
+    @validator('entry_date')
+    def validate_entry_date(cls, v):
+        if v is not None and is_future(v):
+            raise ValueError('Entry date cannot be in the future')
+        return v
 
 
 class ResultUpdate(BaseModel):

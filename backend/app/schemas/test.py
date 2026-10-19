@@ -21,16 +21,18 @@ class TestBase(BaseModel):
     technician_id: Optional[UUID] = Field(None, description="ID of technician user")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
+
+class TestCreate(TestBase):
+    """Schema for creating a new test.
+
+    Future-day checks run here and on update requests, not on TestResponse.
+    """
+
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
         return v
-
-
-class TestCreate(TestBase):
-    """Schema for creating a new test"""
-    pass
 
 
 class TestUpdate(BaseModel):
