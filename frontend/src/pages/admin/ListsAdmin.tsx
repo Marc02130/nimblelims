@@ -24,6 +24,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import ListFormDialog from './ListFormDialog';
 import EntryFormDialog from './EntryFormDialog';
@@ -53,10 +54,9 @@ const AlertComponent = React.forwardRef<HTMLDivElement, AlertProps>(function Ale
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
 });
 
-function formatDate(dateStr: string | undefined): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return d.toLocaleString();
+function formatDate(dateStr: string | null | undefined): string {
+  if (dateStr === undefined || dateStr === null || dateStr === '') return '';
+  return formatInstant(dateStr);
 }
 
 const ListsAdmin: React.FC = () => {
@@ -254,7 +254,7 @@ const ListsAdmin: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created At',
-      width: 170,
+      width: 200,
       valueFormatter: (value) => formatDate(value as string),
     },
     ...(canEdit

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from app.schemas._instants import APIModel as BaseModel
 
 from models.lims_run_checklist import LimsRunChecklistStepStatus
 

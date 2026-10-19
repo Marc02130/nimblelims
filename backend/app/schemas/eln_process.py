@@ -3,7 +3,8 @@ Pydantic schemas for ELN Process instances (Phase 1–3).
 
 Distinct from lims_run_checklist schemas (checklist inside a LimsRun).
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Any
 from datetime import datetime
 from uuid import UUID

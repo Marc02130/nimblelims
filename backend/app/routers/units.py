@@ -18,7 +18,7 @@ from app.core.conversions import (
     designate_base_unit,
     is_base_multiplier,
 )
-from pydantic import BaseModel
+from app.schemas._instants import APIModel as BaseModel
 from uuid import UUID
 from datetime import datetime
 from typing import Optional

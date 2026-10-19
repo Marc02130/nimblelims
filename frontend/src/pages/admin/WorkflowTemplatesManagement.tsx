@@ -22,6 +22,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 
 export interface WorkflowTemplateRow {
@@ -250,8 +251,8 @@ const WorkflowTemplatesManagement: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created',
-      width: 160,
-      valueFormatter: (value) => (value ? new Date(value as string).toLocaleString() : '—'),
+      width: 200,
+      valueFormatter: (value) => (value ? formatInstant(value) : '—'),
     },
     {
       field: 'actions',

@@ -14,7 +14,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
+from app.schemas._instants import APIModel as BaseModel
 
 from models.flexible_experiment import LimsRunStatus, SopParseJobStatus
 

@@ -29,6 +29,7 @@ import {
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import UserFormDialog from './UserFormDialog';
 
@@ -168,9 +169,9 @@ const UsersManagement: React.FC = () => {
     return client?.name || 'Unknown';
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleString();
+  const formatDate = (dateString?: string | null) => {
+    if (dateString === undefined || dateString === null || dateString === '') return 'Never';
+    return formatInstant(dateString);
   };
 
   const columns: GridColDef[] = [
@@ -201,7 +202,7 @@ const UsersManagement: React.FC = () => {
     {
       field: 'last_login',
       headerName: 'Last Login',
-      width: 180,
+      width: 200,
       valueGetter: (value, row) => formatDate((row as User).last_login),
     },
     {

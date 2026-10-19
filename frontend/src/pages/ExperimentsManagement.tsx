@@ -45,6 +45,7 @@ import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay';
 import LinkIcon from '@mui/icons-material/Link';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import EntryCapturePanel from '../components/experiments/EntryCapturePanel';
 import StartExperimentDialog from '../components/experiments/StartExperimentDialog';
@@ -158,7 +159,7 @@ const RunsTab: React.FC<{ experimentId: string }> = ({ experimentId }) => {
                     <TableCell>
                       <Chip size="small" label={run.status} color={statusColor(run.status) as any} />
                     </TableCell>
-                    <TableCell>{run.started_at ? new Date(run.started_at).toLocaleDateString() : '—'}</TableCell>
+                    <TableCell>{run.started_at ? formatInstant(run.started_at) : '—'}</TableCell>
                     <TableCell>
                       <Button size="small" startIcon={<VisibilityIcon />} onClick={() => navigate(`/runs/${run.id}`)}>
                         View
@@ -362,14 +363,14 @@ const ExperimentsManagement: React.FC = () => {
     {
       field: 'started_at',
       headerName: 'Started',
-      width: 120,
-      valueGetter: (v) => (v ? new Date(v as string).toLocaleDateString() : '—'),
+      width: 190,
+      valueGetter: (v) => (v ? formatInstant(v) : '—'),
     },
     {
       field: 'completed_at',
       headerName: 'Completed',
-      width: 120,
-      valueGetter: (v) => (v ? new Date(v as string).toLocaleDateString() : '—'),
+      width: 190,
+      valueGetter: (v) => (v ? formatInstant(v) : '—'),
     },
     {
       field: 'actions',
@@ -452,13 +453,13 @@ const ExperimentsManagement: React.FC = () => {
                 <ListItem>
                   <ListItemText
                     primary="Started"
-                    secondary={selectedExperiment.started_at ? new Date(selectedExperiment.started_at).toLocaleString() : '—'}
+                    secondary={selectedExperiment.started_at ? formatInstant(selectedExperiment.started_at) : '—'}
                   />
                 </ListItem>
                 <ListItem>
                   <ListItemText
                     primary="Completed"
-                    secondary={selectedExperiment.completed_at ? new Date(selectedExperiment.completed_at).toLocaleString() : '—'}
+                    secondary={selectedExperiment.completed_at ? formatInstant(selectedExperiment.completed_at) : '—'}
                   />
                 </ListItem>
                 {selectedExperiment.custom_attributes && Object.keys(selectedExperiment.custom_attributes).length > 0 && (
@@ -496,7 +497,7 @@ const ExperimentsManagement: React.FC = () => {
               {selectedExperiment.started_at && (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   Cohort locked since{' '}
-                  {new Date(selectedExperiment.started_at).toLocaleString()}. Samples cannot be
+                  {formatInstant(selectedExperiment.started_at)}. Samples cannot be
                   added mid-flight.
                 </Alert>
               )}

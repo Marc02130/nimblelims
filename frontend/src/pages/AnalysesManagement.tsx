@@ -41,6 +41,7 @@ import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import CustomAttributeField from '../components/common/CustomAttributeField';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
@@ -483,8 +484,8 @@ const AnalysesManagement: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created',
-      width: 120,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      width: 200,
+      valueGetter: (value) => (value ? formatInstant(value) : ''),
     },
     {
       field: 'actions',

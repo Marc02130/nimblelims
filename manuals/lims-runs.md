@@ -38,7 +38,7 @@ Operator SoT: [HOWTO.md](HOWTO.md) § Later execution. **X-1** (2026-09-11).
 
 - Table: `lims_runs`
 - Status is a strict enum (`LimsRunStatus`) with two lifecycles controlled by the template's `lifecycle_type`.
-- Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`.
+- Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`, plus `created_at` and `modified_at`. The API sends each of those as UTC with `Z`. The run page shows them in the browser's local time, so a run created at 7:23 PM US Eastern is `2026-10-18T23:23:00Z`, not 11:23 PM. The columns are still `timestamp without time zone`; the stored wall time is UTC.
 - Special field: `fit_in_progress` (mutex for curve fitting).
 - **`analysis_id`** (required FK → `analyses`): assay this run is for. Set on create/edit; required to start, import, and publish. On publish, instrument data is promoted to Tests/Results for that analysis.
 

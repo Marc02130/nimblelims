@@ -4,7 +4,8 @@ from decimal import Decimal
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
+from app.schemas._instants import APIModel as BaseModel
 
 StorageCondition = Literal["-80C", "-20C", "4C", "RT"]
 QcStatus = Literal["pending", "released", "rejected"]

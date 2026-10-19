@@ -13,6 +13,7 @@ import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import TestForm from '../components/tests/TestForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
@@ -171,8 +172,8 @@ const TestsManagement: React.FC = () => {
     { 
       field: 'modified_at', 
       headerName: 'Last Modified', 
-      width: 150,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      width: 200,
+      valueGetter: (value) => (value ? formatInstant(value) : ''),
     },
     {
       field: 'actions',

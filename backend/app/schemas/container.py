@@ -1,7 +1,8 @@
 """
 Pydantic schemas for containers and contents
 """
-from pydantic import BaseModel, Field, validator
+from pydantic import Field, validator
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID

@@ -19,3 +19,21 @@ export const calendarDateInput = (value: unknown): string => {
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
   return match ? match[1] : '';
 };
+
+const HAS_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * An instant in the browser's local zone.
+ * A value with no offset is UTC wall time (the API used to omit Z).
+ * Calendar dates do not belong here.
+ */
+export const formatInstant = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = value instanceof Date ? value.toISOString() : String(value).trim();
+  if (raw === '') return '';
+  const hasTime = raw.includes('T') || raw.includes(' ');
+  const normalized = HAS_OFFSET.test(raw) || !hasTime ? raw : `${raw.replace(' ', 'T')}Z`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleString();
+};

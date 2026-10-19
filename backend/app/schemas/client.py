@@ -1,7 +1,7 @@
 """
 Pydantic schemas for clients
 """
-from pydantic import BaseModel
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime
 from uuid import UUID

@@ -14,7 +14,7 @@ from app.schemas.name_template import (
     NameTemplateUpdate,
     NameTemplateListResponse,
 )
-from pydantic import BaseModel
+from app.schemas._instants import APIModel as BaseModel
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
 from app.core.patch_fields import explicit_updates

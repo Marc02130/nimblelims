@@ -2,7 +2,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 
 from models.dose_response import CurveCategory, ReviewStatus
 

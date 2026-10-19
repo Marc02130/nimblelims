@@ -1,7 +1,8 @@
 """
 Pydantic schemas for users, roles, and permissions
 """
-from pydantic import BaseModel, EmailStr
+from pydantic import EmailStr
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID

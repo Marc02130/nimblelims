@@ -15,6 +15,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import ContainerForm from '../components/containers/ContainerForm';
 import ContainerDetails from '../components/containers/ContainerDetails';
 import { apiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Container {
@@ -146,8 +147,12 @@ const ContainerManagement: React.FC = () => {
     { 
       field: 'modified_at', 
       headerName: 'Last Modified', 
-      width: 150,
-      valueGetter: (value, row) => row.modified_at ? new Date(row.modified_at).toLocaleDateString() : new Date(row.created_at).toLocaleDateString()
+      width: 200,
+      valueGetter: (_value, row) => {
+        if (row.modified_at != null && row.modified_at !== '') return formatInstant(row.modified_at);
+        if (row.created_at != null && row.created_at !== '') return formatInstant(row.created_at);
+        return '';
+      }
     },
     {
       field: 'actions',

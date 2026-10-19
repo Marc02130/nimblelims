@@ -1,7 +1,8 @@
 """
 Pydantic schemas for authentication
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import EmailStr, Field
+from app.schemas._instants import APIModel as BaseModel
 from typing import List, Optional
 from datetime import datetime
 

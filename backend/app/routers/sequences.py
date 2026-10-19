@@ -8,7 +8,8 @@ from app.database import get_db
 from app.core.security import get_current_user
 from app.core.rbac import require_config_edit
 from models.user import User
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 
 router = APIRouter(prefix="/admin/sequences", tags=["sequences"])
 

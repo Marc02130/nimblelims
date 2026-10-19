@@ -1,5 +1,6 @@
 """Pydantic schemas for Experiment Entries (P0 foundation)."""
-from pydantic import BaseModel, Field
+from pydantic import Field
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 from uuid import UUID

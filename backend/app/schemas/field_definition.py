@@ -1,7 +1,8 @@
 """
 Pydantic schemas for FieldDefinition
 """
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import Field, validator, ConfigDict
+from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime

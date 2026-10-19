@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import Field, ConfigDict
+from app.schemas._instants import APIModel as BaseModel
 
 
 class InstrumentTypeBase(BaseModel):

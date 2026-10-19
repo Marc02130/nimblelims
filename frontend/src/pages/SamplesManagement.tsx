@@ -28,6 +28,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import SampleForm from '../components/samples/SampleForm';
 import AskedForForm, { AskedForFormValues } from '../components/asked-for/AskedForForm';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { useUser } from '../contexts/UserContext';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 import ListFilterChips from '../components/common/ListFilterChips';
@@ -371,8 +372,8 @@ const SamplesManagement: React.FC = () => {
     { 
       field: 'modified_at', 
       headerName: 'Last Modified', 
-      width: 150,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      width: 200,
+      valueGetter: (value) => (value ? formatInstant(value) : ''),
     },
     {
       field: 'actions',

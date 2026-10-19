@@ -23,6 +23,7 @@ import {
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { apiService } from '../../services/apiService';
+import { formatInstant } from '../../utils/localDate';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -182,7 +183,7 @@ const StartCohortPanel: React.FC<StartCohortPanelProps> = ({
     return (
       <Alert severity="info" sx={{ mb: 2 }}>
         Cohort locked — experiment started{' '}
-        {startedAt ? new Date(startedAt).toLocaleString() : ''}. {existingSampleIds.length}{' '}
+        {startedAt ? formatInstant(startedAt) : ''}. {existingSampleIds.length}{' '}
         sample(s). Mid-flight adds are not allowed; cancel/restart or create a new experiment to
         change the set.
       </Alert>

@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { Formik, Form, Field } from 'formik';
 import * as Yup from 'yup';
+import { formatInstant } from '../../utils/localDate';
 
 interface UserFormDialogProps {
   open: boolean;
@@ -285,7 +286,7 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         label="Last Login"
-                        value={user?.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                        value={user?.last_login ? formatInstant(user.last_login) : 'Never'}
                         fullWidth
                         margin="normal"
                         disabled

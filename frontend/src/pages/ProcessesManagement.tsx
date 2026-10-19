@@ -43,6 +43,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, ApiService } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 import StartExperimentDialog from '../components/experiments/StartExperimentDialog';
 
@@ -493,9 +494,9 @@ const ProcessesManagement: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created',
-      width: 160,
+      width: 200,
       valueGetter: (_v, row) =>
-        row.created_at ? new Date(row.created_at).toLocaleString() : '',
+        row.created_at ? formatInstant(row.created_at) : '',
     },
     {
       field: 'actions',
@@ -524,9 +525,9 @@ const ProcessesManagement: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created',
-      width: 160,
+      width: 200,
       valueGetter: (_v, row) =>
-        row.created_at ? new Date(row.created_at).toLocaleString() : '',
+        row.created_at ? formatInstant(row.created_at) : '',
     },
     {
       field: 'actions',

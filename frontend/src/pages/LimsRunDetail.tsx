@@ -33,6 +33,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, PromotionPreview } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import PublishPromotionDialog from '../components/runs/PublishPromotionDialog';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 import StartCohortPanel from '../components/experiments/StartCohortPanel';
@@ -544,25 +545,25 @@ const LimsRunDetail: React.FC = () => {
               <ListItem>
                 <ListItemText
                   primary="Started"
-                  secondary={run.started_at ? new Date(run.started_at).toLocaleString() : '—'}
+                  secondary={run.started_at ? formatInstant(run.started_at) : '—'}
                 />
               </ListItem>
               <ListItem>
                 <ListItemText
                   primary="Completed"
-                  secondary={run.completed_at ? new Date(run.completed_at).toLocaleString() : '—'}
+                  secondary={run.completed_at ? formatInstant(run.completed_at) : '—'}
                 />
               </ListItem>
               <ListItem>
                 <ListItemText
                   primary="Published"
-                  secondary={run.published_at ? new Date(run.published_at).toLocaleString() : '—'}
+                  secondary={run.published_at ? formatInstant(run.published_at) : '—'}
                 />
               </ListItem>
               <ListItem>
                 <ListItemText
                   primary="Created"
-                  secondary={new Date(run.created_at).toLocaleString()}
+                  secondary={formatInstant(run.created_at)}
                 />
               </ListItem>
             </List>

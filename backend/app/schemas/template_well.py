@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 from typing import List, Optional
-from pydantic import BaseModel
+from app.schemas._instants import APIModel as BaseModel
 
 
 class TemplateWellDefinitionCreate(BaseModel):

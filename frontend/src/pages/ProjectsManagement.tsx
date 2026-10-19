@@ -19,6 +19,7 @@ import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams, GridToolbar }
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import { apiService, addClientFilterIfNeeded } from '../services/apiService';
+import { formatInstant } from '../utils/localDate';
 import ProjectForm from '../components/projects/ProjectForm';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
@@ -250,8 +251,8 @@ const ProjectsManagement: React.FC = () => {
     {
       field: 'created_at',
       headerName: 'Created',
-      width: 150,
-      valueGetter: (value) => value ? new Date(value).toLocaleDateString() : '',
+      width: 200,
+      valueGetter: (value) => (value ? formatInstant(value) : ''),
     },
     {
       field: 'actions',
