@@ -6,7 +6,7 @@ from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -60,7 +60,8 @@ class ResultUpdate(BaseModel):
 
 
 class ResultResponse(ResultBase):
-    """Schema for result response"""
+    """Schema for result response. entry_date is a SQL date, sent as YYYY-MM-DD."""
+    entry_date: date
     id: UUID
     active: bool
     created_at: datetime

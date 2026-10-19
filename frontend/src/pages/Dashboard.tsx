@@ -16,6 +16,7 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useUser } from '../contexts/UserContext';
 import { apiService } from '../services/apiService';
+import { formatCalendarDay } from '../utils/localDate';
 import { FillHeightPage, FillHeightTable } from '../components/common/FillHeightPage';
 
 interface Sample {
@@ -192,7 +193,7 @@ const Dashboard: React.FC = () => {
       field: 'due_date', 
       headerName: 'Due Date', 
       width: 120,
-      valueGetter: (value, row) => new Date(row.due_date).toLocaleDateString()
+      valueGetter: (value, row) => formatCalendarDay(row.due_date)
     },
     { 
       field: 'temperature', 

@@ -188,9 +188,9 @@ Get eligible samples with prioritization for batch creation.
       "id": "uuid",
       "name": "SAMPLE-001",
       "description": "Sample description",
-      "due_date": "2026-01-25T00:00:00",
-      "received_date": "2026-01-19T00:00:00",
-      "date_sampled": "2026-01-15T00:00:00",
+      "due_date": "2026-01-25",
+      "received_date": "2026-01-19",
+      "date_sampled": "2026-01-15",
       "sample_type": "uuid",
       "status": "uuid",
       "matrix": "uuid",
@@ -204,8 +204,8 @@ Get eligible samples with prioritization for batch creation.
       "analysis_name": "EPA Method 8080",
       "shelf_life": 14,
       "project_name": "Project Alpha",
-      "project_due_date": "2026-01-25T00:00:00",
-      "effective_due_date": "2026-01-25T00:00:00"
+      "project_due_date": "2026-01-25",
+      "effective_due_date": "2026-01-25"
     },
     {
       "id": "uuid",
@@ -252,7 +252,7 @@ List batches with filtering and pagination.
       "description": "January batch",
       "type": "uuid",
       "status": "uuid",
-      "start_date": "2026-01-19T00:00:00",
+      "start_date": "2026-01-19",
       "end_date": null,
       "custom_attributes": {},
       "active": true,
@@ -411,7 +411,7 @@ Validate container compatibility for cross-project batching without creating a b
           "sample_id": "uuid",
           "sample_name": "SAMPLE-001",
           "days_expired": 5,
-          "expiration_date": "2026-01-14T00:00:00"
+          "expiration_date": "2026-01-14"
         }
       ]
     },
@@ -423,7 +423,7 @@ Validate container compatibility for cross-project batching without creating a b
           "sample_id": "uuid",
           "sample_name": "SAMPLE-002",
           "days_until_expiration": 2,
-          "expiration_date": "2026-01-21T00:00:00"
+          "expiration_date": "2026-01-21"
         }
       ]
     }

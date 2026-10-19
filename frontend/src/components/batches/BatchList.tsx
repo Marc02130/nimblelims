@@ -31,6 +31,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { apiService, addClientFilterIfNeeded } from '../../services/apiService';
+import { formatCalendarDay } from '../../utils/localDate';
 import { useUser } from '../../contexts/UserContext';
 
 interface BatchContainer {
@@ -169,9 +170,7 @@ const BatchList: React.FC<BatchListProps> = ({ onViewBatch, onEditBatch, onCreat
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
+  const formatDate = (dateString: string) => formatCalendarDay(dateString);
 
   if (loading) {
     return (

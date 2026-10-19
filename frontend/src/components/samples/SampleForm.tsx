@@ -30,7 +30,7 @@ import CustomAttributeField from '../common/CustomAttributeField';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
 import { apiErrorText } from '../../utils/apiErrorText';
-import { calendarDateInput, localDateString } from '../../utils/localDate';
+import { calendarDateInput, localDateString, parseCalendarDate } from '../../utils/localDate';
 
 /** Shows experiments this sample participated in (view-only, used in SampleForm when readOnly). */
 function SampleExperimentsSection({ sampleId }: { sampleId: string }) {
@@ -404,15 +404,7 @@ const SampleForm: React.FC<SampleFormProps> = ({
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label="Due Date"
-                    value={values.due_date ? (() => {
-                      // Parse date string in local timezone (YYYY-MM-DD format)
-                      const dateStr = values.due_date;
-                      if (dateStr && typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        const [year, month, day] = dateStr.split('-').map(Number);
-                        return new Date(year, month - 1, day);
-                      }
-                      return new Date(dateStr);
-                    })() : null}
+                    value={parseCalendarDate(values.due_date)}
                     onChange={(date) => {
                       if (date) {
                         // Format date in local timezone as YYYY-MM-DD
