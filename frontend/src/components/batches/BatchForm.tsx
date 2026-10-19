@@ -23,6 +23,7 @@ import * as Yup from 'yup';
 import CustomAttributeField from '../common/CustomAttributeField';
 import ContainerGrid from './ContainerGrid';
 import { apiService } from '../../services/apiService';
+import { formatCalendarDate, parseCalendarDate } from '../../utils/localDate';
 
 interface CustomAttributeConfig {
   id: string;
@@ -281,8 +282,8 @@ const BatchForm: React.FC<BatchFormProps> = ({ batch, onSuccess, onCancel }) => 
         description: batch.description || '',
         type: batch.type || '',
         status: batch.status || '',
-        start_date: batch.start_date ? new Date(batch.start_date) : null,
-        end_date: batch.end_date ? new Date(batch.end_date) : null,
+        start_date: parseCalendarDate(batch.start_date),
+        end_date: parseCalendarDate(batch.end_date),
         custom_attributes: batch.custom_attributes || {},
       };
     }
@@ -307,8 +308,8 @@ const BatchForm: React.FC<BatchFormProps> = ({ batch, onSuccess, onCancel }) => 
         description: values.description,
         type: values.type || null,
         status: values.status,
-        start_date: values.start_date?.toISOString() || null,
-        end_date: values.end_date?.toISOString() || null,
+        start_date: formatCalendarDate(values.start_date),
+        end_date: formatCalendarDate(values.end_date),
         custom_attributes: values.custom_attributes,
       };
 

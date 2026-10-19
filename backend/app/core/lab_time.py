@@ -159,15 +159,27 @@ def is_naive_midnight(value: datetime) -> bool:
 def as_calendar_day(value: Union[date, datetime], zone_name: str) -> date:
     """The calendar day of ``value`` in ``zone_name``.
 
-    A naive midnight is that calendar date and is not shifted by the zone.
-    Any other datetime, including one that carries an offset, is converted
-    into the lab zone. A plain ``date`` is already a calendar day.
+    A naive datetime is lab-zone wall time, midnight or not, so its calendar
+    date is ``value.date()``. An offset-bearing datetime is converted into
+    the lab zone. A plain ``date`` is already a calendar day.
+
+    This disagrees with the earlier reading that a naive non-midnight value
+    is UTC wall time. ``datetime(2026, 10, 19, 2, 0)`` is 2026-10-19 in the
+    lab, not the previous evening in America/New_York. Seeded ``utcnow()``
+    rows were written as UTC wall time; the date backfill keeps their date
+    part (``col::date``) rather than shifting them with
+    ``((col AT TIME ZONE 'UTC') AT TIME ZONE lab_zone)::date``.
     """
     if isinstance(value, datetime):
-        if is_naive_midnight(value):
+        if value.tzinfo is None:
             return value.date()
         return clock_date(zone_name, value)
     return value
+
+
+def current_lab_day() -> date:
+    """Today on the lab clock. ``current_lab_zone`` must already be published."""
+    return clock_date(current_lab_zone())
 
 
 def days_from_today(

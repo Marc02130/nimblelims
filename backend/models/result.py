@@ -1,6 +1,6 @@
 """Result model — instance of an analyte value on a test (not a named entity)."""
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer, Text
+from sqlalchemy import Column, Date, String, DateTime, ForeignKey, Boolean, Integer, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -30,7 +30,7 @@ class Result(Base):
     reported_result = Column(String(255), nullable=True)
     qualifiers = Column(PostgresUUID(as_uuid=True), ForeignKey('list_entries.id'), nullable=True)
     calculated_result = Column(String(255), nullable=True)
-    entry_date = Column(DateTime, server_default=func.now(), nullable=False)
+    entry_date = Column(Date, server_default=text("CURRENT_DATE"), nullable=False)
     entered_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')
 
