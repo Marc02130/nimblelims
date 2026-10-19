@@ -13,6 +13,11 @@ does not return one.
 Visibility matches ``batches_access``: an administrator, or a sample in the
 batch whose project passes ``has_project_access``. An inactive row is
 ``not_found``, same as the routes that filter ``active``.
+
+``EXECUTE`` is revoked from ``PUBLIC`` and from the function owner. It is
+granted only to ``lims_app``. Revoking ``PUBLIC`` is what writes the owner's
+privilege into the function ACL; this block removes that entry at creation
+so recreating the function does not leave it behind.
 """
 from alembic import op
 
@@ -89,6 +94,10 @@ def upgrade() -> None:
                 owner_name
             );
             EXECUTE 'REVOKE ALL ON FUNCTION public.batch_access_status(uuid) FROM PUBLIC';
+            EXECUTE format(
+                'REVOKE EXECUTE ON FUNCTION public.batch_access_status(uuid) FROM %I',
+                owner_name
+            );
             IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'lims_app') THEN
                 EXECUTE 'GRANT EXECUTE ON FUNCTION public.batch_access_status(uuid) TO lims_app';
             END IF;
