@@ -25,6 +25,7 @@ import {
 import { DataGrid, GridColDef, GridRowParams, GridCellParams, GridRenderCellParams } from '@mui/x-data-grid';
 import { apiService } from '../../services/apiService';
 import { apiErrorText } from '../../utils/apiErrorText';
+import { entryDateRefusal } from '../../utils/entryDateGuard';
 import { localDateString } from '../../utils/localDate';
 
 interface Analyte {
@@ -425,6 +426,14 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
       setError(null);
       setQcFailures([]);
 
+      const dateRefusal = entryDateRefusal(entryDate);
+      if (dateRefusal !== null) {
+        setError(dateRefusal);
+        setSaving(false);
+        setConfirmDialogOpen(false);
+        return;
+      }
+
       // Validate all results
       const errors = validateAllResults();
       if (errors.length > 0) {
@@ -530,7 +539,14 @@ const BatchResultsEntryTable: React.FC<BatchResultsEntryTableProps> = ({
         <Button
           variant="contained"
           startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-          onClick={() => setConfirmDialogOpen(true)}
+          onClick={() => {
+            const dateRefusal = entryDateRefusal(entryDate);
+            if (dateRefusal !== null) {
+              setError(dateRefusal);
+              return;
+            }
+            setConfirmDialogOpen(true);
+          }}
           disabled={saving}
         >
           Submit Results

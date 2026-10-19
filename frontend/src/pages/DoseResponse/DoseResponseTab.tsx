@@ -170,12 +170,16 @@ const DoseResponseTab: React.FC<Props> = ({ runId, runStatus }) => {
         )}
       </Box>
 
+      {summary != null && (
+        <Typography variant="subtitle2" sx={{ mb: 1 }} color="text.secondary">
+          Last fit: {summary.last_fit_at != null && summary.last_fit_at !== ''
+            ? formatInstant(summary.last_fit_at)
+            : '—'}
+        </Typography>
+      )}
+
       {summary && summary.total > 0 ? (
         <>
-          <Typography variant="subtitle2" sx={{ mb: 1 }} color="text.secondary">
-            Last fit: {summary.last_fit_at ? formatInstant(summary.last_fit_at) : '—'}
-          </Typography>
-
           {(summary.by_category['CANNOT_FIT'] ?? 0) > 0 && (
             <Alert
               severity="error"

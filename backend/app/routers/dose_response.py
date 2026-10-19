@@ -241,7 +241,6 @@ def get_result_svg(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
 
     from models.sample import Sample
-    from models.list import ListEntry
     from models.template_well import TemplateWellDefinition
     from app.services.dose_response_fit import DoseResponseFitService
 
@@ -284,8 +283,8 @@ def get_result_svg(
     )
     all_sample_ids = {r.sample_id for r in all_run_rows if r.sample_id}
     samples_map = {s.id: s for s in db.query(Sample).filter(Sample.id.in_(all_sample_ids)).all()} if all_sample_ids else {}
-    qc_entries = db.query(ListEntry).filter(ListEntry.name.in_(["positive_control", "negative_control"])).all()
-    qc_by_id = {e.id: e.name for e in qc_entries}
+    from app.services.qc_controls import NEGATIVE, POSITIVE, codes_for_qc_types
+    qc_by_id = codes_for_qc_types(db, (s.qc_type for s in samples_map.values()))
 
     pos_signals: list = []
     neg_signals: list = []
@@ -300,10 +299,12 @@ def get_result_svg(
         sig = DoseResponseFitService._extract_signal(r, result_col)
         if sig is None:
             continue
-        qc_name = qc_by_id.get(s.qc_type)
-        if qc_name == "positive_control":
+        qc_code = None
+        if s.qc_type is not None:
+            qc_code = qc_by_id.get(s.qc_type)
+        if qc_code == POSITIVE:
             pos_signals.append(sig)
-        elif qc_name == "negative_control":
+        elif qc_code == NEGATIVE:
             neg_signals.append(sig)
 
     if pos_signals and neg_signals:
@@ -390,6 +391,14 @@ def get_summary(
 
     mean_r2 = sum(r_squareds) / len(r_squareds) if r_squareds else None
 
+    last_fit_at = None
+    for row in all_latest:
+        instant = row.fit_triggered_at if row.fit_triggered_at is not None else row.created_at
+        if instant is None:
+            continue
+        if last_fit_at is None or instant > last_fit_at:
+            last_fit_at = instant
+
     return DoseResponseSummary(
         total=total,
         by_category=by_category,
@@ -397,6 +406,7 @@ def get_summary(
         ic50_range=ic50_range,
         mean_r_squared=mean_r2,
         fit_in_progress=run.fit_in_progress,
+        last_fit_at=last_fit_at,
     )
 
 

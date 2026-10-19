@@ -1,6 +1,6 @@
 # UAT: instant columns are timestamptz
 
-Stack: migration `0097_instant_timestamptz` after the instant-display branch.
+Stack: migration `0099_instant_timestamptz` after `0098_batch_access_status`.
 
 ## What changed
 

@@ -34,6 +34,7 @@ import {
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
 import { apiErrorText } from '../../utils/apiErrorText';
+import { entryDateRefusal } from '../../utils/entryDateGuard';
 import { localDateString } from '../../utils/localDate';
 
 interface CustomAttributeConfig {
@@ -172,7 +173,7 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
 
   const loadQualifiers = async () => {
     try {
-      const data = await apiService.getListEntries('qualifiers');
+      const data = await apiService.getListEntries('result_qualifiers');
       setQualifiers(data);
     } catch (err) {
       console.error('Failed to load qualifiers:', err);
@@ -236,6 +237,12 @@ const ResultsEntryTable: React.FC<ResultsEntryTableProps> = ({
       setSaving(true);
       setError(null);
       setSuccess(null);
+
+      const dateRefusal = entryDateRefusal(entryDate);
+      if (dateRefusal !== null) {
+        setError(dateRefusal);
+        return;
+      }
 
       // Validate all results
       const validationErrors: string[] = [];

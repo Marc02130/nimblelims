@@ -208,12 +208,27 @@ describe('ResultsEntryTable', () => {
     expect(defaultProps.onResultsSaved).toHaveBeenCalled();
   });
 
-  it('caps entry date at the browser today and shows the API sentence', async () => {
+  it('caps entry date at the browser today and shows the API sentence once', async () => {
     const user = userEvent.setup();
     mockApiService.enterBatchResults.mockRejectedValue({
       response: {
         data: {
-          detail: [{ loc: ['body', 'results', 0, 'entry_date'], msg: 'Entry date cannot be in the future' }],
+          detail: [
+            {
+              type: 'value_error',
+              loc: ['body', 'results', 0, 'entry_date'],
+              msg: 'Value error, Entry date cannot be in the future',
+              input: '2026-10-19',
+              ctx: { error: {} },
+            },
+            {
+              type: 'value_error',
+              loc: ['body', 'results', 0, 'entry_date'],
+              msg: 'Value error, Entry date cannot be in the future',
+              input: '2026-10-19',
+              ctx: { error: {} },
+            },
+          ],
         },
       },
     });
@@ -223,7 +238,21 @@ describe('ResultsEntryTable', () => {
     expect(await screen.findByLabelText('Entry date')).toHaveAttribute('max', localDateString());
     await user.click(screen.getByText('Save Results'));
 
-    expect(await screen.findByText('results.0.entry_date: Entry date cannot be in the future')).toBeInTheDocument();
+    expect(await screen.findAllByText('Entry date cannot be in the future')).toHaveLength(1);
+    expect(screen.queryByText(/results\.0\.entry_date/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Value error/)).not.toBeInTheDocument();
+  });
+
+  it('refuses a typed entry date after today without posting', async () => {
+    const user = userEvent.setup();
+    render(<ResultsEntryTable {...defaultProps} />);
+
+    const dateInput = await screen.findByLabelText('Entry date');
+    fireEvent.change(dateInput, { target: { value: '2099-01-01' } });
+    await user.click(screen.getByText('Save Results'));
+
+    expect(await screen.findAllByText('Entry date cannot be in the future')).toHaveLength(1);
+    expect(mockApiService.enterBatchResults).not.toHaveBeenCalled();
   });
 
   it('handles API errors gracefully', async () => {
@@ -259,14 +288,17 @@ describe('ResultsEntryTable', () => {
   });
 
   it('loads qualifiers and displays them in dropdown', async () => {
+    const user = userEvent.setup();
     render(<ResultsEntryTable {...defaultProps} />);
 
     await waitFor(() => {
-      expect(mockApiService.getListEntries).toHaveBeenCalledWith('qualifiers');
+      expect(mockApiService.getListEntries).toHaveBeenCalledWith('result_qualifiers');
     });
 
-    // Check if qualifier dropdowns are present
     const qualifierSelects = await screen.findAllByRole('combobox', { name: 'Qualifiers' });
     expect(qualifierSelects.length).toBeGreaterThan(0);
+    await user.click(qualifierSelects[0]);
+    expect(await screen.findByRole('option', { name: 'ND' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '<' })).toBeInTheDocument();
   });
 });

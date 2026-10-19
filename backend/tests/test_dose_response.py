@@ -31,11 +31,22 @@ from models.template_well import TemplateWellDefinition
 # Shared fixture helpers
 # ---------------------------------------------------------------------------
 
-def _make_list_entry(db: Session, name: str, user_id: uuid.UUID) -> ListEntry:
+def _make_list_entry(
+    db: Session,
+    name: str,
+    user_id: uuid.UUID,
+    code: str | None = None,
+) -> ListEntry:
     lst = List(name=f"list_{name}_{uuid.uuid4().hex[:6]}", created_by=user_id, modified_by=user_id)
     db.add(lst)
     db.flush()
-    entry = ListEntry(list_id=lst.id, name=name, created_by=user_id, modified_by=user_id)
+    entry = ListEntry(
+        list_id=lst.id,
+        name=name,
+        code=code,
+        created_by=user_id,
+        modified_by=user_id,
+    )
     db.add(entry)
     db.flush()
     return entry
@@ -212,8 +223,8 @@ def dr_setup(db_session: Session, test_admin_user, test_org):
     user_id = test_admin_user.id
     client_id = test_org.id
 
-    pos_entry = _make_list_entry(db_session, "positive_control", user_id)
-    neg_entry = _make_list_entry(db_session, "negative_control", user_id)
+    pos_entry = _make_list_entry(db_session, "positive_control", user_id, code="positive")
+    neg_entry = _make_list_entry(db_session, "negative_control", user_id, code="negative")
 
     pos_sample = _make_sample(db_session, user_id, client_id, pos_entry.id)
     neg_sample = _make_sample(db_session, user_id, client_id, neg_entry.id)
@@ -286,7 +297,9 @@ def test_trigger_fit_fittable_status_running(db_session, test_admin_user, test_o
         svc.trigger_fit(run.id)
     # Should fail at control validation, not status gate
     assert exc_info.value.status_code == 422
-    assert "positive_control" in exc_info.value.detail or "negative_control" in exc_info.value.detail or "Cannot normalize" in exc_info.value.detail
+    detail = exc_info.value.detail
+    assert isinstance(detail, dict)
+    assert detail.get("code") in ("missing_positive_control", "missing_negative_control")
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +343,7 @@ def test_trigger_fit_clears_in_progress_on_r_failure(db_session, test_admin_user
 def test_trigger_fit_no_positive_controls(db_session, test_admin_user, test_org):
     user_id = test_admin_user.id
     client_id = test_org.id
-    neg_entry = _make_list_entry(db_session, "negative_control", user_id)
+    neg_entry = _make_list_entry(db_session, "negative_control", user_id, code="negative")
     neg_sample = _make_sample(db_session, user_id, client_id, neg_entry.id)
 
     tmpl = _make_template(db_session, user_id)
@@ -341,7 +354,7 @@ def test_trigger_fit_no_positive_controls(db_session, test_admin_user, test_org)
     with pytest.raises(HTTPException) as exc_info:
         svc.trigger_fit(run.id)
     assert exc_info.value.status_code == 422
-    assert "positive_control" in exc_info.value.detail
+    assert exc_info.value.detail["code"] == "missing_positive_control"
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +364,7 @@ def test_trigger_fit_no_positive_controls(db_session, test_admin_user, test_org)
 def test_trigger_fit_no_negative_controls(db_session, test_admin_user, test_org):
     user_id = test_admin_user.id
     client_id = test_org.id
-    pos_entry = _make_list_entry(db_session, "positive_control", user_id)
+    pos_entry = _make_list_entry(db_session, "positive_control", user_id, code="positive")
     pos_sample = _make_sample(db_session, user_id, client_id, pos_entry.id)
 
     tmpl = _make_template(db_session, user_id)
@@ -362,7 +375,7 @@ def test_trigger_fit_no_negative_controls(db_session, test_admin_user, test_org)
     with pytest.raises(HTTPException) as exc_info:
         svc.trigger_fit(run.id)
     assert exc_info.value.status_code == 422
-    assert "negative_control" in exc_info.value.detail
+    assert exc_info.value.detail["code"] == "missing_negative_control"
 
 
 # ---------------------------------------------------------------------------
@@ -372,8 +385,8 @@ def test_trigger_fit_no_negative_controls(db_session, test_admin_user, test_org)
 def test_trigger_fit_degenerate_controls(db_session, test_admin_user, test_org):
     user_id = test_admin_user.id
     client_id = test_org.id
-    pos_entry = _make_list_entry(db_session, "positive_control", user_id)
-    neg_entry = _make_list_entry(db_session, "negative_control", user_id)
+    pos_entry = _make_list_entry(db_session, "positive_control", user_id, code="positive")
+    neg_entry = _make_list_entry(db_session, "negative_control", user_id, code="negative")
     pos_sample = _make_sample(db_session, user_id, client_id, pos_entry.id)
     neg_sample = _make_sample(db_session, user_id, client_id, neg_entry.id)
 
@@ -424,8 +437,8 @@ def test_normalization_inverted_signal_direction(db_session, test_admin_user, te
     """
     user_id = test_admin_user.id
     client_id = test_org.id
-    pos_entry = _make_list_entry(db_session, "positive_control", user_id)
-    neg_entry = _make_list_entry(db_session, "negative_control", user_id)
+    pos_entry = _make_list_entry(db_session, "positive_control", user_id, code="positive")
+    neg_entry = _make_list_entry(db_session, "negative_control", user_id, code="negative")
     pos_sample = _make_sample(db_session, user_id, client_id, pos_entry.id)
     neg_sample = _make_sample(db_session, user_id, client_id, neg_entry.id)
     test_sample = _make_sample(db_session, user_id, client_id, None)
@@ -746,6 +759,8 @@ def test_get_summary_aggregates_correctly(client, db_session, test_admin_user, t
     assert body["by_category"]["INACTIVE"] == 1
     assert body["by_review_status"]["approved"] == 2
     assert body["by_review_status"]["pending"] == 1
+    assert body["last_fit_at"] is not None
+    assert body["last_fit_at"].endswith("Z")
 
 
 # ---------------------------------------------------------------------------
@@ -779,6 +794,57 @@ def test_get_summary_excludes_superseded_results(client, db_session, test_admin_
     assert resp.json()["total"] == 1  # only the active version
 
 
+def test_summary_last_fit_at_is_null_without_a_fit(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
+    run = dr_setup["run"]
+    resp = client.get(
+        f"/v1/lims-runs/{run.id}/dose-response/summary",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["total"] == 0
+    assert resp.json()["last_fit_at"] is None
+
+
+def test_summary_last_fit_at_is_the_latest_current_fit(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
+    run = dr_setup["run"]
+    sample = dr_setup["test_sample"]
+    current = DoseResponseResult(
+        lims_run_id=run.id,
+        sample_id=sample.id,
+        model="4PL",
+        curve_category=CurveCategory.SIGMOID,
+        quality_flag="ok",
+        review_status=ReviewStatus.pending,
+        fit_version=2,
+        client_id=test_org.id,
+        fit_triggered_at=datetime(2026, 10, 18, 23, 23, tzinfo=timezone.utc),
+    )
+    db_session.add(current)
+    db_session.flush()
+    superseded = DoseResponseResult(
+        lims_run_id=run.id,
+        sample_id=sample.id,
+        model="4PL",
+        curve_category=CurveCategory.SIGMOID,
+        quality_flag="ok",
+        review_status=ReviewStatus.pending,
+        fit_version=1,
+        superseded_by=current.id,
+        client_id=test_org.id,
+        fit_triggered_at=datetime(2026, 10, 19, 1, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(superseded)
+    db_session.commit()
+
+    resp = client.get(
+        f"/v1/lims-runs/{run.id}/dose-response/summary",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["total"] == 1
+    assert resp.json()["last_fit_at"] == "2026-10-18T23:23:00Z"
+
+
 # ---------------------------------------------------------------------------
 # 22. mixed concentration units → 422
 # ---------------------------------------------------------------------------
@@ -787,8 +853,8 @@ def test_trigger_fit_mixed_concentration_units(db_session, test_admin_user, test
     """All template wells must use the same concentration_unit."""
     user_id = test_admin_user.id
     client_id = test_org.id
-    pos_entry = _make_list_entry(db_session, "positive_control", user_id)
-    neg_entry = _make_list_entry(db_session, "negative_control", user_id)
+    pos_entry = _make_list_entry(db_session, "positive_control", user_id, code="positive")
+    neg_entry = _make_list_entry(db_session, "negative_control", user_id, code="negative")
     pos_sample = _make_sample(db_session, user_id, client_id, pos_entry.id)
     neg_sample = _make_sample(db_session, user_id, client_id, neg_entry.id)
     test_sample1 = _make_sample(db_session, user_id, client_id, None)
@@ -811,3 +877,88 @@ def test_trigger_fit_mixed_concentration_units(db_session, test_admin_user, test
         svc.trigger_fit(run.id)
     assert exc_info.value.status_code == 422
     assert "Mixed concentration units" in exc_info.value.detail
+
+
+def _stock_controls(db: Session, user_id: uuid.UUID):
+    """The seed QC list: display names Positive/Negative Control, codes set.
+
+    create_all databases do not run migration 0004, so this inserts those two
+    rows. It does not invent a list entry named positive_control.
+    """
+    lst = List(
+        name=f"qc_types_{uuid.uuid4().hex[:6]}",
+        created_by=user_id,
+        modified_by=user_id,
+    )
+    db.add(lst)
+    db.flush()
+    positive = ListEntry(
+        list_id=lst.id,
+        name="Positive Control",
+        code="positive",
+        created_by=user_id,
+        modified_by=user_id,
+    )
+    negative = ListEntry(
+        list_id=lst.id,
+        name="Negative Control",
+        code="negative",
+        created_by=user_id,
+        modified_by=user_id,
+    )
+    db.add(positive)
+    db.add(negative)
+    db.flush()
+    return positive, negative
+
+
+def _fit_points(db_session, user, org, pos_entry, neg_entry):
+    user_id = user.id
+    client_id = org.id
+    pos_sample = _make_sample(db_session, user_id, client_id, pos_entry.id)
+    neg_sample = _make_sample(db_session, user_id, client_id, neg_entry.id)
+    test_sample = _make_sample(db_session, user_id, client_id, None)
+    tmpl = _make_template(db_session, user_id)
+    run = _make_run(db_session, tmpl.id, user_id)
+    _make_well(db_session, tmpl.id, client_id, "A1", 1.0)
+    _make_data_row(db_session, run.id, pos_sample.id, "B1", 100.0, user_id)
+    _make_data_row(db_session, run.id, neg_sample.id, "C1", 0.0, user_id)
+    _make_data_row(db_session, run.id, test_sample.id, "A1", 50.0, user_id)
+    mock_r = MagicMock()
+    mock_r.fit.return_value = [_sigmoid_r_result(test_sample.id)]
+    svc = DoseResponseFitService(db_session, user, r_client=mock_r)
+    svc.trigger_fit(run.id)
+    compounds = mock_r.fit.call_args[0][0]
+    return compounds
+
+
+def test_fit_uses_stock_qc_codes_after_rename(db_session, test_admin_user, test_org):
+    positive, negative = _stock_controls(db_session, test_admin_user.id)
+    first = _fit_points(db_session, test_admin_user, test_org, positive, negative)
+    assert abs(first[0]["points"][0]["response"] - 50.0) < 0.01
+    positive.name = "POS CTL"
+    negative.name = "NEG CTL"
+    db_session.flush()
+    second = _fit_points(db_session, test_admin_user, test_org, positive, negative)
+    assert abs(second[0]["points"][0]["response"] - 50.0) < 0.01
+
+
+def test_display_name_positive_control_without_code_is_not_a_control(
+    db_session, test_admin_user, test_org
+):
+    user_id = test_admin_user.id
+    named_only = _make_list_entry(db_session, "positive_control", user_id)
+    assert named_only.code is None
+    _positive, negative = _stock_controls(db_session, user_id)
+    pos_sample = _make_sample(db_session, user_id, test_org.id, named_only.id)
+    neg_sample = _make_sample(db_session, user_id, test_org.id, negative.id)
+    tmpl = _make_template(db_session, user_id)
+    run = _make_run(db_session, tmpl.id, user_id)
+    _make_data_row(db_session, run.id, pos_sample.id, "B1", 100.0, user_id)
+    _make_data_row(db_session, run.id, neg_sample.id, "C1", 0.0, user_id)
+    svc = DoseResponseFitService(db_session, test_admin_user, r_client=MagicMock())
+    with pytest.raises(HTTPException) as exc_info:
+        svc.trigger_fit(run.id)
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["code"] == "missing_positive_control"
+    assert "message" in exc_info.value.detail

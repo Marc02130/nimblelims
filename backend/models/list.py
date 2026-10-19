@@ -18,6 +18,9 @@ class ListEntry(BaseModel):
     
     # List entry-specific fields
     list_id = Column(PostgresUUID(as_uuid=True), ForeignKey('lists.id'), nullable=False)
+    # Stable designation. 'positive' and 'negative' mark dose-response controls.
+    # name stays the display label and can be renamed without moving the role.
+    code = Column(String(64), nullable=True)
     
     # Relationships
     list = relationship("List", back_populates="entries")

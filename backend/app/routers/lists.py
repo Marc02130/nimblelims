@@ -26,6 +26,22 @@ _LIST_NAME_ALIASES = {
 }
 
 
+def _reject_duplicate_code(db: Session, list_id: UUID, code: str, entry_id: UUID | None) -> None:
+    """One positive and one negative code per list. None is not a code."""
+    query = db.query(ListEntry).filter(
+        ListEntry.list_id == list_id,
+        ListEntry.code == code,
+    )
+    if entry_id is not None:
+        query = query.filter(ListEntry.id != entry_id)
+    clash = query.first()
+    if clash is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"code '{code}' is already used in this list",
+        )
+
+
 def _get_active_list(db: Session, list_name: str) -> ListModel:
     names = [list_name]
     alias = _LIST_NAME_ALIASES.get(list_name)
@@ -272,10 +288,13 @@ def create_list_entry(
         )
     
     # Create new entry
+    if entry_data.code is not None:
+        _reject_duplicate_code(db, list_obj.id, entry_data.code, None)
     new_entry = ListEntry(
         list_id=list_obj.id,
         name=entry_data.name,
         description=entry_data.description,
+        code=entry_data.code,
         active=entry_data.active,
         created_by=current_user.id,
         modified_by=current_user.id
@@ -330,6 +349,8 @@ def update_list_entry(
             )
     
     update_data = explicit_updates(entry_data, entry, refuse_null={"active"})
+    if "code" in update_data and update_data["code"] is not None:
+        _reject_duplicate_code(db, list_obj.id, update_data["code"], entry.id)
     for field, value in update_data.items():
         setattr(entry, field, value)
     

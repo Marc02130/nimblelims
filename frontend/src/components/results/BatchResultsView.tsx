@@ -26,6 +26,7 @@ import ResultsEntryTable from './ResultsEntryTable';
 import BatchResultsEntryTable from './BatchResultsEntryTable';
 import { apiService } from '../../services/apiService';
 import { useUser } from '../../contexts/UserContext';
+import { apiErrorText } from '../../utils/apiErrorText';
 
 interface Batch {
   id: string;
@@ -87,31 +88,32 @@ const BatchResultsView: React.FC<BatchResultsViewProps> = ({ batchId, onBack }) 
 
       // Extract samples from containers
       const allSamples: Sample[] = [];
-      containersData.forEach((container: any) => {
-        if (container.contents) {
-          container.contents.forEach((content: any) => {
-            allSamples.push({
-              id: content.sample_id,
-              name: content.sample_name,
-              container_id: container.id,
-              row: container.row,
-              column: container.column,
-              qc_type: content.sample?.qc_type || content.qc_type,
-            });
+      const containers = Array.isArray(containersData) ? containersData : [];
+      containers.forEach((container: any) => {
+        const contents = Array.isArray(container.contents) ? container.contents : [];
+        contents.forEach((content: any) => {
+          allSamples.push({
+            id: content.sample_id,
+            name: content.sample_name,
+            container_id: container.id,
+            row: container.row,
+            column: container.column,
+            qc_type: content.sample?.qc_type || content.qc_type,
           });
-        }
+        });
       });
       setSamples(allSamples);
 
       // Load tests for the batch
       const testsData = await apiService.getTestsByBatch(batchId);
-      setTests(testsData);
+      const tests = Array.isArray(testsData) ? testsData : [];
+      setTests(tests);
 
-      if (testsData.length > 0) {
-        setSelectedTest(testsData[0].id);
+      if (tests.length > 0) {
+        setSelectedTest(tests[0].id);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load batch data');
+      setError(apiErrorText(err, 'Failed to load batch data'));
     } finally {
       setLoading(false);
     }

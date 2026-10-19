@@ -1,7 +1,7 @@
 """
 Pydantic schemas for results
 """
-from app.schemas._dates import is_future
+from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
@@ -29,16 +29,18 @@ class ResultBase(BaseModel):
         description="Source LimsRun when created via promote-on-publish",
     )
 
-    @validator('entry_date')
-    def validate_entry_date(cls, v):
-        if is_future(v):
-            raise ValueError('Entry date cannot be in the future')
-        return v
-
 
 class ResultCreate(ResultBase):
-    """Schema for creating a new result"""
-    pass
+    """Schema for creating a new result.
+
+    Entry-date checks run on create, update, and batch entry, not on read.
+    """
+
+    @validator('entry_date')
+    def validate_entry_date(cls, v):
+        if v is not None and is_future(v):
+            raise ValueError('Entry date cannot be in the future')
+        return store_calendar_day(v)
 
 
 class ResultUpdate(BaseModel):
@@ -56,7 +58,7 @@ class ResultUpdate(BaseModel):
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class ResultResponse(ResultBase):
@@ -118,7 +120,7 @@ class TestResultEntry(BaseModel):
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class BatchResultsEntryRequestUS28(BaseModel):

@@ -35,7 +35,7 @@
 
 ## Timestamps
 
-Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, and the other audit clocks) are `timestamptz`. The API sends them as UTC and the value ends in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `start_date`, `end_date`) stay `timestamp without time zone` lab days and are not given a timezone. `used_on` and the reagent lot dates stay SQL `date`. Custom-attribute JSON is not rewritten.
+Instant fields (`created_at`, `modified_at`, `started_at`, `completed_at`, `published_at`, `canceled_at`, `last_login`, `last_fit_at`, and the other audit clocks) are `timestamptz`. The API sends them as UTC and the value ends in `Z` or an explicit offset. Screens show them in the browser's local time. Calendar dates (`received_date`, `report_date`, `due_date`, `test_date`, `review_date`, `entry_date`, `date_sampled`, `start_date`, `end_date`) stay `timestamp without time zone` lab days and are not given a timezone. An offset-bearing calendar value is converted to the lab-zone calendar day on input and stored as that day's naive midnight. A date-only value (`YYYY-MM-DD` or a naive midnight) is stored unchanged. `due_date` and `date_sampled` follow that storage rule and are not future-capped. Batch `start_date` and `end_date` follow it too, and a later lab day is allowed for scheduling. `used_on` and the reagent lot dates stay SQL `date`. Custom-attribute JSON is not rewritten. Future-day checks (`received_date`, `report_date`, `test_date`, `review_date`, `entry_date`, temperature bounds, and the other input rules) run on create and update bodies only. Response models do not re-run them, so a stored date that is "future" after a lab-zone change still returns **200** from `GET /samples`, `GET /tests`, `GET /results`, and the matching detail routes.
 
 ## Authentication
 
@@ -257,7 +257,7 @@ These are explicit later planning actions, not calls that Receive or asked-for c
 }
 ```
 
-**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. Eligible-sample and batch expiration day counts use that same lab calendar.
+**Note:** `custom_attributes` are validated against active configurations for 'samples' entity type. `received_date` and `report_date` cannot fall on a later calendar day than today in the lab timezone. `due_date` may. The same lab day applies to test `test_date` and `review_date`, and to result `entry_date` (including `entry_date` on `POST /results/batch`). Those refusals are **422** on create and update only. `GET /samples`, `GET /tests`, `GET /results`, and their detail routes do not re-check a stored date, so one future value does not turn the list into **500**. The sample and test forms cap received, report, test, review, and entry dates at the browser's today and show the API sentence when a later day is refused. `due_date` is not capped. A time that is still today in the lab is accepted after UTC has already moved to the next day. A `YYYY-MM-DD` value, and a stored naive midnight that was saved that way, is that calendar day and is not shifted by the zone. A value that carries an offset is converted to the lab-zone calendar day and stored as that day's naive midnight, so `2026-10-20T00:00:00Z` at 8 PM America/New_York on 2026-10-19 is stored as `2026-10-19 00:00`. A date-only value is stored unchanged. Lab tomorrow given with an offset is still **422** on the future-checked fields. Eligible-sample and batch expiration day counts use that same lab calendar, so a midnight due or expiry date counts as that day.
 
 **Response:** Sample with created tests
 
@@ -761,7 +761,19 @@ Or if incompatible:
 ### GET /batches/{id}
 Get batch details with containers.
 
-**Requires:** `batch:read` permission
+**Requires:** `batch:read`. A missing or inactive batch is **404** `Batch not found`. A batch that exists but this session cannot see under `batches_access` is **403** `{"code":"batch_forbidden","message":"Access denied"}`. That body has no client id, client name, batch name, or batch contents. The same **403** / **404** applies to `GET /batches/{id}/containers`, `GET /batches/{id}/tests`, `POST /batches/{id}/containers`, `PATCH /batches/{id}`, `PATCH /batches/{id}/status`, `DELETE /batches/{id}`, and `DELETE /batches/{id}/containers/{container_id}`.
+
+The check is `batch_access_status(batch_id)`, a `SECURITY DEFINER` function owned by the migration role (that role bypasses row security). It reads `app.current_user_id`, the same session setting as `current_user_id()`. It returns only `not_found`, `forbidden`, or `visible`. It does not take a client id and does not return one. `EXECUTE` is revoked from `PUBLIC` and granted only to `lims_app`. No batch policy is loosened and no extra table grant is added. After the status is `visible`, containers, contents, and tests still go through their own policies, so a mixed-client batch returns only the caller's rows.
+
+### GET /batches/{id}/containers
+Containers in the batch, with each content's `sample_id`, `sample_name`, `qc_type`, and `sample.qc_type`. Enter Results uses this list. An empty batch the caller can see returns `[]`.
+
+**Requires:** `batch:read`. **403** / **404** as on `GET /batches/{id}`. A container the caller cannot read is left out of the list.
+
+### GET /batches/{id}/tests
+Active tests for samples in those containers. Returns a JSON array (`id`, `name`, `status`, `analysis_id`, `sample_id`), not the paginated `/tests` envelope. An empty batch the caller can see returns `[]`.
+
+**Requires:** `batch:read`. **403** / **404** as on `GET /batches/{id}`. Test rows are still filtered by the tests access policy.
 
 ### POST /batches/{id}/containers
 Add container to existing batch.
@@ -2383,7 +2395,7 @@ Soft-delete a name template (sets active=false).
 ### GET /admin/name-templates/preview
 Preview a generated name without consuming a sequence value.
 
-**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD). When `reference_date` is omitted, date placeholders use today in the lab timezone. A supplied `reference_date` is used as that calendar day.
+**Query Parameters:** `entity_type` (required), `client_id?`, `reference_date?` (YYYY-MM-DD). When `reference_date` is omitted, date placeholders use today in the lab timezone. A supplied `reference_date` is used as that calendar day. A saved timezone that is no longer a known IANA name is **503** `lab_timezone_invalid`, the same code as the other lab-date endpoints.
 
 **Response:** `{ preview: string }`
 
@@ -2493,6 +2505,15 @@ Operator steps: [configuring-agent.md](configuring-agent.md).
 ## LIMS Runs — promote-on-publish
 
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.
+
+### GET /v1/lims-runs/{id}/dose-response/summary
+Curve Curator counts for one run. **Requires** `experiment:manage`.
+
+**Response:** `total`, `by_category`, `by_review_status`, `ic50_range`, `mean_r_squared`, `fit_in_progress`, `last_fit_at`. `last_fit_at` is the latest `fit_triggered_at` (or `created_at` when the fit time was not stored) among results that are not superseded. It is UTC and ends in `Z`. It is `null` when the run has no current fit. The dose-response tab shows that instant in the browser's local time, and shows — only when `last_fit_at` is null.
+
+A fit treats a sample as a positive or negative control only when `samples.qc_type` points at a list entry whose `code` is `positive` or `negative`. The entry's display name is not used. Seed rows `Positive Control` and `Negative Control` on `qc_types` are backfilled with those codes. Renaming the entry leaves the code in place. A missing control is **422** `detail.code` `missing_positive_control` or `missing_negative_control`, with `detail.message` naming the code the QC type needs. The curve SVG uses the same codes and still draws an un-normalized plot when a control is absent.
+
+Result qualifiers are the list `result_qualifiers` (`GET /lists/result_qualifiers/entries`). `GET /lists/qualifiers/entries` is **404**. Enter Results loads `result_qualifiers`.
 
 ### GET /v1/lims-runs/{id}/promotion/preview
 Dry-run of what publish would write to existing Tests/Results when `analysis_id` is set. **No DB writes and no Test creation.**

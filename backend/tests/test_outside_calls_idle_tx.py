@@ -105,8 +105,8 @@ def real(db_engine):
 def _dr_run(Session, ids):
     with Session() as s:
         uid, cid = ids["user"], ids["org"]
-        pos = _make_sample(s, uid, cid, _make_list_entry(s, "positive_control", uid).id)
-        neg = _make_sample(s, uid, cid, _make_list_entry(s, "negative_control", uid).id)
+        pos = _make_sample(s, uid, cid, _make_list_entry(s, "positive_control", uid, code="positive").id)
+        neg = _make_sample(s, uid, cid, _make_list_entry(s, "negative_control", uid, code="negative").id)
         test = _make_sample(s, uid, cid, None)
         tmpl = _make_template(s, uid)
         run = _make_run(s, tmpl.id, uid)

@@ -4,7 +4,7 @@ Batches router for NimbleLims
 import os
 from typing import List, Optional, Set
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, text, func
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from app.database import get_db
@@ -18,8 +18,10 @@ from models.list import ListEntry
 from app.schemas.batch import (
     BatchCreate, BatchUpdate, BatchResponse, BatchListResponse,
     BatchContainerRequest, BatchContainerResponse, BatchContainerBody,
-    BatchCreateWithContainersRequest
+    BatchCreateWithContainersRequest, BatchContainerRead, BatchContainerContentRead,
+    BatchContentSample,
 )
+from app.schemas.test import TestResponse
 from app.core.rbac import (
     require_batch_manage, require_batch_read, require_batch_update,
     require_batch_delete, require_project_access, validate_client_access
@@ -144,6 +146,59 @@ def get_batches(
     )
 
 
+_BATCH_FORBIDDEN = {
+    "code": "batch_forbidden",
+    "message": "Access denied",
+}
+
+
+def _visible_batch_or_http(db: Session, batch_id: UUID) -> Batch:
+    """404 when the batch is missing. 403 when it exists and this session cannot see it.
+
+    ``batch_access_status`` reads ``app.current_user_id`` and returns one word.
+    The body of a 403 is that word's public message. It does not name a client
+    or the batch.
+    """
+    seen = db.execute(
+        text("SELECT public.batch_access_status(CAST(:batch_id AS uuid))"),
+        {"batch_id": str(batch_id)},
+    ).scalar()
+    if seen == "forbidden":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_BATCH_FORBIDDEN,
+        )
+    if seen != "visible":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch not found",
+        )
+    batch = db.query(Batch).filter(
+        Batch.id == batch_id,
+        Batch.active == True,
+    ).first()
+    if batch is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch not found",
+        )
+    return batch
+
+
+def _links_caller_can_see(db: Session, batch_id: UUID) -> List[BatchContainer]:
+    """Junction rows have no policy. Keep only containers this session can read."""
+    links = db.query(BatchContainer).filter(BatchContainer.batch_id == batch_id).all()
+    visible: List[BatchContainer] = []
+    for link in links:
+        container = db.query(Container).filter(
+            Container.id == link.container_id,
+            Container.active == True,
+        ).first()
+        if container is not None:
+            visible.append(link)
+    return visible
+
+
 @router.get("/{batch_id}", response_model=BatchResponse)
 def get_batch(
     batch_id: UUID,
@@ -153,56 +208,105 @@ def get_batch(
     """
     Get a specific batch by ID.
     """
-    batch = db.query(Batch).filter(
-        Batch.id == batch_id,
-        Batch.active == True
-    ).first()
-    
-    if not batch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Batch not found"
-        )
-    
-    # Validate client access: check access to all projects in the batch
-    # Get all containers in batch
-    batch_containers = db.query(BatchContainer).filter(
-        BatchContainer.batch_id == batch.id
+    del current_user
+    batch = _visible_batch_or_http(db, batch_id)
+    return build_batch_response(batch, _links_caller_can_see(db, batch.id))
+
+
+def _active_batch_or_404(db: Session, batch_id: UUID) -> Batch:
+    return _visible_batch_or_http(db, batch_id)
+
+
+@router.get("/{batch_id}/containers", response_model=List[BatchContainerRead])
+def get_batch_containers(
+    batch_id: UUID,
+    current_user: User = Depends(require_batch_read),
+    db: Session = Depends(get_db),
+):
+    """
+    Containers in a batch, with the samples Enter Results lists.
+
+    GET was missing, so the page received 405 from POST /batches/{id}/containers.
+    """
+    del current_user
+    batch = _active_batch_or_404(db, batch_id)
+
+    links = _links_caller_can_see(db, batch.id)
+    container_ids = [link.container_id for link in links]
+    if not container_ids:
+        return []
+
+    containers = db.query(Container).filter(
+        Container.id.in_(container_ids),
+        Container.active == True,
     ).all()
-    container_ids = [bc.container_id for bc in batch_containers]
-    
-    if container_ids:
-        # Get all samples from batch containers
-        contents = db.query(Contents).filter(
-            Contents.container_id.in_(container_ids)
-        ).all()
-        sample_ids = [c.sample_id for c in contents if c.sample_id]
-        
-        if sample_ids:
-            # Get all unique projects for these samples
-            projects = db.query(Sample.project_id).filter(
-                Sample.id.in_(sample_ids),
-                Sample.active == True
-            ).distinct().all()
-            project_ids = [p[0] for p in projects]
-            
-            # Validate client access for all projects
-            projects_objs = db.query(Project).filter(Project.id.in_(project_ids)).all()
-            for project in projects_objs:
-                try:
-                    validate_client_access(current_user, project.client_id)
-                except HTTPException:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Access denied: insufficient client permissions for batch"
-                    )
-    
-    # Load containers for response
-    batch_containers = db.query(BatchContainer).filter(
-        BatchContainer.batch_id == batch.id
+    by_id = {container.id: container for container in containers}
+    contents = db.query(Contents).options(joinedload(Contents.sample)).filter(
+        Contents.container_id.in_(container_ids)
     ).all()
-    
-    return build_batch_response(batch, batch_containers)
+    contents_by_container: dict = {}
+    for content in contents:
+        contents_by_container.setdefault(content.container_id, []).append(content)
+
+    result: List[BatchContainerRead] = []
+    for link in links:
+        container = by_id.get(link.container_id)
+        if container is None:
+            continue
+        content_rows: List[BatchContainerContentRead] = []
+        for content in contents_by_container.get(container.id, []):
+            sample = content.sample
+            sample_name = sample.name if sample is not None else None
+            qc_type = sample.qc_type if sample is not None else None
+            content_rows.append(BatchContainerContentRead(
+                sample_id=content.sample_id,
+                sample_name=sample_name,
+                qc_type=qc_type,
+                sample=BatchContentSample(qc_type=qc_type) if sample is not None else None,
+            ))
+        result.append(BatchContainerRead(
+            id=container.id,
+            name=container.name,
+            row=container.row,
+            column=container.column,
+            contents=content_rows,
+        ))
+    return result
+
+
+@router.get("/{batch_id}/tests", response_model=List[TestResponse])
+def get_batch_tests(
+    batch_id: UUID,
+    current_user: User = Depends(require_batch_read),
+    db: Session = Depends(get_db),
+):
+    """
+    Active tests for samples in this batch.
+
+    Enter Results calls this path. It did not exist (404). RLS on tests
+    still hides rows the caller cannot see.
+    """
+    del current_user
+    batch = _active_batch_or_404(db, batch_id)
+
+    links = _links_caller_can_see(db, batch.id)
+    container_ids = [link.container_id for link in links]
+    if not container_ids:
+        return []
+    sample_ids = [
+        row[0]
+        for row in db.query(Contents.sample_id).filter(
+            Contents.container_id.in_(container_ids),
+            Contents.sample_id.isnot(None),
+        ).distinct().all()
+    ]
+    if not sample_ids:
+        return []
+    tests = db.query(Test).filter(
+        Test.sample_id.in_(sample_ids),
+        Test.active == True,
+    ).all()
+    return [TestResponse.model_validate(test) for test in tests]
 
 
 @router.post("/validate-compatibility")
@@ -960,17 +1064,7 @@ def add_container_to_batch(
     """
     Add a container to a batch.
     """
-    # Verify batch exists
-    batch = db.query(Batch).filter(
-        Batch.id == batch_id,
-        Batch.active == True
-    ).first()
-    
-    if not batch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Batch not found"
-        )
+    batch = _visible_batch_or_http(db, batch_id)
     
     # Validate client access: check access to the container's sample's project
     container = db.query(Container).filter(
@@ -1045,16 +1139,7 @@ def update_batch(
     Update a batch.
     Requires batch:update permission.
     """
-    batch = db.query(Batch).filter(
-        Batch.id == batch_id,
-        Batch.active == True
-    ).first()
-    
-    if not batch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Batch not found"
-        )
+    batch = _visible_batch_or_http(db, batch_id)
     
     # Validate client access: check access to all projects in the batch
     # Get all containers in batch
@@ -1133,16 +1218,7 @@ def update_batch_status(
     Update batch status.
     Implements US-11: Create and Manage Batches status flow.
     """
-    batch = db.query(Batch).filter(
-        Batch.id == batch_id,
-        Batch.active == True
-    ).first()
-    
-    if not batch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Batch not found"
-        )
+    batch = _visible_batch_or_http(db, batch_id)
     
     # Validate status exists
     from models.list import ListEntry
@@ -1188,16 +1264,7 @@ def delete_batch(
     Soft delete a batch (set active=False).
     Requires batch:delete permission.
     """
-    batch = db.query(Batch).filter(
-        Batch.id == batch_id,
-        Batch.active == True
-    ).first()
-    
-    if not batch:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Batch not found"
-        )
+    batch = _visible_batch_or_http(db, batch_id)
     
     # Soft delete
     batch.active = False
@@ -1219,6 +1286,7 @@ def remove_container_from_batch(
     """
     Remove a container from a batch.
     """
+    _visible_batch_or_http(db, batch_id)
     batch_container = db.query(BatchContainer).filter(
         BatchContainer.batch_id == batch_id,
         BatchContainer.container_id == container_id

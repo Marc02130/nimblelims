@@ -80,6 +80,6 @@ describe('SampleForm dates', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'Update sample' }));
-    expect(await screen.findByText('received_date: Date cannot be in the future')).toBeInTheDocument();
+    expect(await screen.findByText('Date cannot be in the future')).toBeInTheDocument();
   });
 });

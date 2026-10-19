@@ -1,27 +1,29 @@
 /**
  * Turn a FastAPI/axios error into a string safe for a React text node.
  * Validation 422 bodies are arrays of { type, loc, msg, input, ctx }.
- * Refusals that carry detail.message show that sentence.
+ * Render the messages as text, once each, without the loc prefix or the
+ * pydantic "Value error," prefix. Refusals that carry detail.message show
+ * that sentence.
  */
+const readableMessage = (msg: unknown): string | null => {
+  if (typeof msg !== 'string') return null;
+  const stripped = msg.replace(/^Value error,\s*/i, '').trim();
+  return stripped === '' ? null : stripped;
+};
+
 export const apiErrorText = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
   if (typeof detail === 'string' && detail.trim()) return detail;
   if (Array.isArray(detail) && detail.length > 0) {
-    return (
-      detail
-        .map((item: any) => {
-          if (typeof item === 'string') return item;
-          if (item?.msg) {
-            const loc = Array.isArray(item.loc)
-              ? item.loc.filter((part: any) => part !== 'body' && part !== 'query').join('.')
-              : '';
-            return loc ? `${loc}: ${item.msg}` : item.msg;
-          }
-          return null;
-        })
-        .filter(Boolean)
-        .join('; ') || fallback
-    );
+    const seen = new Set<string>();
+    const parts: string[] = [];
+    detail.forEach((item: any) => {
+      const text = typeof item === 'string' ? item : readableMessage(item?.msg);
+      if (text === null || seen.has(text)) return;
+      seen.add(text);
+      parts.push(text);
+    });
+    return parts.join('; ') || fallback;
   }
   if (detail && typeof detail === 'object') {
     if (typeof detail.message === 'string') {

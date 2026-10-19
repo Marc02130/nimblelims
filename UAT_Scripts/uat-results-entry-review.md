@@ -54,7 +54,7 @@ Enter results for multiple tests/samples in a batch using the tabular interface,
 | 1 | Navigate to `/results` or Results Management page | Results Management page loads with batch list |
 | 2 | **Select Batch** | |
 | 2.1 | Locate batch: `BATCH-RESULTS-001` | Batch row visible in table with status "In Process" |
-| 2.2 | Click "Enter Results" button | Batch results entry view opens |
+| 2.2 | Click "Enter Results" button | Batch results entry view opens. The page loads `GET /batches/{id}/containers` and `GET /batches/{id}/tests` (both **200**, not 405 or 404) and shows the sample count and the test count. Save posts `POST /results/batch`. |
 | 2.3 | Verify batch information card | Card displays: batch name, status, description, sample count, test count |
 | 3 | **Load Tabular Interface** | |
 | 3.1 | Verify tabular interface loads | Table displays with:<br>- Rows: Tests/samples in batch<br>- Columns: Sample name, Position, custom attributes (if configured), analyte columns |
@@ -209,7 +209,7 @@ Review and approve test results, updating test status to "Complete" and sample s
 | 3 | **Review Results** | |
 | 3.1 | Verify all required analytes have results | Results displayed for all required analytes |
 | 3.2 | Check result values against expected ranges | Values within configured ranges |
-| 3.3 | Review qualifiers and notes | Qualifiers and notes visible (if applicable) |
+| 3.3 | Review qualifiers and notes | Qualifiers dropdown lists entries from `GET /lists/result_qualifiers/entries` (not `/lists/qualifiers/entries`, which is 404). Notes visible when present |
 | 3.4 | Verify calculations (if applicable) | Calculated results displayed (post-MVP) |
 | 4 | **Approve Test** | |
 | 4.1 | Click "Approve" or "Mark Complete" button | Review dialog or confirmation appears |
@@ -296,7 +296,7 @@ Verify QC failure detection and handling during batch results entry, with config
 | 2 | **Select Batch with QC Sample** | |
 | 2.1 | Locate batch: `BATCH-QC-001` | Batch row visible |
 | 2.2 | Verify QC indicator | Batch row shows QC warning icon (⚠️) or chip |
-| 2.3 | Click "Enter Results" button | Batch results entry view opens |
+| 2.3 | Click "Enter Results" button | Batch results entry view opens. `GET /batches/{id}/containers` and `GET /batches/{id}/tests` return **200** and the QC sample is in the container contents. |
 | 3 | **Verify QC Sample Highlighting** | |
 | 3.1 | Locate QC sample row in table | QC sample row highlighted with warning background color |
 | 3.2 | Verify QC type indicator | QC type displayed (e.g., "Blank", "Positive Control") |

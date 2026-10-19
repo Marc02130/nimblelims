@@ -200,15 +200,12 @@ class DoseResponseFitService:
         constraints = dr_config.get("parameter_constraints", {})
 
         # ── Step 1: Identify control wells via sample.qc_type ─────────────────
-        # sample.qc_type is a UUID FK to list_entries. We match by list entry name.
-        # Control identification uses lims_run_data.sample_id → samples.qc_type → list_entries.name
-        from models.list import ListEntry
-        qc_list_entries = (
-            self.db.query(ListEntry)
-            .filter(ListEntry.name.in_(["positive_control", "negative_control"]))
-            .all()
+        # samples.qc_type → list_entries.code. The display name is not used.
+        from app.services.qc_controls import NEGATIVE, POSITIVE, codes_for_qc_types, missing_control
+        qc_code_by_id = codes_for_qc_types(
+            self.db,
+            (sample.qc_type for sample in samples_by_id.values()),
         )
-        qc_entry_by_id: Dict[uuid.UUID, str] = {e.id: e.name for e in qc_list_entries}
 
         pos_control_signals: List[float] = []
         neg_control_signals: List[float] = []
@@ -227,11 +224,13 @@ class DoseResponseFitService:
             if signal is None:
                 continue
 
-            qc_name = qc_entry_by_id.get(sample.qc_type)
-            if qc_name == "positive_control":
+            qc_code = None
+            if sample.qc_type is not None:
+                qc_code = qc_code_by_id.get(sample.qc_type)
+            if qc_code == POSITIVE:
                 if str(row.id) not in excluded_data_ids:
                     pos_control_signals.append(signal)
-            elif qc_name == "negative_control":
+            elif qc_code == NEGATIVE:
                 if str(row.id) not in excluded_data_ids:
                     neg_control_signals.append(signal)
             else:
@@ -239,15 +238,9 @@ class DoseResponseFitService:
 
         # ── Step 2: Validate controls ──────────────────────────────────────────
         if not pos_control_signals:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No positive_control wells found. Check that control samples have qc_type='positive_control'.",
-            )
+            raise missing_control(POSITIVE)
         if not neg_control_signals:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="No negative_control wells found. Check that control samples have qc_type='negative_control'.",
-            )
+            raise missing_control(NEGATIVE)
 
         pos_mean = sum(pos_control_signals) / len(pos_control_signals)
         neg_mean = sum(neg_control_signals) / len(neg_control_signals)

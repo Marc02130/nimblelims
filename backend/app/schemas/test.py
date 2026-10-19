@@ -1,7 +1,7 @@
 """
 Pydantic schemas for tests
 """
-from app.schemas._dates import is_future
+from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
@@ -21,16 +21,18 @@ class TestBase(BaseModel):
     technician_id: Optional[UUID] = Field(None, description="ID of technician user")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
+
+class TestCreate(TestBase):
+    """Schema for creating a new test.
+
+    Future-day checks run here and on update requests, not on TestResponse.
+    """
+
     @validator('review_date', 'test_date')
     def validate_dates(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
-
-
-class TestCreate(TestBase):
-    """Schema for creating a new test"""
-    pass
+        return store_calendar_day(v)
 
 
 class TestUpdate(BaseModel):
@@ -49,7 +51,7 @@ class TestUpdate(BaseModel):
     def validate_dates(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class TestResponse(TestBase):
@@ -86,7 +88,7 @@ class TestAssignmentRequest(BaseModel):
     def validate_test_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Test date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class TestStatusUpdateRequest(BaseModel):
@@ -100,7 +102,7 @@ class TestStatusUpdateRequest(BaseModel):
     def validate_dates(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Date cannot be in the future')
-        return v
+        return store_calendar_day(v)
 
 
 class TestReviewRequest(BaseModel):
@@ -112,4 +114,4 @@ class TestReviewRequest(BaseModel):
     def validate_review_date(cls, v):
         if is_future(v):
             raise ValueError('Review date cannot be in the future')
-        return v
+        return store_calendar_day(v)
