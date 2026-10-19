@@ -30,7 +30,7 @@ from app.core.rbac import (
 )
 from app.core.security import get_current_user
 from app.core.patch_fields import explicit_updates
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.lab_time import current_lab_day
 from uuid import UUID
@@ -414,7 +414,7 @@ def enter_batch_results_us28(
                     if test_result_entry.entry_date is not None:
                         existing_result.entry_date = test_result_entry.entry_date
                     existing_result.modified_by = current_user.id
-                    existing_result.modified_at = datetime.utcnow()
+                    existing_result.modified_at = datetime.now(timezone.utc)
                     created_results.append(existing_result)
                 else:
                     # Create new result. An omitted entry date stays the write instant.
@@ -425,7 +425,7 @@ def enter_batch_results_us28(
                         reported_result=analyte_result.reported_result,
                         qualifiers=analyte_result.qualifiers,
                         entry_date=(
-                            datetime.utcnow()
+                            datetime.now(timezone.utc)
                             if test_result_entry.entry_date is None
                             else test_result_entry.entry_date
                         ),
@@ -458,7 +458,7 @@ def enter_batch_results_us28(
             if all_analyte_ids.issubset(all_entered_analyte_ids) and test.status != complete_status_id:
                 test.status = complete_status_id
                 test.modified_by = current_user.id
-                test.modified_at = datetime.utcnow()
+                test.modified_at = datetime.now(timezone.utc)
                 updated_tests.append(test)
         
         # Check QC samples for failures
@@ -544,7 +544,7 @@ def enter_batch_results_us28(
                     batch.status = completed_status_entry.id
                     batch.end_date = current_lab_day()
                     batch.modified_by = current_user.id
-                    batch.modified_at = datetime.utcnow()
+                    batch.modified_at = datetime.now(timezone.utc)
         
         # Commit transaction
         db.commit()
@@ -713,7 +713,7 @@ def update_result(
         setattr(result, field, value)
     
     result.modified_by = current_user.id
-    result.modified_at = datetime.utcnow()
+    result.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(result)
@@ -753,7 +753,7 @@ def delete_result(
     # Soft delete
     result.active = False
     result.modified_by = current_user.id
-    result.modified_at = datetime.utcnow()
+    result.modified_at = datetime.now(timezone.utc)
     
     db.commit()
     

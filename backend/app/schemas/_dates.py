@@ -1,10 +1,11 @@
 """Shared calendar-day helpers for schema validators.
 
-A future check compares calendar days in the lab timezone. A naive midnight
-is a date-only value (``YYYY-MM-DD``, or a row saved that way) and is that
-calendar day with no zone shift. Any other datetime, including one with an
-offset, is converted into the lab zone. A time that is still today in the
-lab is accepted after UTC has rolled to the next day.
+Lab-day columns are SQL ``date``. Instant columns are
+``timestamptz``. A future check compares calendar days in the lab timezone.
+A naive midnight is a date-only value (``YYYY-MM-DD``, or a row saved that
+way) and is that calendar day with no zone shift. Any other datetime,
+including one with an offset, is converted into the lab zone. A time that
+is still today in the lab is accepted after UTC has rolled to the next day.
 
 Storage of a calendar value is naive midnight of the lab day, then a SQL
 ``date``. A naive non-midnight value keeps its own date (lab-zone wall

@@ -250,8 +250,8 @@ def create_project(
         # Generate name if not provided (using client name + timestamp)
         project_name = project_data.name
         if not project_name:
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            from datetime import datetime, timezone
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
             project_name = f"{client.name}-{timestamp}"
         
         # Check for unique name

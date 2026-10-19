@@ -64,7 +64,7 @@ class AnalyteAlias(Base):
         index=True,
     )
     alias = Column(String(255), nullable=False)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
     analyte = relationship("Analyte", back_populates="aliases")

@@ -6,7 +6,7 @@ No project auto-create. No sample-ID field. Status forced to Available for Testi
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Sequence
 from uuid import UUID
 
@@ -207,7 +207,7 @@ def receive_sample(
                 detail="client_sample_id already exists",
             )
 
-    received_at = datetime.utcnow()
+    received_at = datetime.now(timezone.utc)
     import uuid as _uuid
 
     # Name generation may CREATE SEQUENCE; lims_app often lacks CREATE privilege.

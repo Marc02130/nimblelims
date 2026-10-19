@@ -7,7 +7,7 @@ for downstream steps.
 """
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -139,7 +139,7 @@ def _run_action(
             )
         name = params.get("name") or context.get("name")
         if not name:
-            name = f"Experiment_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            name = f"Experiment_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
         data = ExperimentCreate(
             name=str(name).strip()[:255],
             description=params.get("description"),
@@ -529,7 +529,7 @@ def execute_workflow(
     base_name = (body.name or template.name).strip()
     if not base_name:
         base_name = template.name
-    instance_name = f"{base_name}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    instance_name = f"{base_name}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     # Ensure uniqueness
     existing = db.query(WorkflowInstance).filter(WorkflowInstance.name == instance_name).first()
     if existing:
