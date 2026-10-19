@@ -1,17 +1,16 @@
-"""timestamptz migration: values, calendar columns, and naive-write guard.
+"""timestamptz migration: values, calendar dates, and naive-write guard.
 
-``backend/tests`` still builds naive datetimes for calendar columns
-(``start_date``, ``received_date``, and the other lab days). Those fixtures
-are not server writes, so ``checks/naive_instants.py`` does not scan them.
-Already-applied migrations are not scanned either: they inserted naive
-timestamps while the columns were still ``timestamp without time zone``.
+Lab-day columns are SQL ``date`` before this migration runs. This module
+stamps those as dates and stamps instants as naive UTC wall time.
+``checks/naive_instants.py`` does not scan ``backend/tests``.
+Already-applied migrations are not scanned either.
 Every test in this module runs.
 """
 from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from alembic import command
@@ -29,8 +28,9 @@ from models.base import Base
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
-BEFORE = "0099_batch_update_qualifiers"
+BEFORE = "0101_revoke_probe_execute"
 NAIVE = datetime(2020, 1, 15, 19, 23)
+LAB_DAY = date(2020, 1, 15)
 _IDENT = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
@@ -142,9 +142,9 @@ def _stamp_sample(conn) -> dict:
     )
     conn.execute(
         text(
-            "UPDATE samples SET created_at = :wall, received_date = :wall WHERE id = :id"
+            "UPDATE samples SET created_at = :wall, received_date = :day WHERE id = :id"
         ),
-        {"wall": NAIVE, "id": targets["samples"]},
+        {"wall": NAIVE, "day": LAB_DAY, "id": targets["samples"]},
     )
     if targets["lims_runs"] is None:
         # Seed data has samples and results, and no LIMS run. Insert one so
@@ -167,9 +167,9 @@ def _stamp_sample(conn) -> dict:
         )
     conn.execute(
         text(
-            "UPDATE results SET created_at = :wall, entry_date = :wall WHERE id = :id"
+            "UPDATE results SET created_at = :wall, entry_date = :day WHERE id = :id"
         ),
-        {"wall": NAIVE, "id": targets["results"]},
+        {"wall": NAIVE, "day": LAB_DAY, "id": targets["results"]},
     )
     return targets
 
@@ -177,19 +177,19 @@ def _stamp_sample(conn) -> dict:
 def _assert_naive_wall(conn, targets: dict) -> None:
     _expect_wall(conn, "users", "last_login", targets["users"], aware=False)
     _expect_wall(conn, "samples", "created_at", targets["samples"], aware=False)
-    _expect_wall(conn, "samples", "received_date", targets["samples"], aware=False)
+    _expect_date(conn, "samples", "received_date", targets["samples"])
     _expect_wall(conn, "lims_runs", "started_at", targets["lims_runs"], aware=False)
     _expect_wall(conn, "results", "created_at", targets["results"], aware=False)
-    _expect_wall(conn, "results", "entry_date", targets["results"], aware=False)
+    _expect_date(conn, "results", "entry_date", targets["results"])
 
 
 def _assert_upgraded_values(conn, targets: dict) -> None:
     _expect_wall(conn, "users", "last_login", targets["users"], aware=True)
     _expect_wall(conn, "samples", "created_at", targets["samples"], aware=True)
-    _expect_wall(conn, "samples", "received_date", targets["samples"], aware=False)
+    _expect_date(conn, "samples", "received_date", targets["samples"])
     _expect_wall(conn, "lims_runs", "started_at", targets["lims_runs"], aware=True)
     _expect_wall(conn, "results", "created_at", targets["results"], aware=True)
-    _expect_wall(conn, "results", "entry_date", targets["results"], aware=False)
+    _expect_date(conn, "results", "entry_date", targets["results"])
 
 
 def _expect_wall(conn, table: str, column: str, row_id, aware: bool) -> None:
@@ -209,6 +209,17 @@ def _expect_wall(conn, table: str, column: str, row_id, aware: bool) -> None:
         if value.tzinfo is not None:
             raise AssertionError(f"{table}.{column} gained a timezone")
         assert value == NAIVE
+
+
+def _expect_date(conn, table: str, column: str, row_id) -> None:
+    _ident(table)
+    _ident(column)
+    value = conn.execute(
+        text(f"SELECT {column} FROM {table} WHERE id = :id"),
+        {"id": row_id},
+    ).scalar()
+    if value != LAB_DAY:
+        raise AssertionError(f"{table}.{column} is {value!r}, expected {LAB_DAY}")
 
 
 def _assert_catalog(conn, instants_are_aware: bool) -> None:

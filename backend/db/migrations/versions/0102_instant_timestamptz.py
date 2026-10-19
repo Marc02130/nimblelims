@@ -1,15 +1,16 @@
 """Convert naive UTC instant columns to timestamptz.
 
-Revision ID: 0100_instant_timestamptz
-Revises: 0099_batch_update_qualifiers
+Revision ID: 0102_instant_timestamptz
+Revises: 0101_revoke_probe_execute
 
 Each converted column is ``timestamp without time zone`` holding a UTC wall
 time. ``USING col AT TIME ZONE 'UTC'`` reads that wall time as UTC, so the
 instant does not shift. Downgrade writes the UTC wall time back with the same
 expression.
 
-Calendar-day columns and SQL ``date`` columns are not altered. Custom-attribute
-JSON is not a timestamp column and is not rewritten.
+Calendar-day columns are already SQL ``date`` from ``0100_calendar_dates``.
+Reagent SQL ``date`` columns are not altered. Custom-attribute JSON is not a
+timestamp column and is not rewritten.
 
 Views, materialized views, rules, and generated columns that depend on a
 converted column stop the migration. Indexes, defaults, triggers, and row
@@ -30,8 +31,8 @@ from app.core.instant_columns import (
     SQL_DATE_COLUMNS,
 )
 
-revision = "0100_instant_timestamptz"
-down_revision = "0099_batch_update_qualifiers"
+revision = "0102_instant_timestamptz"
+down_revision = "0101_revoke_probe_execute"
 branch_labels = None
 depends_on = None
 
@@ -87,7 +88,7 @@ def _require_expected_types(conn, source: str) -> None:
         problems.append("SQL date columns changed: " + ", ".join(dates_moved))
     if problems:
         raise RuntimeError(
-            "0100_instant_timestamptz refused to change types. "
+            "0102_instant_timestamptz refused to change types. "
             + " ".join(problems)
         )
 
@@ -190,7 +191,7 @@ def _refuse_unsafe_dependents(conn) -> None:
 
     if blockers:
         raise RuntimeError(
-            "0100_instant_timestamptz stopped. A dependent object would have "
+            "0102_instant_timestamptz stopped. A dependent object would have "
             "to be dropped, and this migration does not drop schema objects: "
             + "; ".join(sorted(blockers))
         )
