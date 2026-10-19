@@ -1,7 +1,7 @@
 """Probe whether the session may see a batch, without returning the owner.
 
-Revision ID: 0097_batch_access_status
-Revises: 0096_lab_tz_fk_restrict
+Revision ID: 0098_batch_access_status
+Revises: 0097_list_entry_code
 
 ``batches`` is FORCE ROW LEVEL SECURITY, so ``lims_app`` cannot tell a missing
 batch from one that belongs to another client. This function runs as the
@@ -16,8 +16,8 @@ batch whose project passes ``has_project_access``. An inactive row is
 """
 from alembic import op
 
-revision = "0097_batch_access_status"
-down_revision = "0096_lab_tz_fk_restrict"
+revision = "0098_batch_access_status"
+down_revision = "0097_list_entry_code"
 branch_labels = None
 depends_on = None
 

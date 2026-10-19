@@ -91,10 +91,10 @@ def _install_access_functions(engine):
             / "db"
             / "migrations"
             / "versions"
-            / "0097_batch_access_status.py"
+            / "0098_batch_access_status.py"
         )
         status_spec = importlib.util.spec_from_file_location(
-            "_mig_0097_batch_access_status", status_path
+            "_mig_0098_batch_access_status", status_path
         )
         status_mod = importlib.util.module_from_spec(status_spec)
         status_spec.loader.exec_module(status_mod)

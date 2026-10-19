@@ -575,7 +575,7 @@ def test_downgrade_drops_the_function(migrated_engine, batch_world):
     cfg.set_main_option("sqlalchemy.url", url)
     os.environ["DATABASE_URL"] = url
     try:
-        command.downgrade(cfg, "0096_lab_tz_fk_restrict")
+        command.downgrade(cfg, "0097_list_entry_code")
         with migrated_engine.connect() as conn:
             present = conn.execute(
                 text(

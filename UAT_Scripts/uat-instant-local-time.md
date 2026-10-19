@@ -28,6 +28,7 @@ On each of these, a created or updated time matches the local clock, and the JSO
 - Analyses, Analytes, Projects, Containers, Clients, Processes, experiment templates, workflow templates, lists admin
 - Users, Last Login
 - Dose-response Last fit. After a fit, `GET /v1/lims-runs/{id}/dose-response/summary` returns `last_fit_at` ending in `Z`, and the tab shows that instant in local time. With no fit, `last_fit_at` is null and the tab shows —.
+- Dose-response controls. On stock data, samples whose QC type is Positive Control (`code` `positive`) and Negative Control (`code` `negative`) fit. Rename those list entries and fit again; the same samples are still the controls. Remove the positive code and the fit is **422** `missing_positive_control`. A display name of `positive_control` with no code is not a control.
 
 ## IT-3 Calendar dates do not shift
 
