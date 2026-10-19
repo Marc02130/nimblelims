@@ -1,13 +1,17 @@
-"""Shared 'not in the future' check for schema validators.
+"""Shared calendar-day helpers for schema validators.
 
 A future check compares calendar days in the lab timezone. A naive midnight
 is a date-only value (``YYYY-MM-DD``, or a row saved that way) and is that
 calendar day with no zone shift. Any other datetime, including one with an
 offset, is converted into the lab zone. A time that is still today in the
 lab is accepted after UTC has rolled to the next day.
+
+Storage of an offset-bearing calendar value is naive midnight of that lab
+day. Date-only input is left as written. Response models do not call
+``store_calendar_day``; a row already saved is returned as stored.
 """
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Union
 
 from app.core.lab_time import as_calendar_day, clock_date, current_lab_zone
 
@@ -28,3 +32,23 @@ def is_future(value, *, today: Optional[date] = None) -> bool:
     if today is not None:
         return value > today
     return value > clock_date(current_lab_zone())
+
+
+def store_calendar_day(value: Optional[Union[date, datetime]]):
+    """Persist a calendar field as the lab day's naive midnight.
+
+    ``None`` stays ``None``. A plain ``date`` and a naive ``datetime``
+    (a ``YYYY-MM-DD`` value, or a non-midnight naive value already written
+    that way) are unchanged. ``datetime`` is a ``date`` subclass, so it is
+    checked first. An offset-bearing datetime becomes naive midnight of
+    ``as_calendar_day`` in the lab zone. Columns are ``timestamp without
+    time zone``; that midnight is what a later read treats as the lab day.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value
+        day = as_calendar_day(value, current_lab_zone())
+        return datetime(day.year, day.month, day.day)
+    return value

@@ -2,6 +2,7 @@
 Pydantic schemas for batches
 """
 from pydantic import Field, validator
+from app.schemas._dates import store_calendar_day
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -38,6 +39,11 @@ class BatchCreate(BatchBase):
     divergent_analyses: Optional[List[UUID]] = Field(None, description="List of analysis IDs that require separate sub-batches (future: child_batch_id FK)")
     qc_additions: Optional[List[QCAddition]] = Field(None, description="List of QC samples to auto-create and add to batch (US-27). QC samples are automatically assigned to the system Laboratory QC project.")
 
+    @validator('start_date', 'end_date')
+    def store_calendar_dates(cls, v):
+        """Start and end are lab calendar days. A later day is allowed for scheduling."""
+        return store_calendar_day(v)
+
 
 class BatchUpdate(BaseModel):
     """Schema for updating a batch"""
@@ -51,6 +57,9 @@ class BatchUpdate(BaseModel):
 
     # Removed date validation - dates can be in the future for scheduling
     # End dates are typically set when batch is completed, not during creation
+    @validator('start_date', 'end_date')
+    def store_calendar_dates(cls, v):
+        return store_calendar_day(v)
 
 
 class BatchContainerRequest(BaseModel):
@@ -132,6 +141,9 @@ class BatchCreateWithContainersRequest(BaseModel):
 
     # Removed date validation - dates can be in the future for scheduling
     # End dates are typically set when batch is completed, not during creation
+    @validator('start_date', 'end_date')
+    def store_calendar_dates(cls, v):
+        return store_calendar_day(v)
 
 
 class BatchContentSample(BaseModel):
