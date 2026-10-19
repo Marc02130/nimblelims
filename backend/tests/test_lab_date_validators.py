@@ -254,6 +254,23 @@ def test_offset_input_is_stored_as_lab_midnight_on_every_input_model(monkeypatch
         assert date_only.start_date.tzinfo is None
 
 
+def test_omitted_entry_date_defaults_to_the_lab_day_not_utc(monkeypatch):
+    """2026-10-20 01:00Z is still 2026-10-19 in America/New_York."""
+    monkeypatch.setattr(
+        lab_time, "_utcnow", lambda: datetime(2026, 10, 20, 1, 0, tzinfo=timezone.utc)
+    )
+    lab_time.remember_lab_zone("America/New_York")
+    created = ResultCreate(test_id=UID, analyte_id=UID, entered_by=UID)
+    assert created.entry_date == datetime(2026, 10, 19, 0, 0)
+    assert created.entry_date.date() != date(2026, 10, 20)
+    omitted = TestResultEntry(
+        test_id=UID,
+        analyte_results=[{"analyte_id": UID, "raw_result": "1"}],
+    )
+    assert omitted.entry_date is None
+    assert lab_time.current_lab_day() == date(2026, 10, 19)
+
+
 def test_days_from_today_follows_the_lab_calendar(monkeypatch):
     monkeypatch.setattr(
         lab_time, "_utcnow", lambda: datetime(2026, 10, 19, 0, 30, tzinfo=timezone.utc)

@@ -1,11 +1,12 @@
 """
 Pydantic schemas for results
 """
+from app.core.lab_time import current_lab_day
 from app.schemas._dates import is_future, store_calendar_day
 from pydantic import Field, validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 
@@ -17,10 +18,7 @@ class ResultBase(BaseModel):
     reported_result: Optional[str] = Field(None, max_length=255, description="Reported result value")
     qualifiers: Optional[UUID] = Field(None, description="ID of qualifier from list_entries")
     calculated_result: Optional[str] = Field(None, max_length=255, description="Calculated result (post-MVP)")
-    entry_date: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="Date result was entered",
-    )
+    entry_date: datetime = Field(default_factory=current_lab_day, description="Date result was entered")
     entered_by: UUID = Field(..., description="ID of user who entered result")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
     replicate: int = Field(1, ge=1, description="Replicate number (default 1)")
@@ -36,7 +34,7 @@ class ResultCreate(ResultBase):
     Entry-date checks run on create, update, and batch entry, not on read.
     """
 
-    @validator('entry_date')
+    @validator('entry_date', always=True)
     def validate_entry_date(cls, v):
         if v is not None and is_future(v):
             raise ValueError('Entry date cannot be in the future')
