@@ -4,7 +4,7 @@ Stem: `lab-timezone-no-fallback`. Migration `0105_lab_timezone_required` (revise
 
 ## Decision for Marc
 
-There is no UTC or `America/New_York` default. A missing, blank, or NULL `lab_settings.timezone` fails. An administrator must save a real IANA zone before anyone else uses the app.
+The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. A missing, blank, or NULL value fails. An administrator must save a real IANA zone before anyone else uses the app.
 
 `public.current_lab_day()` uses `now()` only. A session cannot override the lab day with `SET lims.as_of` or `SET lims.allow_as_of`.
 

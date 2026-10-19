@@ -44,7 +44,7 @@ This project uses a five-container Docker setup:
    docker compose up -d --build
    ```
 
-   `.env.example` uses `change-me` placeholders. Nothing reads `LAB_TIMEZONE`. An administrator must save `lab_settings.timezone`. A fresh database also needs the five required Compose secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose uses `${VAR:?}` for those five and will not start when any of them is unset. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
+   `.env.example` uses `change-me` placeholders. The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. A fresh database also needs the five required Compose secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose uses `${VAR:?}` for those five and will not start when any of them is unset. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
    
    This will automatically:
    - Start the database container
@@ -288,7 +288,7 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - Database connection settings
 - JWT secret keys
 - Application environment settings
-- The lab zone lives only on `lab_settings`. Nothing reads `LAB_TIMEZONE`. An empty, blank, or NULL value fails until an administrator saves a real IANA name with `PATCH /v1/lab-settings`. `/auth/me` reports `timezone_configured`. Non-admin users are blocked after login; administrators are sent to a required setup step. Pytest sets a timezone on `lab_settings` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not read an environment zone. A lab manager can read the saved zone with `GET /v1/lab-settings`. Lab managers, lab technicians, clients, and configuration editors cannot change it. The configuring agent has no allow-list entry for that path.
+- The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. `/auth/me` reports `timezone_configured`. Non-admin users are blocked after login; administrators are sent to that setup step. Pytest sets a timezone on `lab_settings` explicitly. Alembic, `create_admin.py`, the seed scripts, and the MCP service do not seed a zone. A lab manager can read the saved zone with `GET /v1/lab-settings`. Lab managers, lab technicians, clients, and configuration editors cannot change it. The configuring agent has no allow-list entry for that path.
 
 ### Optional Environment Variables
 

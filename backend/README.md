@@ -268,10 +268,12 @@ Copyright (c) 2025 Marc Breneiser
    ```
 
    `DATABASE_URL` uses `lims_app`. `MIGRATE_DATABASE_URL` uses `lims_migrate`.
-   Copy the root `.env.example` as well before `docker compose up`. Nothing
-   reads `LAB_TIMEZONE`. An administrator must save `lab_settings.timezone`.
-   A fresh compose database also needs
-   `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`,
+   Copy the root `.env.example` as well before `docker compose up`. The lab
+   timezone is required. It is stored in `lab_settings.timezone` and set by
+   an administrator at the required post-login step, or with
+   `PATCH /v1/lab-settings`. There is no environment fallback.
+   `current_lab_day()` raises until it is set. A fresh compose database also
+   needs `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`,
    `LIMS_APP_PASSWORD`, and `SECRET_KEY` (Compose `${VAR:?}`). Role jobs
    are in `manuals/db-roles.md`.
 
@@ -294,7 +296,7 @@ Required environment variables (see `env.example`):
 - `JWT_SECRET_KEY` - Secret key for JWT token signing
 - `JWT_ALGORITHM` - JWT algorithm (default: HS256)
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - Token expiration time
-- The lab zone lives only on `lab_settings`. Nothing reads `LAB_TIMEZONE`. An empty, blank, or NULL value fails until an administrator saves a real IANA name with `PATCH /v1/lab-settings`. The API starts without a zone so login and that setup step can run. `create_admin.py` and the seed scripts do not read an environment zone. A lab manager can read the saved zone with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
+- The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. The API starts without a zone so login and that setup step can run. `create_admin.py` and the seed scripts do not seed a zone. A lab manager can read the saved zone with `GET`. Lab managers, lab technicians, clients, and configuration editors receive 403 on update.
 
 Optional environment variables:
 - `REQUIRE_QC_FOR_BATCH_TYPES` - Comma-separated list of batch type UUIDs that require QC samples
