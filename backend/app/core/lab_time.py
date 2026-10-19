@@ -23,6 +23,9 @@ UNSET_MESSAGE = "lab timezone not configured: set lab_settings.timezone"
 INVALID_TIMEZONE = "invalid_timezone"
 LAB_TIMEZONE_INVALID = "lab_timezone_invalid"
 LAB_TIMEZONE_UNSET = "lab_timezone_not_configured"
+# tzfile leftovers. Some hosts list them in available_timezones() and
+# pg_timezone_names, so the two-catalog AND is not enough on its own.
+_LEFTOVER_ZONES = frozenset({"Factory", "localtime", "posixrules"})
 
 
 class LabTimezoneInvalid(RuntimeError):
@@ -40,12 +43,16 @@ class LabTimezoneUnset(RuntimeError):
 def known_zone(name: str) -> tzinfo:
     """Return the IANA zone. Raises ValueError when the name is blank or unknown.
 
-    The name must be in ``zoneinfo.available_timezones()``. That rejects
-    leftovers such as ``localtime``, ``posixrules``, and ``Factory`` on
-    some systems; Postgres must still accept the name on PATCH.
+    The name must be in ``zoneinfo.available_timezones()`` and must not
+    be a leftover such as ``localtime``, ``posixrules``, or ``Factory``.
+    Postgres must still accept the name on PATCH.
     """
     cleaned = name.strip()
-    if cleaned == "" or cleaned not in available_timezones():
+    if (
+        cleaned == ""
+        or cleaned in _LEFTOVER_ZONES
+        or cleaned not in available_timezones()
+    ):
         raise ValueError(cleaned or "empty")
     try:
         return ZoneInfo(cleaned)
@@ -75,7 +82,7 @@ def accept_lab_timezone(db: Session, name: str) -> str:
     """The name to store. Raises ValueError when Python or Postgres rejects it."""
     zone = known_zone(name)
     key = getattr(zone, "key", None) or name.strip()
-    if not postgres_accepts_timezone(db, key):
+    if key in _LEFTOVER_ZONES or not postgres_accepts_timezone(db, key):
         raise ValueError(key)
     return key
 
