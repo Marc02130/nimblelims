@@ -77,8 +77,8 @@ def _insert_omitting_entry_date(conn, parents):
     return conn.execute(
         text(
             """
-            INSERT INTO results (id, test_id, analyte_id, entered_by, replicate)
-            VALUES (gen_random_uuid(), :test_id, :analyte_id, :entered_by, :replicate)
+            INSERT INTO results (id, test_id, analyte_id, entered_by, replicate, active)
+            VALUES (gen_random_uuid(), :test_id, :analyte_id, :entered_by, :replicate, true)
             RETURNING entry_date
             """
         ),
