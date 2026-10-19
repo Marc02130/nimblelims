@@ -268,8 +268,10 @@ Copyright (c) 2025 Marc Breneiser
    ```
 
    `DATABASE_URL` uses `lims_app`. `MIGRATE_DATABASE_URL` uses `lims_migrate`.
-   Copy the root `.env.example` as well before `docker compose up`. Role jobs
-   are in `manuals/db-roles.md`.
+   Copy the root `.env.example` as well before `docker compose up`. A fresh
+   compose database needs `LAB_TIMEZONE` plus `POSTGRES_USER`,
+   `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and
+   `SECRET_KEY` (Compose `${VAR:?}`). Role jobs are in `manuals/db-roles.md`.
 
 4. **Run migrations**
    ```bash

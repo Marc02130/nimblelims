@@ -37,6 +37,22 @@ Prefer adding scripts next to existing UAT scripts so operators find them in one
 3. Capture evidence (screenshots, IDs) for failures.  
 4. **All must-pass cases green** (or written waiver) before merge.
 
+Seed passwords for UAT use `--secrets-out` only. See [`UAT_Scripts/uat-seed-secrets.md`](../../../UAT_Scripts/uat-seed-secrets.md) and [`manuals/uat-artifacts.md`](../../../manuals/uat-artifacts.md).
+
+## Publish evidence
+
+Before sharing a folder or tarball:
+
+1. Keep backups in `/workspace/.uat-backups/<round>/`. They are never inside evidence.
+2. If a log still has a `printed once` header, run `python scripts/mask_printed_once.py` and keep only the filtered copy.
+3. Scan the folder or tarball:
+
+```bash
+python scripts/scan_uat_evidence.py /path/to/evidence
+```
+
+Share only when the scan exits 0. A non-zero exit lists hits (`printed once`, a 24-character password-pool token, `$2a$` / `$2b$` / `$2y$`, or a `.dump` file) and the pack is not shared.
+
 ## Exit criteria
 
 | Result | Action |
@@ -75,3 +91,4 @@ Pass / Fail — signature
 - [Parent process](../README.md)  
 - [Dogfood](../dogfood/README.md)  
 - Existing scripts: [`UAT_Scripts/`](../../../UAT_Scripts/)  
+- Backups and secrets: [`manuals/uat-artifacts.md`](../../../manuals/uat-artifacts.md)  

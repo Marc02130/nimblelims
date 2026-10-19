@@ -44,7 +44,7 @@ This project uses a five-container Docker setup:
    docker compose up -d --build
    ```
 
-   `.env.example` uses `change-me` placeholders. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
+   `.env.example` uses `change-me` placeholders. A fresh database needs `LAB_TIMEZONE` plus the five required Compose secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose uses `${VAR:?}` for those five and will not start when any of them is unset. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
    
    This will automatically:
    - Start the database container
@@ -63,8 +63,8 @@ This project uses a five-container Docker setup:
 
 4. **Login**
    - Username: `admin`
-   - A fresh database locks `admin`, `lab-manager`, `lab-tech`, `client`, `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`. None of them can sign in until you run `docker compose exec backend python seed_dev_passwords.py --apply`.
-   - If the matching `DEV_SEED_*` variable is unset, that command prints the password once. To choose it yourself, set the variable from `.env.example` before `--apply`. Do not commit the value.
+   - A fresh database locks `admin`, `lab-manager`, `lab-tech`, `client`, `alice-tech`, `bob-tech`, `carol-manager`, and `david-cro`. None of them can sign in until you run `docker compose exec backend python seed_dev_passwords.py --apply --secrets-out /tmp/uat-secrets.env`.
+   - If a `DEV_SEED_*` variable is unset, that command writes the generated password to the new `--secrets-out` file (mode `0600`) and prints only the path. UAT uses this mode only. To choose the password yourself, set the variable from `.env.example` before `--apply`. Do not commit the value. See [manuals/uat-artifacts.md](manuals/uat-artifacts.md).
    - An existing database keeps its current passwords. Run `--check` before `--apply` on a shared, UAT, or demo database. Pass `--defaults-file` on both when you need to detect an old bcrypt hash of a published default (the four biotech users are not flagged must-change).
    - **⚠️ IMPORTANT**: Production bootstrap uses `BOOTSTRAP_ADMIN_PASSWORD`, not a password stored in git.
    - **Forgot password?** on the sign-in page emails a one-time link. Local Compose sends it to Mailpit at http://localhost:8025. See [manuals/admin-setup.md](manuals/admin-setup.md).
@@ -95,7 +95,7 @@ sudo docker compose up -d --build
 
 - **2 clients** (NovaBio Therapeutics, PharmaTest CRO) with RLS isolation
 - **8 users** across 4 roles: admin, lab techs, managers, client
-  - Logins: `admin` / `DEV_SEED_ADMIN_PASSWORD`, `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD`, `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD`, `bob-tech` / `DEV_SEED_BOB_TECH_PASSWORD`, and the other `DEV_SEED_*` variables. Fresh databases stay locked until `seed_dev_passwords.py --apply`.
+  - Logins: `admin` / `DEV_SEED_ADMIN_PASSWORD`, `lab-tech` / `DEV_SEED_LAB_TECH_PASSWORD`, `alice-tech` / `DEV_SEED_ALICE_TECH_PASSWORD`, `bob-tech` / `DEV_SEED_BOB_TECH_PASSWORD`, and the other `DEV_SEED_*` variables. Fresh databases stay locked until `seed_dev_passwords.py --apply --secrets-out PATH`.
 - **6 projects** (mAb PK study, CAR-T in-process, plasmid lot release, CRO services)
 - **7 samples** spanning full lifecycle (Received → Available → Testing Complete → Reviewed)
 - **Parent/aliquot chains**, **QC samples**, **batches**, **tests**, **results**
@@ -311,7 +311,7 @@ Alembic migrations run automatically when the backend container starts. The star
 - All database tables and indexes
 - Initial roles (Administrator, Lab Manager, Lab Technician, CRO Partner / Client)
 - Initial permissions (~15 core permissions including `batch:read`, `batch:manage`, `config:edit`, `test:configure`, etc.)
-- Default admin user (username: `admin`). The password is `DEV_SEED_ADMIN_PASSWORD` after `python backend/seed_dev_passwords.py --apply`. Until then the account is locked.
+- Default admin user (username: `admin`). The password is `DEV_SEED_ADMIN_PASSWORD` after `python backend/seed_dev_passwords.py --apply --secrets-out PATH`. Until then the account is locked.
 - Initial lists and list entries for statuses, types, etc. (normalized to lowercase slug format)
 - Seed data: BioTech/Pharma assays (Cell Viability, Dose-Response Screening, Target Binding, Kinase Selectivity Panel, ADME Profiling), analytes (IC50, Emax, Kd, Ki, clearance, permeability, solubility), and assay panels (e.g., 'ADME Panel' battery)
 
