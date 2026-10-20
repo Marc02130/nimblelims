@@ -1825,6 +1825,27 @@ def test_missing_allowlist_redacts_configured_secret(tmp_path, capsys, monkeypat
     assert configured not in err
 
 
+def test_invalid_json_allowlist_redacts_configured_secret(
+    tmp_path, capsys, monkeypatch
+):
+    configured = "seed" + uuid.uuid4().hex[:12]
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    allow_dir = tmp_path / configured
+    allow_dir.mkdir()
+    allow = allow_dir / "allow.json"
+    allow.write_text("{not-json", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (configured,)
+    )
+    assert code == 2
+    assert "allowlist is not valid JSON" in err
+    assert configured not in out
+    assert configured not in err
+
+
 def test_missing_secrets_file_redacts_configured_secret(
     tmp_path, capsys, monkeypatch
 ):
@@ -1891,11 +1912,22 @@ def test_hex_and_base64_runs_of_200_are_hits(tmp_path, capsys):
     assert _hit("encoded run", "b64.txt", line=1) in err
 
 
-def test_weak_signature_in_utf8_text_is_not_archive(tmp_path, capsys):
+def test_utf8_text_starting_x_caret_is_not_archive(tmp_path, capsys):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
     evidence.mkdir()
     (evidence / "notes.txt").write_text("x^ just a note\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "archive" not in err
+    assert "clean" in out
+
+
+def test_utf8_text_starting_bzh_is_not_archive(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("BZh just a note\n", encoding="utf-8")
     code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 0
     assert "archive" not in err

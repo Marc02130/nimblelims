@@ -7,8 +7,10 @@ import importlib.util
 import io
 import json
 import os
+import shlex
 import subprocess
 import tarfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -64,9 +66,35 @@ def _gzip_n9(data: bytes) -> bytes:
     return proc.stdout
 
 
-def _run_pack(args: list[str], planted: tuple[str, ...] = ()) -> subprocess.CompletedProcess[str]:
+def _run_pack(
+    args: list[str],
+    planted: tuple[str, ...] = (),
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run(
         ["python3", str(PACK), *args],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    for value in planted:
+        assert value not in proc.stdout
+        assert value not in proc.stderr
+    return proc
+
+
+def _run_pack_umask(
+    umask: str,
+    args: list[str],
+    planted: tuple[str, ...] = (),
+) -> subprocess.CompletedProcess[str]:
+    quoted = " ".join(shlex.quote(part) for part in ["python3", str(PACK), *args])
+    proc = subprocess.run(
+        ["bash", "-lc", f"umask {umask} && exec {quoted}"],
         check=False,
         capture_output=True,
         text=True,
@@ -464,6 +492,7 @@ def test_tar_pack_argv_keeps_dash_dash_before_name():
     assert "--" in argv
     assert argv[argv.index("--") + 1] == "-f"
     assert "--format=gnu" in argv
+    assert "--mode=u=rwX,go=" in argv
     assert any(
         item.startswith("--use-compress-program=") and "-n" in item and "gzip" in item
         for item in argv
@@ -628,3 +657,74 @@ def test_verify_refuses_symlinked_archive(tmp_path):
     verified = _run_pack(["--verify", str(linked), "--no-allowlist"], (token,))
     assert verified.returncode == 2
     assert "symlink" in verified.stderr
+
+
+def test_pack_verify_is_stable_across_umask_and_mode_change(tmp_path):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    notes = evidence / "notes.txt"
+    notes.write_text("sample id 123\n", encoding="utf-8")
+    notes.chmod(0o644)
+    output = tmp_path / "round.tgz"
+    packed_077 = _run_pack_umask(
+        "077",
+        [str(evidence), "--output", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert packed_077.returncode == 0
+    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    verified_022 = _run_pack_umask(
+        "022",
+        ["--verify", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert verified_022.returncode == 0
+    notes.chmod(0o664)
+    output2 = tmp_path / "round2.tgz"
+    packed_022 = _run_pack_umask(
+        "022",
+        [str(evidence), "--output", str(output2), "--no-allowlist"],
+        (token,),
+    )
+    assert packed_022.returncode == 0
+    verified_077 = _run_pack_umask(
+        "077",
+        ["--verify", str(output2), "--no-allowlist"],
+        (token,),
+    )
+    assert verified_077.returncode == 0
+    assert hashlib.sha256(output2.read_bytes()).hexdigest() == digest
+    notes.chmod(0o600)
+    verified_after_chmod = _run_pack_umask(
+        "022",
+        ["--verify", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert verified_after_chmod.returncode == 0
+
+
+def test_verify_failed_hardlink_redacts_tar_stderr(tmp_path):
+    token = _token_with_symbol("_")
+    configured = "seed" + uuid.uuid4().hex[:12]
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        root = tarfile.TarInfo(name="round")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o700
+        bundle.addfile(root)
+        leak = tarfile.TarInfo(name=f"round/{token}")
+        leak.type = tarfile.LNKTYPE
+        leak.linkname = f"round/{configured}"
+        bundle.addfile(leak)
+    archive = tmp_path / "crafted.tgz"
+    archive.write_bytes(_gzip_n9(raw.getvalue()))
+    _write_sidecar(archive)
+    verified = _run_pack(
+        ["--verify", str(archive), "--no-allowlist"],
+        (token, configured),
+        extra_env={"POSTGRES_PASSWORD": configured},
+    )
+    assert verified.returncode == 2
+    assert "tar extract failed" in verified.stderr
+    assert "<redacted name hmac:" in verified.stderr

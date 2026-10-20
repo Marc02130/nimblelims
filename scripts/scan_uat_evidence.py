@@ -177,6 +177,55 @@ def redact_name_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
     return "/".join(shown)
 
 
+def _redact_pool_windows(text: str) -> str:
+    """Replace each strong password-pool window with an HMAC tag."""
+    out: list[str] = []
+    run: list[str] = []
+
+    def flush() -> None:
+        if not run:
+            return
+        chunk = "".join(run)
+        index = 0
+        while index <= len(chunk) - DEV_PASSWORD_LENGTH:
+            window = chunk[index : index + DEV_PASSWORD_LENGTH]
+            if _is_strong_window(window):
+                out.append(_redact_tag(window))
+                index += DEV_PASSWORD_LENGTH
+            else:
+                out.append(chunk[index])
+                index += 1
+        if index < len(chunk):
+            out.append(chunk[index:])
+        run.clear()
+
+    for char in text:
+        if char in _POOL:
+            run.append(char)
+            continue
+        flush()
+        out.append(char)
+    flush()
+    return "".join(out)
+
+
+def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
+    """Redact configured secrets and pool-token windows in arbitrary text."""
+    if not text:
+        return text
+    shown = text
+    needles: list[tuple[str, str]] = []
+    for secret in sorted((item for item in secrets if item), key=len, reverse=True):
+        needles.append((secret, _redact_tag(secret)))
+        encoded = quote(secret, safe="")
+        if encoded and encoded != secret:
+            needles.append((encoded, _redact_tag(secret)))
+    for needle, tag in needles:
+        if needle in shown:
+            shown = shown.replace(needle, tag)
+    return _redact_pool_windows(shown)
+
+
 class Hit:
     """One structured finding. ``identity`` is never normalized."""
 
@@ -407,78 +456,87 @@ def is_unsafe_evidence_name(raw: str) -> bool:
     return is_unsafe_name(raw)
 
 
+def _allowlist_shown(path: Path, secrets: tuple[str, ...]) -> str:
+    return redact_name_path(str(path), secrets)
+
+
 def load_allowlist(
     path: Path,
     secrets: tuple[str, ...] = (),
 ) -> list[AllowlistEntry]:
     """Load a reviewed allowlist. Refuses extension/glob and non-canonical paths."""
+    shown = _allowlist_shown(path, secrets)
     if not path.is_file():
-        shown = redact_name_path(str(path), secrets)
         raise SystemExit(f"ERROR: allowlist not found: {shown}")
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"ERROR: allowlist is not valid JSON: {path}") from exc
+        raise SystemExit(f"ERROR: allowlist is not valid JSON: {shown}") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
-        raise SystemExit(f"ERROR: allowlist must be an object with entries: {path}")
-    entries = [_parse_allowlist_entry(item, path) for item in raw["entries"]]
+        raise SystemExit(f"ERROR: allowlist must be an object with entries: {shown}")
+    entries = [_parse_allowlist_entry(item, path, secrets) for item in raw["entries"]]
     seen: set[Identity] = set()
     for entry in entries:
         if entry.identity in seen:
-            raise SystemExit(f"ERROR: allowlist has a duplicate path: {path}")
+            raise SystemExit(f"ERROR: allowlist has a duplicate path: {shown}")
         seen.add(entry.identity)
     return entries
 
 
-def _parse_allowlist_entry(item: object, source: Path) -> AllowlistEntry:
+def _parse_allowlist_entry(
+    item: object,
+    source: Path,
+    secrets: tuple[str, ...] = (),
+) -> AllowlistEntry:
+    shown = _allowlist_shown(source, secrets)
     if not isinstance(item, dict):
-        raise SystemExit(f"ERROR: allowlist entry must be an object: {source}")
+        raise SystemExit(f"ERROR: allowlist entry must be an object: {shown}")
     if "extension" in item or "glob" in item:
         raise SystemExit(
-            f"ERROR: allowlist must not allow by extension or glob: {source}"
+            f"ERROR: allowlist must not allow by extension or glob: {shown}"
         )
     if "line" in item:
-        raise SystemExit(f"ERROR: allowlist must not use line entries: {source}")
+        raise SystemExit(f"ERROR: allowlist must not use line entries: {shown}")
     rel = item.get("path")
     if isinstance(rel, str):
         if any(char in rel for char in "*?[]"):
             raise SystemExit(
-                f"ERROR: allowlist must not allow by extension or glob: {source}"
+                f"ERROR: allowlist must not allow by extension or glob: {shown}"
             )
         if not is_canonical_path(rel):
             raise SystemExit(
-                f"ERROR: allowlist path must be a relative file path: {source}"
+                f"ERROR: allowlist path must be a relative file path: {shown}"
             )
         identity: Identity = (rel,)
     elif isinstance(rel, list) and rel and all(isinstance(part, str) for part in rel):
         if any(any(char in part for char in "*?[]") for part in rel):
             raise SystemExit(
-                f"ERROR: allowlist must not allow by extension or glob: {source}"
+                f"ERROR: allowlist must not allow by extension or glob: {shown}"
             )
         if any(not is_canonical_path(part) for part in rel):
             raise SystemExit(
-                f"ERROR: allowlist path must be a relative file path: {source}"
+                f"ERROR: allowlist path must be a relative file path: {shown}"
             )
         identity = tuple(rel)
     else:
         raise SystemExit(
-            f"ERROR: allowlist must not allow by extension or glob: {source}"
+            f"ERROR: allowlist must not allow by extension or glob: {shown}"
         )
     reviewed = item.get("reviewed_by")
     approved = item.get("approved_by")
     date = item.get("date")
     if not isinstance(reviewed, str) or not reviewed.strip():
-        raise SystemExit(f"ERROR: allowlist entry needs reviewed_by: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs reviewed_by: {shown}")
     if not isinstance(approved, str) or not approved.strip():
-        raise SystemExit(f"ERROR: allowlist entry needs approved_by: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs approved_by: {shown}")
     if not isinstance(date, str) or not date.strip():
-        raise SystemExit(f"ERROR: allowlist entry needs date: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs date: {shown}")
     sha = item.get("sha256")
     if sha is None:
-        raise SystemExit(f"ERROR: allowlist entry needs path plus sha256: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs path plus sha256: {shown}")
     if not isinstance(sha, str) or not _SHA256_RE.fullmatch(sha):
         raise SystemExit(
-            f"ERROR: allowlist sha256 must be 64 hex characters: {source}"
+            f"ERROR: allowlist sha256 must be 64 hex characters: {shown}"
         )
     return AllowlistEntry(
         identity=identity,
