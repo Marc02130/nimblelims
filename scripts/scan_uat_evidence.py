@@ -33,8 +33,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a folder whose scanned files exceed the 64 MiB total cap
   (67108864 bytes)
 - a 200-character or longer hex or Base64 run
-- a JWT under 200 characters (three base64url segments starting
-  ``eyJ``)
+- a JWT of any realistic length (three base64url segments
+  starting ``eyJ``)
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -140,8 +140,9 @@ KIND_PNG_TRAIL = "png-trailing"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
 B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
-JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
-MAX_JWT_CHARS = 200
+JWT_RE = re.compile(
+    r"eyJ[A-Za-z0-9_-]{0,8192}\.[A-Za-z0-9_-]{1,8192}\.[A-Za-z0-9_-]{1,8192}"
+)
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -361,11 +362,13 @@ def scan_text(
 
 
 def jwt_on_line(line: str) -> bool:
-    """True when a JWT under 200 characters starts with eyJ and has three segments."""
-    for match in JWT_RE.finditer(line):
-        if len(match.group(0)) < MAX_JWT_CHARS:
-            return True
-    return False
+    """True when a JWT starts with eyJ and has three base64url segments.
+
+    Segment lengths are bounded so a large file cannot trip catastrophic
+    backtracking. There is no total-length cap: tokens around 200-280
+    characters still hit.
+    """
+    return JWT_RE.search(line) is not None
 
 
 def scan_name(
