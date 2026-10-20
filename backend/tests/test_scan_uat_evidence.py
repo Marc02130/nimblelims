@@ -12,6 +12,7 @@ import re
 import socket
 import stat
 import tarfile
+import time
 import uuid
 import zlib
 from pathlib import Path
@@ -150,31 +151,54 @@ def _runtime_pool_token() -> str:
     raise AssertionError("could not generate a pool token")
 
 
-def _runtime_jwt(length: int | None = None) -> str:
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
-    def part(count: int, prefix: str = "") -> str:
-        need = count - len(prefix)
-        body = "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(need))
-        return prefix + body
+
+def _runtime_header_jwt(
+    header: dict[str, object],
+    length: int | None = None,
+) -> str:
+    first = _b64url(json.dumps(header, separators=(",", ":")).encode("ascii"))
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+    def part(count: int) -> str:
+        chars: list[str] = []
+        for index in range(count):
+            if index % 40 == 0:
+                chars.append("g")
+                continue
+            chars.append(alphabet[os.urandom(1)[0] % len(alphabet)])
+        return "".join(chars)
 
     if length is None:
-        raw = os.urandom(12)
-        first = "eyJ" + base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-        token = f"{first}.{part(24)}.{part(20)}"
+        token = f"{first}.{part(12)}.{part(12)}"
         assert token.startswith("eyJ")
         assert len(token.split(".")) == 3
         assert len(token) < 200
         return token
-    inner = length - 2
-    first = 3 + (inner - 3) // 3
-    second = (inner - 3) // 3
-    third = inner - first - second
-    token = f"{part(first, 'eyJ')}.{part(second)}.{part(third)}"
+    remaining = length - len(first) - 2
+    assert remaining >= 2
+    second = remaining // 2
+    third = remaining - second
+    token = f"{first}.{part(second)}.{part(third)}"
     assert token.startswith("eyJ")
     assert len(token.split(".")) == 3
     assert len(token) == length
     return token
+
+
+def _runtime_jwt(length: int | None = None) -> str:
+    return _runtime_header_jwt({"alg": "HS256", "typ": "JWT"}, length)
+
+
+def _gzip_cap_payload(count: int) -> bytes:
+    stub = b"\x1f\x8b\x08\x00" + (b"\xff" * 16)
+    body = bytearray(b"RAND")
+    for _ in range(count):
+        body.extend(stub)
+        body.extend(b"\x00\x11\x22")
+    return bytes(body)
 
 
 def _binary_with_stray_gzip(prefix: bytes, size: int = 64 * 1024) -> bytes:
@@ -2078,3 +2102,156 @@ def test_long_runtime_jwt_is_an_unsuppressible_hit(tmp_path, capsys, length):
     assert _hit("jwt", "notes.txt", line=1) in err
     assert jwt not in out
     assert jwt not in err
+
+
+def test_redact_text_redacts_jwt_in_tar_error_text():
+    jwt = _runtime_jwt()
+    shown = scan.redact_text(f"tar: round/{jwt}: Cannot hard link")
+    assert jwt not in shown
+    assert "<redacted name hmac:" in shown
+    assert shown.startswith("tar: round/")
+
+
+def test_jwt_named_file_is_a_hit_and_redacted(tmp_path, capsys):
+    token = _runtime_pool_token()
+    jwt = _runtime_jwt()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / f"{jwt}.txt").write_text("ok\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token, jwt))
+    assert code == 1
+    shown = _redacted_path(f"{jwt}.txt")
+    assert _hit("jwt", shown) in err
+    assert "<redacted name hmac:" in err
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_eyjx_dot_y_dot_z_is_not_a_jwt(tmp_path, capsys):
+    token = _runtime_pool_token()
+    probe = "".join(("eyJ", "x", ".", "y", ".", "z"))
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"note {probe}\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token, probe))
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out
+    assert scan.jwt_on_line(probe) is False
+
+
+def test_eyj_plus_dot_a_dot_b_is_not_a_jwt(tmp_path, capsys):
+    """Zero extra header chars after eyJ is not a JWT; alg still required."""
+    token = _runtime_pool_token()
+    plus_probe = "".join(("eyJ", "+", ".", "a", ".", "b"))
+    zero_probe = "".join(("eyJ", ".", "a", ".", "b"))
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(
+        f"note {plus_probe}\nnote {zero_probe}\n",
+        encoding="utf-8",
+    )
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"],
+        capsys,
+        (token, plus_probe, zero_probe, jwt),
+    )
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out
+    assert scan.jwt_on_line(plus_probe) is False
+    assert scan.jwt_on_line(zero_probe) is False
+    assert scan.jwt_on_line(jwt) is True
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_jwt_header_without_alg_is_not_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    probe = _runtime_header_jwt({"typ": "JWT"})
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {probe}\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token, probe))
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out
+    assert scan.jwt_on_line(probe) is False
+
+
+def test_real_shaped_jwt_header_with_alg_is_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token, jwt))
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert scan.jwt_on_line(jwt) is True
+
+
+def test_jwt_after_failed_header_is_still_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    decoy = "".join(("eyJ", "x", ".", "y", ".", "z"))
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{decoy} {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, decoy, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert decoy not in out
+    assert decoy not in err
+
+
+def test_repeated_eyj_jwt_scan_is_linear_time():
+    """About 1 MiB of repeated eyJ must scan well under 1 s.
+
+    The old regex backtracked (~15 s per MiB, ~16 min at the 64 MiB cap).
+    jwt_on_line and JWT redaction are typically under 10 ms on 1 MiB.
+    The assertion budget is 2.0 s so shared CI runners have slack; this
+    test always runs (no skip). redact_text is not timed here because
+    the password-pool window scan is a separate linear pass.
+    """
+    blob = "eyJ" * ((1024 * 1024) // 3)
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    started = time.perf_counter()
+    assert scan.jwt_on_line(blob) is False
+    shown = scan._redact_jwts(blob)
+    elapsed = time.perf_counter() - started
+    assert shown == blob
+    assert elapsed < 2.0
+    assert scan.jwt_on_line(jwt) is True
+    assert jwt not in blob
+    assert jwt not in shown
+
+
+def test_gzip_candidate_cap_is_unsuppressible_archive(tmp_path, capsys):
+    token = _runtime_pool_token()
+    under = _gzip_cap_payload(31)
+    payload = _gzip_cap_payload(32)
+    assert scan.archive_kind(under) is None
+    assert scan.archive_kind(payload) == "gzip"
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "capped.bin").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "capped.bin", "sha256": digest}],
+    )
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+    )
+    assert code == 1
+    assert _hit("archive", "capped.bin") in err
+    assert _hit("refuse binary", "capped.bin") not in err
+    assert "clean" not in out
