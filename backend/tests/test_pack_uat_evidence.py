@@ -119,6 +119,33 @@ def _jwt_segment_encoded(token: str) -> str:
     return encoded
 
 
+def _assert_no_jwt_windows(
+    stdout: str, stderr: str, token: str, width: int = 24
+) -> None:
+    """Refuse a leftover payload/signature window. Never print the token."""
+    _header, payload, signature = token.split(".")
+    blobs = (stdout, stderr)
+    for source in (payload, signature):
+        if len(source) < width:
+            if source and any(source in blob for blob in blobs):
+                raise AssertionError("planted JWT fragment leaked")
+            continue
+        for index in range(len(source) - width + 1):
+            window = source[index : index + width]
+            if any(window in blob for blob in blobs):
+                raise AssertionError("planted JWT window leaked")
+
+
+def _jwt_quote_layers(token: str, layers: int) -> str:
+    """Fully percent-encode every byte, then nest ``%`` → ``%25``."""
+    encoded = "".join("%{:02X}".format(ord(char)) for char in token)
+    for _ in range(max(0, layers - 1)):
+        encoded = encoded.replace("%", "%25")
+    if encoded == token or "%" not in encoded:
+        raise AssertionError("quoted JWT was not percent-encoded")
+    return encoded
+
+
 def _assert_no_jwt_grams(stdout: str, stderr: str, token: str) -> None:
     _header, payload, signature = token.split(".")
     blobs = (stdout, stderr)
@@ -954,6 +981,7 @@ def _verify_encoded_jwt_case(
         verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
         _assert_jwt_absent(verified.stdout, verified.stderr, token)
         _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+        _assert_no_jwt_windows(verified.stdout, verified.stderr, token)
         if encoded in verified.stdout or encoded in verified.stderr:
             raise AssertionError("percent-encoded JWT leaked")
         if verified.returncode != 2:
@@ -962,6 +990,36 @@ def _verify_encoded_jwt_case(
             raise AssertionError("verify did not report tar extract failed")
         if "<redacted name hmac:" not in verified.stderr:
             raise AssertionError("tar stderr was not redacted")
+
+
+def test_verify_double_dot_jwt_member_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        lambda token: token.replace(".", "%252E"),
+        "gone/{jwt}",
+        "round/missing-target",
+        "dbl-dot-member",
+    )
+
+
+def test_verify_triple_dot_jwt_link_target_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        lambda token: token.replace(".", "%25252E"),
+        "round/link",
+        "missing_{jwt}",
+        "tpl-dot-target",
+    )
+
+
+def test_verify_fully_double_encoded_jwt_member_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        lambda token: _jwt_quote_layers(token, 2),
+        "gone/{jwt}",
+        "round/missing-target",
+        "dbl-full-member",
+    )
 
 
 def test_verify_percent_dot_jwt_member_does_not_leak(tmp_path):
@@ -984,6 +1042,24 @@ def test_verify_percent_dot_jwt_link_target_does_not_leak(tmp_path):
     )
 
 
+def test_verify_eyj_decoy_prefix_16_and_17_does_not_leak(tmp_path):
+    """Bound-prefixed JWT in a member name must not print on --verify."""
+    for decoys in (16, 17):
+        token = _pyjwt_access_token()
+        glued = ("eyJx" * decoys) + token
+        archive = tmp_path / f"bound-{decoys}.tgz"
+        _crafted_hardlink_tgz(archive, f"gone/{glued}", "round/missing-target")
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_jwt_absent(verified.stdout, verified.stderr, token)
+        _assert_no_jwt_windows(verified.stdout, verified.stderr, token)
+        if glued in verified.stdout or glued in verified.stderr:
+            raise AssertionError("bound-prefixed JWT leaked from verify")
+        if verified.returncode == 0:
+            raise AssertionError("bound-prefixed JWT pack verified clean")
+        if token in verified.stdout or token in verified.stderr:
+            raise AssertionError("bound-prefixed JWT printed in full")
+
+
 def test_verify_percent_segment_jwt_member_does_not_leak(tmp_path):
     _verify_encoded_jwt_case(
         tmp_path,
@@ -992,6 +1068,70 @@ def test_verify_percent_segment_jwt_member_does_not_leak(tmp_path):
         "round/missing-target",
         "seg-member",
     )
+
+
+def test_pack_refuses_secret_output_name_and_redacts_it(tmp_path):
+    jwt = _runtime_jwt()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / f"{jwt}.tgz"
+    packed = _run_pack_unchecked(
+        [str(evidence), "--output", str(output), "--no-allowlist"]
+    )
+    _assert_jwt_absent(packed.stdout, packed.stderr, jwt)
+    if packed.returncode != 2:
+        raise AssertionError("secret output name was not refused")
+    if "secret rule" not in packed.stderr:
+        raise AssertionError("secret output name was not reported")
+    if "<redacted name hmac:" not in packed.stderr:
+        raise AssertionError("secret output path was not redacted")
+    if output.exists():
+        raise AssertionError("secret-named output was created")
+
+
+def test_pack_refuses_secret_sidecar_name_and_redacts_it(tmp_path):
+    token = _token_with_symbol("_")
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / f"{token}.tgz"
+    packed = _run_pack_unchecked(
+        [str(evidence), "--output", str(output), "--no-allowlist"]
+    )
+    if token in packed.stdout or token in packed.stderr:
+        raise AssertionError("pool output name leaked")
+    if packed.returncode != 2:
+        raise AssertionError("pool output name was not refused")
+    if "secret rule" not in packed.stderr:
+        raise AssertionError("pool output name was not reported")
+    if "<redacted name hmac:" not in packed.stderr:
+        raise AssertionError("pool output path was not redacted")
+
+
+def test_verify_refuses_secret_archive_name_and_redacts_it(tmp_path):
+    jwt = _runtime_jwt()
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        root = tarfile.TarInfo(name="round")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o700
+        bundle.addfile(root)
+        notes = tarfile.TarInfo(name="round/notes.txt")
+        payload = b"ok\n"
+        notes.size = len(payload)
+        bundle.addfile(notes, io.BytesIO(payload))
+    archive = tmp_path / f"{jwt}.tgz"
+    archive.write_bytes(_gzip_n9(raw.getvalue()))
+    _write_sidecar(archive)
+    verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+    _assert_jwt_absent(verified.stdout, verified.stderr, jwt)
+    if verified.returncode != 2:
+        raise AssertionError("secret archive name was not refused")
+    if "secret rule" not in verified.stderr:
+        raise AssertionError("secret archive name was not reported")
+    if "<redacted name hmac:" not in verified.stderr:
+        raise AssertionError("secret archive path was not redacted")
 
 
 def test_verify_percent_segment_jwt_link_target_does_not_leak(tmp_path):
