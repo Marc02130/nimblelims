@@ -34,7 +34,7 @@ python scripts/mask_printed_once.py < captured.log > filtered.log
 
 The filter replaces the entire next line with `[redacted]`. It exits non-zero when the header is missing, when the header has no following line, or when the mask token is missing. Do not share the unfiltered log.
 
-Scan every evidence folder or tarball before sharing:
+Scan only the plain evidence folder. Archives inside it are refused by signature. Do not pass a `.tgz` to the scanner.
 
 ```bash
 python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
@@ -42,19 +42,43 @@ python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
 
 `--secrets-file` is the `--secrets-out` file for the round. The scan also reads `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, `SECRET_KEY`, and `DEV_SEED_*` / `SLICE_*` password variables from the environment.
 
-The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is an exact path relative to the evidence folder (normalized, no `..`, no absolute path) plus either a line number or a file SHA-256, with `reviewed_by`, `approved_by`, and `date`. Every new allowlist entry needs Günter's (CSO) own review and approval, recorded in `reviewed_by` and `approved_by`, keyed by that exact path plus SHA-256 (or line). A hit is suppressed only when that same scanned file's own SHA-256 equals the entry hash. Tar members are separate paths (`archive.tar!ui/name.png`). A file entry never covers a member, and a member entry never covers a file. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
+The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is a canonical evidence-relative path plus the file's SHA-256, with `reviewed_by`, `approved_by`, and `date`. There are no line entries. Every new allowlist entry needs Günter's (CSO) own review and approval, recorded in `reviewed_by` and `approved_by`. A hit is suppressed only when the identity tuple matches exactly and that same object's SHA-256 equals the entry hash. A sha entry may suppress only refused-binary and password-pool hits. It never suppresses configured-secret, bcrypt, dump/PGDMP, printed-once, unsafe-name, duplicate, link, archive, size-cap, or unreadable hits. Identities are exact one-element tuples (the on-disk relative path) with no normalization. Duplicate or non-canonical allowlist paths refuse the whole allowlist (exit 2). There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
 
 The scan refuses (exit 1, list of hits) on:
 
 - a `printed once` header in any case
 - a 24-character password-pool window that contains upper, lower, digit, and a pool symbol (`_` and `-` count; mixed-case snake_case keys with three or more `_`/`-` separators and no other pool symbol are not hits)
 - a configured compose or seed secret, matched literally and percent-encoded
+- a configured secret or pool token in a file or directory name (whole path and each segment)
 - a bcrypt marker (`$2a$`, `$2b$`, `$2y$`)
 - a `.dump` or `.dump.gz` name, or the `PGDMP` magic
-- gzip or zlib payloads (decompressed, then scanned), including nested tarballs
-- a binary file that is not gzip, zlib, tar, PGDMP, UTF-8 text, or an allowlisted SHA-256
+- an archive or compressed file detected by signature (tar ustar at offset 257 or an old-style tar checksum, gzip `1f8b`, zlib `78 01/5e/9c/da`, xz, bz2 `BZh`, zip `PK\x03\x04` plus empty `PK\x05\x06` and spanned `PK\x07\x08`, zstd, 7z). A sha entry cannot hide this hit
+- a binary file that is not PGDMP or UTF-8 text (a matching sha entry may suppress this hit)
+- an unsafe name in any directory or file (`|`, `\`, `!`, controls, non-ASCII, leading/trailing whitespace, `.`/`..`/`//`, a drive letter, invalid UTF-8, or a casefold collision)
+- a duplicate identity
+- a symlink, fifo, socket, or device
+- a file that exceeds the 64 MiB size cap (67108864 bytes)
+- an unreadable directory or file
 
-Hits name the file and line. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
+Hits name the identity with `json.dumps`. A name segment that is a configured secret or pool token is printed as `<redacted name hmac:xxxxxxxx>` (HMAC-SHA256 of the segment with a per-run random key, first 8 hex), including a parent segment that matches. A secret that contains `/` redacts the whole path. They do not print the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
+
+### Packing evidence
+
+Scan first. Pack only when the scan is clean. Use [`scripts/pack_uat_evidence.py`](../scripts/pack_uat_evidence.py):
+
+```bash
+python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz --secrets-file PATH
+```
+
+The helper runs the folder scan, then packs into a temp name with GNU tar and `gzip -n -9` (no name or mtime in the gzip header): `tar -C <parent> -cf <temp> --owner=0 --group=0 --numeric-owner --sort=name --mtime=@0 --use-compress-program='gzip -n -9' -- <dir>` (no `./`). It extracts that temp archive, requires exactly one top-level real directory, scans that directory as the evidence root (allowlist paths stay `ui/...png`), name-scans the directory's own name, rebuilds with the same flags, and requires a byte-identical SHA-256. Only then is the archive published and recorded in `<name>.tgz.sha256`. Pack and verify need the same tar and gzip implementation. A dirty folder or a dirty packed result produces no `.tgz` and no sidecar. The `.tgz` and sidecar are mode `0600`, created with `O_EXCL|O_NOFOLLOW`. Output inside the scanned folder, a symlinked output path, or a symlinked evidence root is refused.
+
+Verify before sharing:
+
+```bash
+python scripts/pack_uat_evidence.py --verify evidence.tgz --secrets-file PATH
+```
+
+That requires a sidecar line `^[0-9a-f]{64}  <archive-name>$` and a matching SHA-256 (a missing, malformed, or mismatched sidecar fails). Then it extracts, requires exactly one top-level entry that `lstat` says is a real directory, scans that directory (not the extraction root), name-scans the directory name, and requires a byte-identical rebuild. Do not put an archive back into an evidence folder.
 
 ### After each round
 

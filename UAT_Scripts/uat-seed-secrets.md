@@ -44,7 +44,7 @@ Do not paste the file into the evidence folder.
 
 ## TC-SECRETS-002 — Scan evidence before sharing
 
-1. Build the evidence folder or tarball. Leave backups in `/workspace/.uat-backups/<round>/`.
+1. Build the evidence folder. Leave backups in `/workspace/.uat-backups/<round>/`. Do not put archives in the folder.
 2. If a captured log still has a `printed once` header, filter it before it goes into evidence:
 
 ```bash
@@ -53,13 +53,15 @@ python scripts/mask_printed_once.py < captured.log > filtered.log
 
 The filter replaces the entire next line with `[redacted]`. It exits non-zero when the header is missing, when the header has no following line, or when the mask token is missing. Do not share `captured.log`.
 
-3. Scan the folder or tarball:
+3. Scan the plain folder, then pack only if it is clean:
 
 ```bash
 python scripts/scan_uat_evidence.py /path/to/evidence
+python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz
+python scripts/pack_uat_evidence.py --verify evidence.tgz
 ```
 
-Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scripts/uat_evidence_allowlist.json` (exact evidence-relative path plus line or SHA-256, never by extension or path suffix). Tar members need their own entries (`archive.tar!ui/name.png`). A non-zero exit lists hits and the folder is not shared. Hits are a `printed once` header in any case, a 24-character mixed pool-token window (`_` and `-` count as symbols), a configured compose or seed secret, a bcrypt marker, a `.dump` / `.dump.gz` / `PGDMP` dump, nested gzip/zlib/tar payloads, or a binary that is not on that allowlist.
+Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scripts/uat_evidence_allowlist.json` (canonical path plus SHA-256, no line entries, never by extension or path suffix). `reviewed_by` and `approved_by` are Günter (CSO). Identities are the on-disk relative path. A sha entry may suppress only refused-binary and password-pool hits. Duplicate or non-canonical allowlist paths exit 2. A non-zero exit lists hits and the folder is not packed. Hits are a `printed once` header, a 24-character mixed pool-token window, a configured compose or seed secret (including in names), a bcrypt marker, a dump/PGDMP, an archive/compressed signature, a binary that is not on that allowlist, an unsafe name, a duplicate identity, a link or special file, a size-cap miss, or an unreadable path. A dirty folder must produce no `.tgz`. Name hits print `<redacted name hmac:xxxxxxxx>` and never the secret. The pack helper scans the extracted evidence directory (so allowlist paths stay `ui/...png`), name-scans the packed folder name, and requires a byte-identical rebuild with the same GNU tar and `gzip -n -9`. `--verify` fails on a missing or mismatched sidecar, an extra top-level entry, a top-level symlink, or an archive that is not a clean rebuild. The size cap is 64 MiB (67108864 bytes).
 
 ## TC-SECRETS-003 — Reviewed allowlist and r38 clean lines
 
@@ -70,7 +72,10 @@ Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scri
    - `ui/r38_results_UTC.png`
 4. Changing one byte of an allowlisted file must make the entry stop matching.
 5. `other/ui/r38_results_UTC.png` with a runtime-generated pool token must still be reported when only `ui/r38_results_UTC.png` is allowlisted.
-6. A tar member named `ui/r38_results_UTC.png` with a runtime-generated pool token must still be reported when only the loose file path is allowlisted.
+6. A tar, gzip, zlib, xz, bz2, zip, zstd, or 7z file in the folder is an unsuppressible archive hit even when a sha entry matches that file.
+7. Unsafe names (trailing space, leading-space folder, `\`, `|`, `!`, `:1`, controls, non-ASCII, casefold collisions) are unsuppressible hits. File and directory names are also scanned for pool tokens and configured secrets. Symlinks, a directory link, a dangling link, a root link, a fifo, a socket, and a device are hits. An over-budget file and an unreadable dir or file are hits.
+8. Line entries are refused (exit 2). A sha entry whose file later changes no longer matches. Neither a line entry nor a sha entry may suppress a configured secret, bcrypt, or printed-once hit.
+9. Duplicate or non-canonical allowlist paths refuse the whole allowlist (exit 2).
 
 ## Sign-off
 
