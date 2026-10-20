@@ -1060,6 +1060,58 @@ def test_verify_eyj_decoy_prefix_16_and_17_does_not_leak(tmp_path):
             raise AssertionError("bound-prefixed JWT printed in full")
 
 
+def test_verify_bound_hit_dotted_decoy_does_not_leak_grams(tmp_path):
+    """FU-1: 16 decoys + '.' + token must not leak 8-grams on --verify."""
+    for decoys in (16, 17):
+        token = _pyjwt_access_token()
+        planted = ("eyJx" * decoys) + "." + token
+        archive = tmp_path / f"dotted-bound-{decoys}.tgz"
+        _crafted_hardlink_tgz(archive, f"gone/{planted}", "round/missing-target")
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_jwt_absent(verified.stdout, verified.stderr, token)
+        _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+        _assert_no_jwt_windows(verified.stdout, verified.stderr, token)
+        if planted in verified.stdout or planted in verified.stderr:
+            raise AssertionError("dotted-bound JWT leaked from verify")
+        if verified.returncode == 0:
+            raise AssertionError("dotted-bound JWT pack verified clean")
+
+
+def test_verify_over_cap_header_glued_token_does_not_leak_grams(tmp_path):
+    """FU-2: over-cap header + glued token must not leak 8-grams on --verify."""
+    token = _pyjwt_access_token()
+    over = scan._JWT_HEADER_MAX + 64
+    header = ("eyJ" * ((over + 2) // 3))[:over]
+    planted = header + token
+    archive = tmp_path / "over-cap-glued.tgz"
+    _crafted_hardlink_tgz(archive, "round/link", f"missing_{planted}")
+    verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+    _assert_jwt_absent(verified.stdout, verified.stderr, token)
+    _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+    _assert_no_jwt_windows(verified.stdout, verified.stderr, token)
+    if planted in verified.stdout or planted in verified.stderr:
+        raise AssertionError("over-cap glued JWT leaked from verify")
+    if verified.returncode == 0:
+        raise AssertionError("over-cap glued JWT pack verified clean")
+
+
+def test_verify_long_base64url_prefix_does_not_leak_grams(tmp_path):
+    """R48-F1: 32 KiB prefix + glued token must not leak 8-grams on --verify."""
+    token = _pyjwt_access_token()
+    prefix = "A_g" + ("A" * (scan._JWT_HEADER_MAX - 3))
+    planted = prefix + token
+    archive = tmp_path / "long-prefix.tgz"
+    _crafted_hardlink_tgz(archive, "round/link", f"missing_{planted}")
+    verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+    _assert_jwt_absent(verified.stdout, verified.stderr, token)
+    _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+    _assert_no_jwt_windows(verified.stdout, verified.stderr, token)
+    if token in verified.stdout or token in verified.stderr:
+        raise AssertionError("long-prefix JWT leaked from verify")
+    if verified.returncode == 0:
+        raise AssertionError("long-prefix JWT pack verified clean")
+
+
 def test_verify_percent_segment_jwt_member_does_not_leak(tmp_path):
     _verify_encoded_jwt_case(
         tmp_path,

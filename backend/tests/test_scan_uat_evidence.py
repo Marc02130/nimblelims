@@ -2877,7 +2877,7 @@ def test_jwt_signature_over_8192_is_a_hit_and_redacted(tmp_path, capsys):
 
 
 def test_repeated_eyj_then_dot_a_dot_b_256kib_is_fast():
-    """One eyJ run plus .a.b at 256 KiB stays linear (header cap).
+    """One eyJ run plus .a.b at 256 KiB stays linear (bound-hit path).
 
     Also times a decoy run at the 32 KiB header cap (bound hit).
     """
@@ -2885,10 +2885,12 @@ def test_repeated_eyj_then_dot_a_dot_b_256kib_is_fast():
     header = ("eyJ" * ((size + 2) // 3))[:size]
     blob = f"{header}.a.b"
     started = time.perf_counter()
-    assert scan.jwt_on_line(blob) is False
+    if scan.jwt_on_line(blob) is False:
+        raise AssertionError("over-cap eyJ header was not a bound hit")
     shown = scan._redact_jwts(blob)
     elapsed = time.perf_counter() - started
-    assert shown == blob
+    if blob in shown:
+        raise AssertionError("over-cap eyJ header was not fully redacted")
     assert elapsed < 5.0
     cap_header = ("eyJ" * ((scan._JWT_HEADER_MAX + 2) // 3))[: scan._JWT_HEADER_MAX]
     decoy_blob = f"{cap_header}.a.b"
@@ -2903,17 +2905,19 @@ def test_repeated_eyj_then_dot_a_dot_b_256kib_is_fast():
     assert scan.jwt_on_line(jwt) is True
 
 
-def test_jwt_header_over_32kib_is_not_a_hit_and_is_fast():
-    """A header run over 32 KiB is not a JWT; the walk stays linear."""
+def test_jwt_header_over_32kib_is_bound_hit_and_is_fast():
+    """A header run over 32 KiB with a dotted triple is a bound hit."""
     over = scan._JWT_HEADER_MAX + 64
     header = ("eyJ" * ((over + 2) // 3))[:over]
     blob = f"{header}.aa.bb"
     assert len(header) > scan._JWT_HEADER_MAX
     started = time.perf_counter()
-    assert scan.jwt_on_line(blob) is False
+    if scan.jwt_on_line(blob) is False:
+        raise AssertionError("over-cap header dotted triple was not a jwt hit")
     shown = scan._redact_jwts(blob)
     elapsed = time.perf_counter() - started
-    assert shown == blob
+    if blob in shown:
+        raise AssertionError("over-cap header dotted triple was not redacted")
     assert elapsed < 2.0
     jwt = _runtime_header_jwt({"alg": "HS256"})
     assert scan.jwt_on_line(jwt) is True
@@ -3038,6 +3042,150 @@ def test_eyj_decoy_prefix_16_and_17_hit_and_redact(tmp_path, capsys, monkeypatch
         _assert_no_jwt_windows("", shown, token)
         if glued in shown:
             raise AssertionError("bound-prefixed JWT was not fully redacted")
+
+
+def _dotted_decoy_jwt(token: str, decoys: int) -> str:
+    """N ``eyJx`` decoys, then ``.``, then a real token (FU-1 shape)."""
+    planted = (_EYJ_DECOY * decoys) + "." + token
+    if planted.count(".") != token.count(".") + 1:
+        raise AssertionError("dotted decoy prefix did not add a separator")
+    return planted
+
+
+def test_bound_hit_dotted_decoy_does_not_leak_signature_grams(monkeypatch):
+    """FU-1: 16 decoys + '.' + token redacts through every following run."""
+    real_extend = scan._extend_dot_joined_runs
+    calls = {"n": 0}
+
+    def counted(text: str, end: int) -> int:
+        calls["n"] += 1
+        return real_extend(text, end)
+
+    monkeypatch.setattr(scan, "_extend_dot_joined_runs", counted)
+    for decoys in (16, 17):
+        token = _pyjwt_access_token()
+        planted = _dotted_decoy_jwt(token, decoys)
+        if scan.jwt_on_line(planted) is False:
+            raise AssertionError("dotted decoy prefix was not a bound jwt hit")
+        match = next(scan._iter_jwts(planted), None)
+        if match is None:
+            raise AssertionError("dotted decoy prefix produced no jwt span")
+        _begin, end, _span = match
+        if end != len(planted):
+            raise AssertionError("bound redaction stopped before the last dotted run")
+        shown = scan.redact_text(f"tar: {planted}: Cannot open")
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_grams("", shown, token)
+        _assert_no_jwt_windows("", shown, token)
+        if planted in shown:
+            raise AssertionError("dotted decoy JWT was not fully redacted")
+        if token.split(".")[-1][:8] and any(
+            token.split(".")[-1][i : i + 8] in shown
+            for i in range(max(0, len(token.split(".")[-1]) - 7))
+        ):
+            raise AssertionError("signature 8-gram leaked after bound hit")
+    if calls["n"] < 2:
+        raise AssertionError("bound hit did not extend through following runs")
+
+
+def test_over_cap_header_glued_token_does_not_leak_grams(monkeypatch):
+    """FU-2: over-cap header with a glued token is a bound hit and redacted."""
+    real_alg = scan._jwt_header_has_alg
+    alg_calls = {"n": 0}
+
+    def counted_alg(header: str) -> bool:
+        alg_calls["n"] += 1
+        return real_alg(header)
+
+    monkeypatch.setattr(scan, "_jwt_header_has_alg", counted_alg)
+    token = _pyjwt_access_token()
+    over = scan._JWT_HEADER_MAX + 64
+    header = ("eyJ" * ((over + 2) // 3))[:over]
+    planted = header + token
+    if len(header) <= scan._JWT_HEADER_MAX:
+        raise AssertionError("over-cap header was not longer than 32 KiB")
+    if scan.jwt_on_line(planted) is False:
+        raise AssertionError("over-cap glued token was not a jwt hit")
+    if alg_calls["n"] > scan._JWT_EYJ_PER_RUN:
+        raise AssertionError("over-cap header exceeded the eyJ bound")
+    match = next(scan._iter_jwts(planted), None)
+    if match is None:
+        raise AssertionError("over-cap glued token produced no jwt span")
+    _begin, end, _span = match
+    if end != len(planted):
+        raise AssertionError("over-cap redaction missed the glued token")
+    shown = scan.redact_text(f"tar: {planted}: Cannot open")
+    _assert_jwt_absent("", shown, token)
+    _assert_no_jwt_grams("", shown, token)
+    _assert_no_jwt_windows("", shown, token)
+    if planted in shown:
+        raise AssertionError("over-cap glued JWT was not fully redacted")
+
+
+def test_long_base64url_prefix_finds_glued_token_and_does_not_leak(monkeypatch):
+    """R48-F1: search the last 32 KiB of a long run for a real token."""
+    real_alg = scan._jwt_header_has_alg
+    alg_calls = {"n": 0}
+
+    def counted_alg(header: str) -> bool:
+        alg_calls["n"] += 1
+        return real_alg(header)
+
+    monkeypatch.setattr(scan, "_jwt_header_has_alg", counted_alg)
+    token = _pyjwt_access_token()
+    prefix = _b64url_run(scan._JWT_HEADER_MAX)
+    planted = prefix + token
+    if scan.jwt_on_line(planted) is False:
+        raise AssertionError("token after a 32 KiB prefix was not a jwt hit")
+    if alg_calls["n"] < 1:
+        raise AssertionError("last-32-KiB search did not examine the glued token")
+    if alg_calls["n"] > scan._JWT_EYJ_PER_RUN:
+        raise AssertionError("last-32-KiB search exceeded the eyJ bound")
+    match = next(scan._iter_jwts(planted), None)
+    if match is None:
+        raise AssertionError("long prefix produced no jwt span")
+    begin, end, span = match
+    if begin != len(prefix):
+        raise AssertionError("last-32-KiB search did not start at the real token")
+    if end != len(planted):
+        raise AssertionError("long-prefix redaction missed the glued token")
+    if span != token:
+        raise AssertionError("long-prefix hit was not the real token span")
+    shown = scan.redact_text(f"tar: {planted}: Cannot open")
+    _assert_jwt_absent("", shown, token)
+    _assert_no_jwt_grams("", shown, token)
+    _assert_no_jwt_windows("", shown, token)
+    if token in shown:
+        raise AssertionError("token after a 32 KiB prefix leaked")
+
+
+def test_join_tar_newlines_collapses_crlf_and_dot_newline():
+    """R48-F2 mutant: ``.\\n`` or CRLF must become one ``.``, not ``..``."""
+    if scan._join_tar_newlines("a.\nb") != "a.b":
+        raise AssertionError("dot-newline was not collapsed to one dot")
+    if scan._join_tar_newlines("a\r\nb") != "a.b":
+        raise AssertionError("CRLF was not collapsed to one dot")
+    if scan._join_tar_newlines("a.\r\n.b") != "a.b":
+        raise AssertionError("dot-CRLF-dot was not collapsed to one dot")
+    if ".." in scan._join_tar_newlines("hdr.\npay.sig"):
+        raise AssertionError("dot-newline collapse left a double dot")
+
+
+def test_redact_text_crlf_and_dot_newline_jwt_does_not_leak():
+    """R48-F2: CRLF or '.' + newline must not leak payload 8-grams."""
+    token = _pyjwt_access_token()
+    header, payload, signature = token.split(".")
+    crlf = f"{header}\r\n{payload}.{signature}"
+    dot_nl = f"{header}.\n{payload}.{signature}"
+    for planted in (crlf, dot_nl):
+        shown = scan.redact_text(f"tar: {planted}: Cannot open")
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_grams("", shown, token)
+        _assert_no_jwt_windows("", shown, token)
+        if payload in shown or signature in shown:
+            raise AssertionError("newline-split JWT leaked after join")
+        if planted in shown:
+            raise AssertionError("newline-split JWT was not redacted")
 
 
 def test_json_unicode_escapes_in_content_are_not_tar_unescaped(tmp_path, capsys):
