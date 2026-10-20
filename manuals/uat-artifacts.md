@@ -42,7 +42,7 @@ python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
 
 `--secrets-file` is the `--secrets-out` file for the round. The scan also reads `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, `SECRET_KEY`, and `DEV_SEED_*` / `SLICE_*` password variables from the environment.
 
-The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is an exact path relative to the evidence folder (no `..`, no absolute path) plus the file's SHA-256, with `reviewed_by`, `approved_by`, and `date`. A line entry adds a line number and still requires that same file SHA-256. Every new allowlist entry needs Günter's (CSO) own review and approval, recorded in `reviewed_by` and `approved_by`. A hit is suppressed only when that same scanned file's own SHA-256 equals the entry hash. Line entries never suppress configured-secret, seed/pool password, bcrypt, or dump hits. Digests and hits are keyed by the exact on-disk path, and by the exact member name within each tar (`archive.tar!ui/name.png`). A file entry never covers a member, and a member entry never covers a file. Names that change under normalization, or that contain `|` or `\`, are refused. Duplicate evidence paths and duplicate tar members are refused. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
+The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is a canonical evidence-relative path plus the file's SHA-256, with `reviewed_by`, `approved_by`, and `date`. There are no line entries. Every new allowlist entry needs Günter's (CSO) own review and approval, recorded in `reviewed_by` and `approved_by`. A hit is suppressed only when the identity tuple matches exactly and that same object's SHA-256 equals the entry hash. A sha entry may suppress only refused-binary and password-pool hits. It never suppresses configured-secret, bcrypt, dump/PGDMP, printed-once, unsafe-name, duplicate, link, nesting, or decompress-cap hits. Identities are exact tuples (on-disk relative path, then each tar member as stored, then each decode layer) with no normalization. Tar members need their own identity (`["archive.tar", "ui/name.png"]`). A file entry never covers a member. Duplicate or non-canonical allowlist paths refuse the whole allowlist (exit 2). There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
 
 The scan refuses (exit 1, list of hits) on:
 
@@ -52,9 +52,11 @@ The scan refuses (exit 1, list of hits) on:
 - a bcrypt marker (`$2a$`, `$2b$`, `$2y$`)
 - a `.dump` or `.dump.gz` name, or the `PGDMP` magic
 - gzip or zlib payloads (decompressed, then scanned), including nested tarballs
-- a binary file that is not gzip, zlib, tar, PGDMP, UTF-8 text, or an allowlisted SHA-256
-- an evidence file or tar member whose name changes under normalization or contains `|` or `\`
-- a duplicate evidence path or duplicate tar member name
+- a binary file that is not gzip, zlib, tar, PGDMP, or UTF-8 text (a matching sha entry may suppress this hit)
+- an unsafe name in any directory, file, or tar member (`|`, `\`, `!`, controls, non-ASCII, leading/trailing whitespace, `.`/`..`/`//`, a drive letter, invalid UTF-8, or a casefold collision)
+- a duplicate identity, including duplicate tar members
+- a symlink, fifo, socket, device, or tar link/device member
+- nesting past the decoder cap, or a total decompressed-size cap
 
 Hits name the file and line. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
 
