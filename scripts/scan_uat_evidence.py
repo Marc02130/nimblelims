@@ -35,11 +35,14 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a folder whose scanned files exceed the 64 MiB total cap
   (67108864 bytes)
 - a 200-character or longer hex or Base64 run
-- a JWT of any realistic length (three bounded base64url segments
-  starting ``eyJ`` whose first segment base64url-decodes to JSON
-  containing an ``alg`` key). Detection is a linear-time scan
-  (Python 3.10; no possessive regex). ``eyJ.a.b`` / ``eyJ+.a.b``
-  and a header without ``alg`` are not hits
+- a JWT of any realistic length (three base64url segments starting
+  ``eyJ`` whose first segment base64url-decodes to JSON containing
+  an ``alg`` key). Detection finds base64url runs once with a
+  compiled ``re.finditer(r"[A-Za-z0-9_-]+")`` and does a
+  constant-time check at each ``eyJ`` (Python 3.10; no possessive
+  regex). Header length is not capped; payload and signature
+  segments stay bounded at 8192. ``eyJ.a.b`` / ``eyJ+.a.b`` and a
+  header without ``alg`` are not hits
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -149,11 +152,8 @@ SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
 B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
 _JWT_PREFIX = "eyJ"
-_JWT_B64URL = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
-)
-_JWT_FIRST_MAX = len(_JWT_PREFIX) + 8192
 _JWT_OTHER_MAX = 8192
+_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -398,76 +398,82 @@ def _jwt_header_has_alg(token: str) -> bool:
     return isinstance(data, dict) and "alg" in data
 
 
-def _b64url_end(text: str, start: int, limit: int) -> int:
-    """Return the index after a bounded base64url run starting at ``start``."""
-    end = start
-    last = start + limit
-    length = len(text)
-    if last > length:
-        last = length
-    while end < last and text[end] in _JWT_B64URL:
-        end += 1
-    return end
+def _jwt_triple_end(text: str, runs: list[tuple[int, int]], index: int) -> int | None:
+    """Return the signature end when run ``index`` has two dotted followers.
 
-
-def _jwt_token_end(text: str, pos: int) -> int | None:
-    """Return the end index of a three-segment JWT at ``pos``, or None."""
-    end1 = _b64url_end(text, pos, _JWT_FIRST_MAX)
-    if end1 < pos + len(_JWT_PREFIX) or end1 >= len(text) or text[end1] != ".":
+    Payload and signature stay bounded at ``_JWT_OTHER_MAX``. The header
+    run is not length-capped. Separators must be a single ``.``.
+    """
+    if index + 2 >= len(runs):
         return None
-    end2 = _b64url_end(text, end1 + 1, _JWT_OTHER_MAX)
-    if end2 <= end1 + 1 or end2 >= len(text) or text[end2] != ".":
+    header_end = runs[index][1]
+    payload_start, payload_end = runs[index + 1]
+    signature_start, signature_end = runs[index + 2]
+    if header_end >= len(text) or text[header_end] != ".":
         return None
-    end3 = _b64url_end(text, end2 + 1, _JWT_OTHER_MAX)
-    if end3 <= end2 + 1:
+    if payload_start != header_end + 1:
         return None
-    return end3
-
-
-def _jwt_advance_after_miss(text: str, pos: int) -> int:
-    """Advance past a failed start without rescanning an undotted run."""
-    nxt = pos + 1
-    length = len(text)
-    if nxt >= length:
-        return length
-    dot = text.find(".", pos)
-    if dot < 0:
-        return length
-    earliest = dot - _JWT_FIRST_MAX
-    if earliest > nxt:
-        run_end = _b64url_end(text, pos, earliest - pos)
-        if run_end >= earliest:
-            return earliest
-    return nxt
+    if payload_end >= len(text) or text[payload_end] != ".":
+        return None
+    if signature_start != payload_end + 1:
+        return None
+    payload_len = payload_end - payload_start
+    signature_len = signature_end - signature_start
+    if payload_len < 1 or payload_len > _JWT_OTHER_MAX:
+        return None
+    if signature_len < 1 or signature_len > _JWT_OTHER_MAX:
+        return None
+    return signature_end
 
 
 def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
-    """Yield ``(start, end, token)`` for each alg-header JWT. Linear time."""
-    length = len(text)
-    start = 0
-    while start < length:
-        pos = text.find(_JWT_PREFIX, start)
-        if pos < 0:
-            return
-        end = _jwt_token_end(text, pos)
-        if end is not None:
-            token = text[pos:end]
+    """Yield ``(start, end, token)`` for each alg-header JWT. Linear time.
+
+    Base64url runs are found once with ``_JWT_RUN_RE.finditer``. Each
+    ``eyJ`` in a run that is followed by two bounded dotted segments is
+    an O(1) structure check plus the alg-header decode. A failed
+    ``eyJ`` does not skip a later real token, including one immediately
+    adjacent to the miss.
+    """
+    runs = [(match.start(), match.end()) for match in _JWT_RUN_RE.finditer(text)]
+    cursor = 0
+    index = 0
+    while index < len(runs):
+        run_start, run_end = runs[index]
+        if run_end <= cursor:
+            index += 1
+            continue
+        token_end = _jwt_triple_end(text, runs, index)
+        if token_end is None:
+            index += 1
+            continue
+        search_from = run_start if run_start >= cursor else cursor
+        pos = text.find(_JWT_PREFIX, search_from, run_end)
+        found = False
+        while pos != -1:
+            token = text[pos:token_end]
             if _jwt_header_has_alg(token):
-                yield pos, end, token
-                start = end
-                continue
-        start = _jwt_advance_after_miss(text, pos)
+                yield pos, token_end, token
+                cursor = token_end
+                found = True
+                break
+            pos = text.find(_JWT_PREFIX, pos + 1, run_end)
+        if found:
+            while index < len(runs) and runs[index][1] <= cursor:
+                index += 1
+            continue
+        index += 1
 
 
 def jwt_on_line(line: str) -> bool:
     """True when a JWT starts with eyJ and has three base64url segments.
 
     The first segment must base64url-decode to JSON containing ``alg``.
-    Detection is a linear-time scan with the same bounded segment lengths
-    as r44 (Python 3.10; no possessive quantifiers). A failed header
-    check advances one character so a later real token is not skipped.
-    There is no total-length cap: tokens around 200-280 characters
-    still hit.
+    Detection finds base64url runs once, then checks each ``eyJ`` in
+    constant time (Python 3.10; no possessive quantifiers). Header
+    length is not capped. Payload and signature stay bounded at 8192.
+    A failed header check does not skip a later real token. There is
+    no total-length cap: tokens around 200-280 characters still hit.
     """
     return next(_iter_jwts(line), None) is not None
 
