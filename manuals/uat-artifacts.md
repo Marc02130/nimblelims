@@ -59,7 +59,7 @@ The scan refuses (exit 1, list of hits) on:
 - a symlink, fifo, socket, or device
 - a folder whose scanned files exceed the 64 MiB total cap (67108864 bytes)
 - a 200-character or longer hex or Base64 run
-- a JWT under 200 characters (three base64url segments starting `eyJ`)
+- a JWT of any realistic length (three base64url segments starting `eyJ`; each segment is bounded so large files cannot trip catastrophic backtracking)
 - bytes after the IEND chunk of a PNG
 - an unreadable directory or file
 

@@ -150,16 +150,30 @@ def _runtime_pool_token() -> str:
     raise AssertionError("could not generate a pool token")
 
 
-def _runtime_jwt() -> str:
-    def part(nbytes: int, prefix: str = "") -> str:
-        raw = os.urandom(nbytes)
-        text = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-        return prefix + text
+def _runtime_jwt(length: int | None = None) -> str:
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
 
-    token = f"{part(12, 'eyJ')}.{part(18)}.{part(16)}"
+    def part(count: int, prefix: str = "") -> str:
+        need = count - len(prefix)
+        body = "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(need))
+        return prefix + body
+
+    if length is None:
+        raw = os.urandom(12)
+        first = "eyJ" + base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+        token = f"{first}.{part(24)}.{part(20)}"
+        assert token.startswith("eyJ")
+        assert len(token.split(".")) == 3
+        assert len(token) < 200
+        return token
+    inner = length - 2
+    first = 3 + (inner - 3) // 3
+    second = (inner - 3) // 3
+    third = inner - first - second
+    token = f"{part(first, 'eyJ')}.{part(second)}.{part(third)}"
     assert token.startswith("eyJ")
     assert len(token.split(".")) == 3
-    assert len(token) < 200
+    assert len(token) == length
     return token
 
 
@@ -2050,3 +2064,17 @@ def test_eyj_text_without_three_segments_is_not_a_jwt(tmp_path, capsys):
     assert code == 0
     assert "jwt" not in err
     assert "clean" in out
+
+
+@pytest.mark.parametrize("length", [220, 275])
+def test_long_runtime_jwt_is_an_unsuppressible_hit(tmp_path, capsys, length):
+    token = _runtime_pool_token()
+    jwt = _runtime_jwt(length)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token, jwt))
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
