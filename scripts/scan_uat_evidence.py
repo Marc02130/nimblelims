@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Refuse to share a UAT evidence folder or tarball that contains secrets.
+"""Refuse to share a UAT evidence folder that contains secrets or archives.
+
+Scan only a plain folder. Archives and compressed files are detected by
+signature, not extension, and are an unsuppressible hit. There is no
+archive walk and no decompression. Pack only after a clean scan with
+``scripts/pack_uat_evidence.py``.
 
 Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 
@@ -10,17 +15,17 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   more ``_``/``-`` separators and no other pool symbol are not hits.
 - a configured compose or seed secret from the environment or
   ``--secrets-file``, matched literally and percent-encoded
+- a configured secret or pool token in a file or directory name (whole
+  path and each segment)
 - a bcrypt hash marker (``$2a$``, ``$2b$``, ``$2y$``)
 - a ``.dump`` / ``.dump.gz`` name, or the ``PGDMP`` magic
-- gzip or zlib payloads (decompressed, then scanned)
-- nested tarballs
-- a binary file that is not gzip, zlib, tar, PGDMP, or UTF-8 text
-- an unsafe name in any directory, file, or tar member
-- a duplicate identity, including duplicate tar members
-- a symlink, fifo, socket, device, or tar link/device member
-- nesting past ``MAX_NEST``, or a total decompressed-size cap
-- non-zero bytes after a tar end marker, zlib unused data, or an
-  old-style ``/`` member with size greater than 0
+- an archive or compressed payload (tar, gzip, zlib, xz, bz2, zip,
+  zstd, 7z) detected by signature
+- a binary file that is not PGDMP or UTF-8 text
+- an unsafe name in any directory or file
+- a duplicate identity
+- a symlink, fifo, socket, or device
+- a file that exceeds the size cap
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -30,13 +35,11 @@ There are no line entries. A hit is suppressed only when the identity
 tuple matches exactly and that same object's SHA-256 equals the entry
 hash. A sha entry may suppress only refused-binary and password-pool
 hits. It never suppresses configured-secret, bcrypt, dump/PGDMP,
-printed-once, unsafe-name, duplicate, link, nesting, decompress-cap,
-trailing-bytes, dir-payload, or unreadable hits. Identities are exact
-tuples: the on-disk relative path, then each
-tar member as stored, then each decode layer. No name is normalized.
-Tar members need their own identity (``["archive.tar", "ui/name.png"]``).
-A file entry never covers a member. Duplicate or non-canonical allowlist
-paths refuse the whole allowlist (exit 2). There is no allow-by-extension.
+printed-once, unsafe-name, duplicate, link, archive, size-cap, or
+unreadable hits. Identities are exact one-element tuples: the on-disk
+relative path. No name is normalized. Duplicate or non-canonical
+allowlist paths refuse the whole allowlist (exit 2). There is no
+allow-by-extension.
 
 Hits name the identity with ``json.dumps``. They do not repeat the secret.
 """
@@ -44,17 +47,13 @@ from __future__ import annotations
 
 import argparse
 import errno
-import gzip
 import hashlib
-import io
 import json
 import os
 import re
 import shlex
 import stat
 import sys
-import tarfile
-import zlib
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -72,17 +71,23 @@ SECRET_NAME_RE = re.compile(
 )
 PGDMP_MAGIC = b"PGDMP"
 GZIP_MAGIC = b"\x1f\x8b"
-ZLIB_MAGICS = (b"\x78\x01", b"\x78\x9c", b"\x78\xda")
+ZLIB_MAGICS = (b"\x78\x01", b"\x78\x5e", b"\x78\x9c", b"\x78\xda")
+XZ_MAGIC = b"\xfd7zXZ\x00"
+BZ2_MAGIC = b"BZh"
+ZIP_LOCAL = b"PK\x03\x04"
+ZIP_EMPTY = b"PK\x05\x06"
+ZIP_SPAN = b"PK\x07\x08"
+ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
+SEVEN_Z_MAGIC = b"7z\xbc\xaf'\x1c"
+USTAR_MAGIC = b"ustar"
 _POOL = set(DEV_PASSWORD_POOL)
 _SYMBOLS = set("!@#$%^&*-_")
 _SEPARATORS = set("_-")
 _OTHER_SYMBOLS = _SYMBOLS - _SEPARATORS
-MAX_NEST = 8
-MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024
+MAX_SCAN_BYTES = 64 * 1024 * 1024
 DEFAULT_ALLOWLIST = Path(__file__).resolve().parent / "uat_evidence_allowlist.json"
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _SEGMENT_RE = re.compile(r"^[A-Za-z0-9._+=@,-]+(?: [A-Za-z0-9._+=@,-]+)*$")
-_DECODE_LAYERS = frozenset({"gunzip", "inflate"})
 KIND_PRINTED_ONCE = "printed-once header"
 KIND_POOL = "password-pool token"
 KIND_CONFIGURED = "configured secret"
@@ -92,10 +97,8 @@ KIND_BINARY = "refuse binary"
 KIND_UNSAFE = "unsafe-name"
 KIND_DUPLICATE = "duplicate"
 KIND_LINK = "link"
-KIND_NESTING = "nesting"
-KIND_DECOMPRESS_CAP = "decompress-cap"
-KIND_TRAILING = "trailing-bytes"
-KIND_DIR_PAYLOAD = "dir-payload"
+KIND_ARCHIVE = "archive"
+KIND_SIZE_CAP = "size-cap"
 KIND_UNREADABLE = "unreadable"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 Identity = tuple[str, ...]
@@ -208,6 +211,30 @@ def scan_text(
     return hits
 
 
+def scan_name(
+    identity: Identity,
+    raw: str,
+    secrets: tuple[str, ...] = (),
+) -> list[Hit]:
+    """Content-scan a file or directory name, whole and per segment."""
+    hits: list[Hit] = []
+    seen: set[tuple[str, str]] = set()
+    parts = [raw, *[part for part in raw.split("/") if part]]
+    for text in parts:
+        variants = (text, unquote(text))
+        if any(pool_token_on_line(variant) for variant in variants):
+            key = (KIND_POOL, text)
+            if key not in seen:
+                hits.append(Hit(KIND_POOL, identity))
+                seen.add(key)
+        if any(configured_secret_on_line(variant, secrets) for variant in variants):
+            key = (KIND_CONFIGURED, text)
+            if key not in seen:
+                hits.append(Hit(KIND_CONFIGURED, identity))
+                seen.add(key)
+    return hits
+
+
 def load_scan_secrets(
     environ: dict[str, str] | None = None,
     secrets_file: Path | None = None,
@@ -259,15 +286,13 @@ def _segment_is_unsafe(segment: str) -> bool:
         return True
     if any(char in segment for char in "|\\!"):
         return True
-    if _has_invalid_utf8(segment):
-        return True
     if any(ord(char) < 32 or ord(char) == 127 or 128 <= ord(char) <= 159 for char in segment):
         return True
     return _SEGMENT_RE.fullmatch(segment) is None
 
 
 def is_unsafe_name(raw: str) -> bool:
-    """True when a dir, file, or tar-member name is not a canonical relative path."""
+    """True when a dir or file name is not a canonical relative path."""
     if not isinstance(raw, str) or not raw:
         return True
     if raw.startswith("/") or raw.startswith("./"):
@@ -392,10 +417,7 @@ def filter_allowlist_hits(
 
 
 def _identity_leaf(identity: Identity) -> str:
-    for part in reversed(identity):
-        if part not in _DECODE_LAYERS:
-            return Path(part).name
-    return identity[-1] if identity else ""
+    return Path(identity[-1]).name if identity else ""
 
 
 def _is_dump_name(identity: Identity) -> bool:
@@ -407,24 +429,56 @@ def _has_pgdmp_magic(data: bytes) -> bool:
     return data.startswith(PGDMP_MAGIC)
 
 
-def _is_gzip(data: bytes) -> bool:
-    return data.startswith(GZIP_MAGIC)
-
-
-def _is_zlib(data: bytes) -> bool:
-    return data[:2] in ZLIB_MAGICS
-
-
-def _is_tar_bytes(data: bytes) -> bool:
-    if len(data) < 512:
+def _tar_checksum_ok(header: bytes) -> bool:
+    if len(header) < 512:
         return False
-    handle = io.BytesIO(data)
+    field = header[148:156]
+    stripped = field.replace(b"\x00", b" ").strip()
+    if not stripped or any(char not in b"01234567" for char in stripped):
+        return False
     try:
-        with tarfile.open(fileobj=handle, mode="r:") as archive:
-            archive.getmembers()
-        return True
-    except tarfile.TarError:
+        stored = int(stripped, 8)
+    except ValueError:
         return False
+    computed = sum(header[:148]) + sum(b" " * 8) + sum(header[156:512])
+    return computed == stored
+
+
+def _is_old_style_tar_header(data: bytes) -> bool:
+    if len(data) < 512 or data[:512] == b"\x00" * 512:
+        return False
+    if data[0] == 0:
+        return False
+    return _tar_checksum_ok(data[:512])
+
+
+def _is_tar_signature(data: bytes) -> bool:
+    if len(data) >= 262 and data[257:262] == USTAR_MAGIC:
+        return True
+    return _is_old_style_tar_header(data)
+
+
+def archive_kind(data: bytes) -> str | None:
+    """Return the signature name when ``data`` is an archive or compressor."""
+    if data.startswith(GZIP_MAGIC):
+        return "gzip"
+    if len(data) >= 2 and data[:2] in ZLIB_MAGICS:
+        return "zlib"
+    if data.startswith(XZ_MAGIC):
+        return "xz"
+    if data.startswith(BZ2_MAGIC):
+        return "bz2"
+    if data.startswith(ZIP_LOCAL) or data.startswith(ZIP_EMPTY) or data.startswith(
+        ZIP_SPAN
+    ):
+        return "zip"
+    if data.startswith(ZSTD_MAGIC):
+        return "zstd"
+    if data.startswith(SEVEN_Z_MAGIC):
+        return "7z"
+    if _is_tar_signature(data):
+        return "tar"
+    return None
 
 
 def _looks_text(data: bytes) -> bool:
@@ -482,169 +536,22 @@ def _scan_payload(
     identity: Identity,
     data: bytes,
     secrets: tuple[str, ...],
-    depth: int,
     digests: dict[Identity, str],
     announced: set[Identity],
-    budget: list[int],
 ) -> list[Hit]:
     hits: list[Hit] = []
     if identity:
         _record_digest(digests, announced, identity, data, hits)
     if _is_dump_name(identity) or _has_pgdmp_magic(data):
         hits.append(Hit(KIND_DUMP, identity))
-    if depth > MAX_NEST:
-        hits.append(Hit(KIND_NESTING, identity))
-        return hits
-    if _is_gzip(data):
-        return hits + _scan_decode(
-            identity, data, secrets, depth, digests, announced, budget, "gunzip"
-        )
-    if _is_zlib(data):
-        return hits + _scan_decode(
-            identity, data, secrets, depth, digests, announced, budget, "inflate"
-        )
-    if _is_tar_bytes(data):
-        hits.extend(
-            _scan_tar_bytes(
-                identity, data, secrets, depth + 1, digests, announced, budget
-            )
-        )
+    if archive_kind(data) is not None:
+        hits.append(Hit(KIND_ARCHIVE, identity))
         return hits
     if _looks_text(data):
         hits.extend(scan_text(identity, data.decode("utf-8"), secrets))
         return hits
     if not (_is_dump_name(identity) or _has_pgdmp_magic(data)):
         hits.append(Hit(KIND_BINARY, identity))
-    return hits
-
-
-def _scan_decode(
-    identity: Identity,
-    data: bytes,
-    secrets: tuple[str, ...],
-    depth: int,
-    digests: dict[Identity, str],
-    announced: set[Identity],
-    budget: list[int],
-    layer: str,
-) -> list[Hit]:
-    extra = b""
-    try:
-        if layer == "gunzip":
-            inner = gzip.decompress(data)
-        else:
-            decoder = zlib.decompressobj()
-            inner = decoder.decompress(data)
-            extra = decoder.unused_data
-            if extra or not decoder.eof:
-                extra = extra or b"\x00"
-    except (OSError, zlib.error):
-        return [Hit(KIND_BINARY, identity)]
-    hits: list[Hit] = []
-    inner_id = identity + (layer,)
-    if extra:
-        hits.append(Hit(KIND_TRAILING, inner_id))
-        if extra != b"\x00":
-            hits.extend(
-                _scan_payload(
-                    inner_id + ("trailing",),
-                    extra,
-                    secrets,
-                    depth + 1,
-                    digests,
-                    announced,
-                    budget,
-                )
-            )
-    budget[0] += len(inner)
-    if budget[0] > MAX_DECOMPRESSED_BYTES:
-        hits.append(Hit(KIND_DECOMPRESS_CAP, inner_id))
-        return hits
-    hits.extend(
-        _scan_payload(inner_id, inner, secrets, depth + 1, digests, announced, budget)
-    )
-    return hits
-
-
-def _scan_tar_bytes(
-    identity: Identity,
-    data: bytes,
-    secrets: tuple[str, ...],
-    depth: int,
-    digests: dict[Identity, str],
-    announced: set[Identity],
-    budget: list[int],
-) -> list[Hit]:
-    hits: list[Hit] = []
-    seen_members: set[str] = set()
-    handle = io.BytesIO(data)
-    with tarfile.open(fileobj=handle, mode="r:") as archive:
-        members = list(archive.getmembers())
-        # ``r:`` stops at the end marker. ``extractfile`` seeks backward, so
-        # leftover must use this position, not ``tell()`` after reads.
-        end_pos = handle.tell()
-        collided = _casefold_collisions([member.name for member in members])
-        for member in members:
-            member_id = identity + (member.name,)
-            if is_unsafe_name(member.name) or member.name in collided:
-                hits.append(Hit(KIND_UNSAFE, member_id))
-            if member.name in seen_members:
-                hits.append(Hit(KIND_DUPLICATE, member_id))
-                if member_id not in announced:
-                    hits.append(Hit(KIND_DUPLICATE, member_id))
-                    announced.add(member_id)
-            else:
-                seen_members.add(member.name)
-            dir_payload = member.name.endswith("/") and member.size > 0
-            if dir_payload:
-                hits.append(Hit(KIND_DIR_PAYLOAD, member_id))
-            if (
-                member.issym()
-                or member.islnk()
-                or member.ischr()
-                or member.isblk()
-                or member.isfifo()
-            ):
-                hits.append(Hit(KIND_LINK, member_id))
-                continue
-            if member.isdir() and not dir_payload:
-                continue
-            if not member.isfile() and not dir_payload:
-                hits.append(Hit(KIND_LINK, member_id))
-                continue
-            extracted = archive.extractfile(member)
-            if extracted is None:
-                if dir_payload:
-                    continue
-                hits.append(Hit(KIND_LINK, member_id))
-                continue
-            payload = extracted.read()
-            budget[0] += len(payload)
-            if budget[0] > MAX_DECOMPRESSED_BYTES:
-                hits.append(Hit(KIND_DECOMPRESS_CAP, member_id))
-                continue
-            hits.extend(
-                _scan_payload(
-                    member_id, payload, secrets, depth, digests, announced, budget
-                )
-            )
-        leftover = data[end_pos:]
-        if leftover and any(byte != 0 for byte in leftover):
-            trailing_id = identity + ("trailing",)
-            hits.append(Hit(KIND_TRAILING, trailing_id))
-            trailing = leftover.lstrip(b"\x00")
-            if trailing:
-                hits.extend(
-                    _scan_payload(
-                        trailing_id,
-                        trailing,
-                        secrets,
-                        depth,
-                        digests,
-                        announced,
-                        budget,
-                    )
-                )
     return hits
 
 
@@ -693,6 +600,7 @@ def _scan_directory(
             identity = (rel,)
             if name in collided or is_unsafe_name(rel):
                 hits.append(Hit(KIND_UNSAFE, identity))
+            hits.extend(scan_name(identity, rel, secrets))
             try:
                 st = os.lstat(child)
             except OSError:
@@ -708,6 +616,7 @@ def _scan_directory(
             identity = (rel,)
             if name in collided or is_unsafe_name(rel):
                 hits.append(Hit(KIND_UNSAFE, identity))
+            hits.extend(scan_name(identity, rel, secrets))
             try:
                 st = os.lstat(child)
             except OSError:
@@ -718,6 +627,13 @@ def _scan_directory(
             if not stat.S_ISREG(st.st_mode):
                 hits.append(Hit(KIND_LINK, identity))
                 continue
+            if st.st_size > MAX_SCAN_BYTES:
+                hits.append(Hit(KIND_SIZE_CAP, identity))
+                continue
+            budget[0] += st.st_size
+            if budget[0] > MAX_SCAN_BYTES:
+                hits.append(Hit(KIND_SIZE_CAP, identity))
+                continue
             try:
                 data = _read_nofollow(child)
             except OSError as exc:
@@ -726,9 +642,7 @@ def _scan_directory(
                     continue
                 hits.append(Hit(KIND_UNREADABLE, identity))
                 continue
-            hits.extend(
-                _scan_payload(identity, data, secrets, 0, digests, announced, budget)
-            )
+            hits.extend(_scan_payload(identity, data, secrets, digests, announced))
     return hits
 
 
@@ -751,14 +665,7 @@ def scan_path(
     if stat.S_ISDIR(st.st_mode):
         hits = _scan_directory(path, secrets, digests, announced, budget)
         return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
-    if not stat.S_ISREG(st.st_mode):
-        hits = [Hit(KIND_LINK, root_id)]
-        return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
-    data = _read_nofollow(path)
-    if _is_tar_bytes(data) or tarfile.is_tarfile(path):
-        hits = _scan_payload(root_id, data, secrets, 0, digests, announced, budget)
-        return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
-    raise SystemExit(f"ERROR: {path} is not a directory or a tarball")
+    raise SystemExit(f"ERROR: {path} is not a directory")
 
 
 def _resolve_allowlist(args: argparse.Namespace) -> tuple[AllowlistEntry, ...]:
@@ -778,7 +685,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "evidence",
-        help="Evidence directory or tarball to scan before it is shared.",
+        help="Evidence directory to scan before it is packed or shared.",
     )
     parser.add_argument(
         "--secrets-file",

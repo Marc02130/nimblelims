@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import socket
 import stat
 import tarfile
@@ -386,9 +387,7 @@ def test_allowlist_file_entry_does_not_cover_tar_member(tmp_path, capsys):
         [str(evidence), "--allowlist", str(allow)], capsys, (token,)
     )
     assert code == 1
-    assert _hit(
-        "password-pool token", "archive.tar", "ui/r38_results_UTC.png", line=1
-    ) in err
+    assert _hit("archive", "archive.tar") in err
 
 
 def test_allowlist_line_entry_is_refused(tmp_path, capsys):
@@ -548,7 +547,8 @@ def test_dump_gz_name_and_gzip_pgdmp(tmp_path, capsys):
     code, _out, err = _run([str(tmp_path)], capsys, (planted,))
     assert code == 1
     assert _hit("dump file", "users.dump.gz") in err
-    assert _hit("dump file", "renamed.gz", "gunzip") in err
+    assert _hit("archive", "users.dump.gz") in err
+    assert _hit("archive", "renamed.gz") in err
 
 
 def test_zlib_payload_is_inflated_and_scanned(tmp_path, capsys):
@@ -556,22 +556,23 @@ def test_zlib_payload_is_inflated_and_scanned(tmp_path, capsys):
     (tmp_path / "note.zlib").write_bytes(zlib.compress(f"{token}\n".encode("utf-8")))
     code, _out, err = _run([str(tmp_path)], capsys, (token,))
     assert code == 1
-    assert _hit("password-pool token", "note.zlib", "inflate", line=1) in err
+    assert _hit("archive", "note.zlib") in err
 
 
 def test_nested_tarball_is_recursed(tmp_path, capsys):
     token = _mixed_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
     inner_notes = tmp_path / "inner.txt"
     inner_notes.write_text(f"{token}\n", encoding="utf-8")
     inner_tar = tmp_path / "inner.tar"
     with tarfile.open(inner_tar, "w") as bundle:
         bundle.add(inner_notes, arcname="inner.txt")
-    outer = tmp_path / "outer.tar"
-    with tarfile.open(outer, "w") as bundle:
+    with tarfile.open(evidence / "outer.tar", "w") as bundle:
         bundle.add(inner_tar, arcname="wrap/inner.tar")
-    code, _out, err = _run([str(outer)], capsys, (token,))
+    code, _out, err = _run([str(evidence)], capsys, (token,))
     assert code == 1
-    assert "HIT password-pool token:" in err
+    assert _hit("archive", "outer.tar") in err
 
 
 def test_non_allowlisted_binary_is_refused(tmp_path, capsys):
@@ -612,21 +613,24 @@ def test_secrets_file_supplies_configured_values(tmp_path, capsys):
 
 def test_tarball_lists_bcrypt_dump_and_pgdmp(tmp_path, capsys):
     planted = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
     notes = tmp_path / "notes.txt"
     notes.write_text("prefix $2b$12$abcdefghijklmnopqrstuv suffix\n", encoding="utf-8")
     dump = tmp_path / "users.dump"
     dump.write_text("users\n", encoding="utf-8")
     renamed = tmp_path / "renamed-backup.bin"
     renamed.write_bytes(b"PGDMP\x00custom-format")
-    archive = tmp_path / "evidence.tar.gz"
+    archive = evidence / "evidence.tar.gz"
     with tarfile.open(archive, "w:gz") as bundle:
         bundle.add(notes, arcname="notes.txt")
         bundle.add(dump, arcname="round/users.dump")
         bundle.add(renamed, arcname="round/renamed-backup.bin")
-    code, _out, err = _run([str(archive)], capsys, (planted, "abcdefghijklmnopqrstuv"))
+    code, _out, err = _run(
+        [str(evidence)], capsys, (planted, "abcdefghijklmnopqrstuv")
+    )
     assert code == 1
-    assert "HIT bcrypt hash:" in err
-    assert "HIT dump file:" in err
+    assert _hit("archive", "evidence.tar.gz") in err
 
 
 def test_missing_evidence_exits_nonzero(tmp_path, capsys):
@@ -966,9 +970,9 @@ def test_allowlist_spoof_case(case_id, tmp_path, capsys, monkeypatch):
     elif case_id == "B09c":
         assert _hit("unsafe-name", "ui/r38_results_UTC.png|gunzip") in err
     elif case_id == "B12c":
-        assert _hit("duplicate", "pack.tar", "ui/r38_results_UTC.png") in err
+        assert _hit("archive", "pack.tar") in err
     elif case_id == "B12d":
-        assert _hit("unsafe-name", "pack.tar", "./ui/r38_results_UTC.png") in err
+        assert _hit("archive", "pack.tar") in err
     elif case_id == "B13c":
         assert _hit("password-pool token", "notes.txt", line=2) in err
         assert _hit("configured secret", "notes.txt", line=2) in err
@@ -1068,6 +1072,7 @@ def test_spec_bang_in_folder_name(tmp_path, capsys):
         [str(evidence), "--allowlist", str(allow)], capsys, (token,)
     )
     assert code == 1
+    assert _hit("archive", "pack.tar") in err
     assert _hit("unsafe-name", f"pack.tar!ui/{UTC_NAME}") in err
     assert _hit("password-pool token", f"pack.tar!ui/{UTC_NAME}", line=2) in err
 
@@ -1113,7 +1118,7 @@ def test_spec_casefold_collision(tmp_path, capsys):
     assert _hit("unsafe-name", "note.txt") in err
 
 
-def test_spec_invalid_utf8_name(tmp_path, capsys):
+def test_spec_invalid_utf8_name(tmp_path, capsys, monkeypatch):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
     (evidence / "ui").mkdir(parents=True)
@@ -1126,7 +1131,7 @@ def test_spec_invalid_utf8_name(tmp_path, capsys):
             0o600,
             dir_fd=dir_fd,
         )
-        os.write(fd, UTC_PNG)
+        os.write(fd, _secret_text(token).encode("utf-8"))
         os.close(fd)
         created = True
     except (OSError, OverflowError, ValueError, UnicodeError) as exc:
@@ -1135,8 +1140,19 @@ def test_spec_invalid_utf8_name(tmp_path, capsys):
         os.close(dir_fd)
     if not created:
         pytest.skip("invalid-UTF-8 names not creatable here: create did not finish")
-    code, _out, _err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    names = os.listdir(evidence / "ui")
+    presented = names[0]
+    assert scan._has_invalid_utf8(presented)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
+    assert "HIT unsafe-name:" in err
+
+    monkeypatch.setattr(scan, "_has_invalid_utf8", lambda raw: False)
+    monkeypatch.setattr(scan, "_SEGMENT_RE", re.compile(r"^[\s\S]*$"))
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert "HIT unsafe-name:" not in err
+    assert "HIT password-pool token:" in err
 
 
 def _write_tar_with_members(path: Path, members: list[tuple[str, bytes]]) -> None:
@@ -1169,7 +1185,7 @@ def test_spec_tar_duplicate_both_orders(tmp_path, capsys):
             [str(evidence), "--allowlist", str(allow)], capsys, (token,)
         )
         assert code == 1
-        assert _hit("duplicate", "pack.tar", UTC_REL) in err
+        assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_tar_dot_slash_double_slash_backslash_trailing_space(tmp_path, capsys):
@@ -1195,11 +1211,7 @@ def test_spec_tar_dot_slash_double_slash_backslash_trailing_space(tmp_path, caps
         [str(evidence), "--allowlist", str(allow)], capsys, (token,)
     )
     assert code == 1
-    assert _hit("password-pool token", "pack.tar", UTC_REL, line=2) in err
-    assert _hit("unsafe-name", "pack.tar", f"./{UTC_REL}") in err
-    assert _hit("unsafe-name", "pack.tar", "a//b.txt") in err
-    assert _hit("unsafe-name", "pack.tar", f"ui\\{UTC_NAME}") in err
-    assert _hit("unsafe-name", "pack.tar", f"{UTC_REL} ") in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_tar_duplicate_inside_tgz(tmp_path, capsys):
@@ -1214,7 +1226,7 @@ def test_spec_tar_duplicate_inside_tgz(tmp_path, capsys):
     (evidence / "pack.tgz").write_bytes(gzip.compress(raw.getvalue()))
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("duplicate", "pack.tgz", "gunzip", UTC_REL) in err
+    assert _hit("archive", "pack.tgz") in err
 
 
 def test_spec_tar_link_members(tmp_path, capsys):
@@ -1234,9 +1246,7 @@ def test_spec_tar_link_members(tmp_path, capsys):
         bundle.addfile(hard)
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("link", "pack.tar", "ui/link") in err
-    assert _hit("link", "pack.tar", "ui/hard") in err
-    assert _hit("password-pool token", "pack.tar", "ui/notes.txt", line=2) in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_allowlist_duplicate_and_non_canonical_paths(tmp_path, capsys):
@@ -1271,26 +1281,26 @@ def test_spec_allowlist_duplicate_and_non_canonical_paths(tmp_path, capsys):
 def test_spec_nesting_past_max(tmp_path, capsys):
     token = _runtime_pool_token()
     payload = token.encode("utf-8")
-    for _ in range(scan.MAX_NEST + 1):
+    for _ in range(9):
         payload = gzip.compress(payload)
     evidence = tmp_path / "evidence"
     evidence.mkdir()
     (evidence / "nested.gz").write_bytes(payload)
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert "HIT nesting:" in err
+    assert _hit("archive", "nested.gz") in err
 
 
 def test_spec_decompress_cap(tmp_path, capsys, monkeypatch):
     token = _runtime_pool_token()
-    monkeypatch.setattr(scan, "MAX_DECOMPRESSED_BYTES", 16)
+    monkeypatch.setattr(scan, "MAX_SCAN_BYTES", 16)
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    planted = (token + ("x" * 64)).encode("utf-8")
-    (evidence / "big.gz").write_bytes(gzip.compress(planted))
+    planted = token + ("x" * 64)
+    (evidence / "big.txt").write_text(planted, encoding="utf-8")
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("decompress-cap", "big.gz", "gunzip") in err
+    assert _hit("size-cap", "big.txt") in err
 
 
 def test_spec_symlink_exact_path_pack_dir_dangling_root_and_fifo(tmp_path, capsys):
@@ -1331,12 +1341,6 @@ def test_spec_symlink_exact_path_pack_dir_dangling_root_and_fifo(tmp_path, capsy
     assert _hit("link", "ui") in err
 
 
-def _wrap_layers(payload: bytes, layers: int, kind: str) -> bytes:
-    for _ in range(layers):
-        payload = gzip.compress(payload) if kind == "gzip" else zlib.compress(payload)
-    return payload
-
-
 def test_spec_secret_appended_to_tar_is_trailing_bytes(tmp_path, capsys):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
@@ -1346,8 +1350,7 @@ def test_spec_secret_appended_to_tar_is_trailing_bytes(tmp_path, capsys):
     )
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("trailing-bytes", "pack.tar", "trailing") in err
-    assert _hit("password-pool token", "pack.tar", "trailing", line=2) in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_two_tars_joined_with_cat(tmp_path, capsys):
@@ -1359,8 +1362,7 @@ def test_spec_two_tars_joined_with_cat(tmp_path, capsys):
     (evidence / "pack.tar").write_bytes(first + second)
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("trailing-bytes", "pack.tar", "trailing") in err
-    assert _hit("password-pool token", "pack.tar", "trailing", "notes.txt", line=2) in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_tgz_of_joined_tars(tmp_path, capsys):
@@ -1372,10 +1374,7 @@ def test_spec_tgz_of_joined_tars(tmp_path, capsys):
     (evidence / "pack.tgz").write_bytes(gzip.compress(first + second))
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("trailing-bytes", "pack.tgz", "gunzip", "trailing") in err
-    assert _hit(
-        "password-pool token", "pack.tgz", "gunzip", "trailing", "notes.txt", line=2
-    ) in err
+    assert _hit("archive", "pack.tgz") in err
 
 
 def test_spec_corrupted_second_tar_header(tmp_path, capsys):
@@ -1388,7 +1387,7 @@ def test_spec_corrupted_second_tar_header(tmp_path, capsys):
     (evidence / "pack.tar").write_bytes(first + bytes(second))
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("trailing-bytes", "pack.tar", "trailing") in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_old_style_dir_member_with_payload(tmp_path, capsys):
@@ -1405,8 +1404,7 @@ def test_spec_old_style_dir_member_with_payload(tmp_path, capsys):
     (evidence / "pack.tar").write_bytes(raw.getvalue())
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("dir-payload", "pack.tar", "hidden/") in err
-    assert _hit("password-pool token", "pack.tar", "hidden/", line=2) in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_zlib_unused_data_secret(tmp_path, capsys):
@@ -1418,8 +1416,7 @@ def test_spec_zlib_unused_data_secret(tmp_path, capsys):
     )
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("trailing-bytes", "note.zlib", "inflate") in err
-    assert _hit("password-pool token", "note.zlib", "inflate", "trailing", line=2) in err
+    assert _hit("archive", "note.zlib") in err
 
 
 def test_spec_zlib_unused_data_pgdmp(tmp_path, capsys):
@@ -1429,8 +1426,7 @@ def test_spec_zlib_unused_data_pgdmp(tmp_path, capsys):
     (evidence / "note.zlib").write_bytes(zlib.compress(b"ok\n") + b"PGDMP\x00custom")
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("trailing-bytes", "note.zlib", "inflate") in err
-    assert _hit("dump file", "note.zlib", "inflate", "trailing") in err
+    assert _hit("archive", "note.zlib") in err
 
 
 def test_spec_unreadable_directory_is_a_hit(tmp_path, capsys):
@@ -1488,42 +1484,33 @@ def test_spec_unreadable_file_is_a_hit(tmp_path, capsys):
 
 def test_spec_max_nest_exact_and_plus_one_gzip_and_zlib(tmp_path, capsys):
     token = _runtime_pool_token()
-    evidence = tmp_path / "evidence"
-    evidence.mkdir()
-    (evidence / "exact.gz").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST, "gzip"))
-    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
-    assert code == 0
-    assert "clean" in out
-    assert "HIT " not in err
-
-    over = tmp_path / "over-gzip"
-    over.mkdir()
-    (over / "over.gz").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST + 1, "gzip"))
-    code, _out, err = _run([str(over), "--no-allowlist"], capsys, (token,))
+    gzip_dir = tmp_path / "gzip"
+    gzip_dir.mkdir()
+    payload = b"ok\n"
+    for _ in range(8):
+        payload = gzip.compress(payload)
+    (gzip_dir / "nested.gz").write_bytes(payload)
+    code, _out, err = _run([str(gzip_dir), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert "HIT nesting:" in err
+    assert _hit("archive", "nested.gz") in err
 
-    zexact = tmp_path / "exact-zlib"
-    zexact.mkdir()
-    (zexact / "exact.zlib").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST, "zlib"))
-    code, out, err = _run([str(zexact), "--no-allowlist"], capsys, (token,))
-    assert code == 0
-    assert "clean" in out
-
-    zover = tmp_path / "over-zlib"
-    zover.mkdir()
-    (zover / "over.zlib").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST + 1, "zlib"))
-    code, _out, err = _run([str(zover), "--no-allowlist"], capsys, (token,))
+    zlib_dir = tmp_path / "zlib"
+    zlib_dir.mkdir()
+    payload = b"ok\n"
+    for _ in range(8):
+        payload = zlib.compress(payload)
+    (zlib_dir / "nested.zlib").write_bytes(payload)
+    code, _out, err = _run([str(zlib_dir), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert "HIT nesting:" in err
+    assert _hit("archive", "nested.zlib") in err
 
 
 def test_spec_decompress_cap_exact_multifile_and_zlib(tmp_path, capsys, monkeypatch):
     token = _runtime_pool_token()
-    monkeypatch.setattr(scan, "MAX_DECOMPRESSED_BYTES", 16)
+    monkeypatch.setattr(scan, "MAX_SCAN_BYTES", 16)
     exact = tmp_path / "exact"
     exact.mkdir()
-    (exact / "exact.gz").write_bytes(gzip.compress(b"x" * 16))
+    (exact / "exact.txt").write_text("x" * 16, encoding="utf-8")
     code, out, err = _run([str(exact), "--no-allowlist"], capsys, (token,))
     assert code == 0
     assert "clean" in out
@@ -1531,35 +1518,25 @@ def test_spec_decompress_cap_exact_multifile_and_zlib(tmp_path, capsys, monkeypa
 
     multi = tmp_path / "multi"
     multi.mkdir()
-    (multi / "a.gz").write_bytes(gzip.compress(b"x" * 16))
-    (multi / "b.gz").write_bytes(gzip.compress(b"y"))
+    (multi / "a.txt").write_text("x" * 16, encoding="utf-8")
+    (multi / "b.txt").write_text("y", encoding="utf-8")
     code, _out, err = _run([str(multi), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("decompress-cap", "b.gz", "gunzip") in err
+    assert _hit("size-cap", "b.txt") in err
 
-    zexact = tmp_path / "zexact"
-    zexact.mkdir()
-    (zexact / "exact.zlib").write_bytes(zlib.compress(b"x" * 16))
-    code, out, err = _run([str(zexact), "--no-allowlist"], capsys, (token,))
-    assert code == 0
-    assert "clean" in out
-
-    zover = tmp_path / "zover"
-    zover.mkdir()
-    (zover / "over.zlib").write_bytes(zlib.compress(b"x" * 17))
-    code, _out, err = _run([str(zover), "--no-allowlist"], capsys, (token,))
+    over = tmp_path / "over"
+    over.mkdir()
+    (over / "over.txt").write_text("x" * 17, encoding="utf-8")
+    code, _out, err = _run([str(over), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("decompress-cap", "over.zlib", "inflate") in err
+    assert _hit("size-cap", "over.txt") in err
 
-    members = tmp_path / "members"
-    members.mkdir()
-    _write_tar_with_members(
-        members / "pack.tar",
-        [("a.txt", b"x" * 16), ("b.txt", b"y")],
-    )
-    code, _out, err = _run([str(members), "--no-allowlist"], capsys, (token,))
+    zipped = tmp_path / "zipped"
+    zipped.mkdir()
+    (zipped / "note.zlib").write_bytes(zlib.compress(b"x" * 16))
+    code, _out, err = _run([str(zipped), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("decompress-cap", "pack.tar", "b.txt") in err
+    assert _hit("archive", "note.zlib") in err
 
 
 def test_spec_sha_entry_cannot_hide_dump(tmp_path, capsys):
@@ -1598,8 +1575,8 @@ def test_spec_socket_file_is_a_link_hit(tmp_path, capsys):
 
 
 def test_spec_device_file_is_a_link_hit(tmp_path, capsys):
-    # Block devices need mknod/root. Prefer the tar chardev member test when
-    # this skip fires. Never skip silently.
+    # Block devices need mknod/root. The S_IFBLK/S_IFCHR unit test below
+    # covers the classifier when this skip fires. Never skip silently.
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
     evidence.mkdir()
@@ -1613,6 +1590,12 @@ def test_spec_device_file_is_a_link_hit(tmp_path, capsys):
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
     assert _hit("link", "blkdev") in err
+
+
+def test_special_kind_classifies_block_and_char_modes():
+    assert scan._special_kind(stat.S_IFBLK | 0o600) is True
+    assert scan._special_kind(stat.S_IFCHR | 0o600) is True
+    assert scan._special_kind(stat.S_IFREG | 0o600) is False
 
 
 def test_spec_tar_fifo_and_chardev_members(tmp_path, capsys):
@@ -1632,9 +1615,7 @@ def test_spec_tar_fifo_and_chardev_members(tmp_path, capsys):
         bundle.addfile(chardev)
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("link", "pack.tar", "ui/pipe") in err
-    assert _hit("link", "pack.tar", "ui/tty") in err
-    assert _hit("password-pool token", "pack.tar", "ui/notes.txt", line=2) in err
+    assert _hit("archive", "pack.tar") in err
 
 
 def test_spec_tar_casefold_collision_inside_archive(tmp_path, capsys):
@@ -1650,6 +1631,91 @@ def test_spec_tar_casefold_collision_inside_archive(tmp_path, capsys):
     )
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
-    assert _hit("unsafe-name", "pack.tar", "Note.txt") in err
-    assert _hit("unsafe-name", "pack.tar", "note.txt") in err
-    assert _hit("password-pool token", "pack.tar", "Note.txt", line=2) in err
+    assert _hit("archive", "pack.tar") in err
+
+
+def _old_style_tar(name: str, payload: bytes) -> bytes:
+    header = bytearray(512)
+    name_b = name.encode("ascii")[:100]
+    header[0 : len(name_b)] = name_b
+    header[100:108] = b"0000644\x00"
+    header[108:116] = b"0000000\x00"
+    header[116:124] = b"0000000\x00"
+    header[124:136] = f"{len(payload):011o}\x00".encode("ascii")
+    header[136:148] = b"00000000000\x00"
+    header[156:157] = b"0"
+    header[148:156] = b"        "
+    checksum = sum(header)
+    header[148:156] = f"{checksum:06o}\x00 ".encode("ascii")
+    padded = payload + (b"\x00" * ((512 - (len(payload) % 512)) % 512))
+    return bytes(header) + padded + (b"\x00" * 1024)
+
+
+def test_archive_signatures_in_folder_are_hits(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    samples = {
+        "ustar.tar": _tar_bytes([("notes.txt", b"ok\n")]),
+        "oldstyle.tar": _old_style_tar("notes.txt", b"ok\n"),
+        "note.gz": gzip.compress(b"ok\n"),
+        "z78_01.bin": b"\x78\x01" + b"pad",
+        "z78_5e.bin": b"\x78\x5e" + b"pad",
+        "z78_9c.bin": b"\x78\x9c" + b"pad",
+        "z78_da.bin": b"\x78\xda" + b"pad",
+        "note.xz": b"\xfd7zXZ\x00" + b"pad",
+        "note.bz2": b"BZh" + b"pad",
+        "note.zip": b"PK\x03\x04" + b"pad",
+        "empty.zip": b"PK\x05\x06" + b"pad",
+        "span.zip": b"PK\x07\x08" + b"pad",
+        "note.zst": b"\x28\xb5\x2f\xfd" + b"pad",
+        "note.7z": b"7z\xbc\xaf'\x1c" + b"pad",
+    }
+    for name, data in samples.items():
+        (evidence / name).write_bytes(data)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    for name in samples:
+        assert _hit("archive", name) in err
+
+
+def test_sha_entry_cannot_hide_archive(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    payload = gzip.compress(_secret_text(token).encode("utf-8"))
+    (evidence / "hidden.gz").write_bytes(payload)
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "hidden.gz", "sha256": hashlib.sha256(payload).hexdigest()}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+    )
+    assert code == 1
+    assert _hit("archive", "hidden.gz") in err
+
+
+def test_name_is_scanned_for_pool_token_and_configured_secret(
+    tmp_path, capsys, monkeypatch
+):
+    leak = _runtime_pool_token()
+    token = _token_with_symbol("_")
+    configured = "seedpassw0rd"
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / "evidence"
+    (evidence / token).mkdir(parents=True)
+    (evidence / token / f"{configured}.txt").write_text("ok\n", encoding="utf-8")
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (leak,))
+    assert code == 1
+    assert _hit("password-pool token", token) in err
+    assert _hit("configured secret", f"{token}/{configured}.txt") in err
+
+
+def test_regular_file_as_evidence_is_refused(tmp_path, capsys):
+    token = _runtime_pool_token()
+    target = tmp_path / "notes.txt"
+    target.write_text("ok\n", encoding="utf-8")
+    code, _out, err = _run([str(target), "--no-allowlist"], capsys, (token,))
+    assert code == 2
+    assert "not a directory" in err
