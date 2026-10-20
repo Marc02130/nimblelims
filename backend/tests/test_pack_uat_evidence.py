@@ -7,8 +7,11 @@ import importlib.util
 import io
 import json
 import os
+import shlex
+import shutil
 import subprocess
 import tarfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -64,9 +67,35 @@ def _gzip_n9(data: bytes) -> bytes:
     return proc.stdout
 
 
-def _run_pack(args: list[str], planted: tuple[str, ...] = ()) -> subprocess.CompletedProcess[str]:
+def _run_pack(
+    args: list[str],
+    planted: tuple[str, ...] = (),
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
     proc = subprocess.run(
         ["python3", str(PACK), *args],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    for value in planted:
+        assert value not in proc.stdout
+        assert value not in proc.stderr
+    return proc
+
+
+def _run_pack_umask(
+    umask: str,
+    args: list[str],
+    planted: tuple[str, ...] = (),
+) -> subprocess.CompletedProcess[str]:
+    quoted = " ".join(shlex.quote(part) for part in ["python3", str(PACK), *args])
+    proc = subprocess.run(
+        ["bash", "-lc", f"umask {umask} && exec {quoted}"],
         check=False,
         capture_output=True,
         text=True,
@@ -463,7 +492,12 @@ def test_tar_pack_argv_keeps_dash_dash_before_name():
     argv = pack.tar_pack_argv(Path("/parent"), "-f", Path("/out.tgz"))
     assert "--" in argv
     assert argv[argv.index("--") + 1] == "-f"
-    assert "--use-compress-program=gzip -n -9" in argv
+    assert "--format=gnu" in argv
+    assert "--mode=u=rwX,go=" in argv
+    assert any(
+        item.startswith("--use-compress-program=") and "-n" in item and "gzip" in item
+        for item in argv
+    )
 
 
 def test_pack_dash_named_folder_succeeds(tmp_path):
@@ -561,6 +595,65 @@ def test_verify_sidecar_wrong_name_fails(tmp_path):
     assert "valid hash line" in verified.stderr
 
 
+def test_pack_refuses_non_gnu_tar(tmp_path, monkeypatch, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / "round.tgz"
+    monkeypatch.setattr(pack, "_is_gnu", lambda _path: False)
+    code = pack.pack_folder(evidence, output, ["--no-allowlist"])
+    captured = capsys.readouterr()
+    assert token not in captured.out
+    assert token not in captured.err
+    assert code == 2
+    assert "GNU tar" in captured.err
+    assert not output.exists()
+
+
+def test_find_gnu_accepts_homebrew_gtar_and_gzip(tmp_path, monkeypatch):
+    token = _runtime_pool_token()
+    gtar = tmp_path / "gtar"
+    gzip_bin = tmp_path / "gzip"
+    gtar.write_text("#!/bin/sh\necho GNU tar\n", encoding="utf-8")
+    gzip_bin.write_text("#!/bin/sh\necho GNU gzip\n", encoding="utf-8")
+    gtar.chmod(0o755)
+    gzip_bin.chmod(0o755)
+    monkeypatch.setattr(pack, "_HOMEBREW_DIRS", (str(tmp_path),))
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    assert pack._find_gnu(("tar", "gtar")) == str(gtar)
+    assert pack._find_gnu(("gzip",)) == str(gzip_bin)
+    assert token not in str(gtar)
+    assert token not in str(gzip_bin)
+
+
+def test_verify_bytes_after_tar_end_inside_gzip_fails(tmp_path):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / "round.tgz"
+    packed = _run_pack(
+        [str(evidence), "--output", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert packed.returncode == 0
+    unzipped = subprocess.run(
+        ["gzip", "-n", "-d", "-c", str(output)],
+        check=True,
+        capture_output=True,
+    )
+    mutated = unzipped.stdout + (b"\x00" * 512) + token.encode("utf-8")
+    output.write_bytes(_gzip_n9(mutated))
+    _write_sidecar(output)
+    verified = _run_pack(["--verify", str(output), "--no-allowlist"], (token,))
+    assert verified.returncode != 0
+    assert (
+        "byte-identical" in verified.stderr
+        or "tar extract failed" in verified.stderr
+    )
+
+
 def test_verify_refuses_symlinked_archive(tmp_path):
     token = _runtime_pool_token()
     evidence = tmp_path / "round"
@@ -581,3 +674,74 @@ def test_verify_refuses_symlinked_archive(tmp_path):
     verified = _run_pack(["--verify", str(linked), "--no-allowlist"], (token,))
     assert verified.returncode == 2
     assert "symlink" in verified.stderr
+
+
+def test_pack_verify_is_stable_across_umask_and_mode_change(tmp_path):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    notes = evidence / "notes.txt"
+    notes.write_text("sample id 123\n", encoding="utf-8")
+    notes.chmod(0o644)
+    output = tmp_path / "round.tgz"
+    packed_077 = _run_pack_umask(
+        "077",
+        [str(evidence), "--output", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert packed_077.returncode == 0
+    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    verified_022 = _run_pack_umask(
+        "022",
+        ["--verify", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert verified_022.returncode == 0
+    notes.chmod(0o664)
+    output2 = tmp_path / "round2.tgz"
+    packed_022 = _run_pack_umask(
+        "022",
+        [str(evidence), "--output", str(output2), "--no-allowlist"],
+        (token,),
+    )
+    assert packed_022.returncode == 0
+    verified_077 = _run_pack_umask(
+        "077",
+        ["--verify", str(output2), "--no-allowlist"],
+        (token,),
+    )
+    assert verified_077.returncode == 0
+    assert hashlib.sha256(output2.read_bytes()).hexdigest() == digest
+    notes.chmod(0o600)
+    verified_after_chmod = _run_pack_umask(
+        "022",
+        ["--verify", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert verified_after_chmod.returncode == 0
+
+
+def test_verify_failed_hardlink_redacts_tar_stderr(tmp_path):
+    token = _token_with_symbol("_")
+    configured = "seed" + uuid.uuid4().hex[:12]
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        root = tarfile.TarInfo(name="round")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o700
+        bundle.addfile(root)
+        leak = tarfile.TarInfo(name=f"round/{token}")
+        leak.type = tarfile.LNKTYPE
+        leak.linkname = f"round/{configured}"
+        bundle.addfile(leak)
+    archive = tmp_path / "crafted.tgz"
+    archive.write_bytes(_gzip_n9(raw.getvalue()))
+    _write_sidecar(archive)
+    verified = _run_pack(
+        ["--verify", str(archive), "--no-allowlist"],
+        (token, configured),
+        extra_env={"POSTGRES_PASSWORD": configured},
+    )
+    assert verified.returncode == 2
+    assert "tar extract failed" in verified.stderr
+    assert "<redacted name hmac:" in verified.stderr

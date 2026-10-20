@@ -6,32 +6,43 @@ Usage:
     python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz
     python scripts/pack_uat_evidence.py --verify evidence.tgz
 
-The pack step writes a temp archive with GNU tar and ``gzip -n -9``
-(no name or mtime in the gzip header, compression level 9):
+The pack step requires GNU tar and GNU gzip (``tar --version`` and
+``gzip --version``). On macOS install Homebrew ``gnu-tar`` and
+``gzip`` and put ``/opt/homebrew/bin`` first on ``PATH`` (Homebrew
+gzip is ``gzip``; gnu-tar is ``gtar``, or ``tar`` via gnubin). It
+writes a temp archive with ``--format=gnu`` and
+``gzip -n -9`` (no name or mtime in the gzip header, compression
+level 9):
 
-    tar -C <parent> -cf <temp> --owner=0 --group=0 --numeric-owner
-        --sort=name --mtime=@0 --use-compress-program='gzip -n -9' -- <dir>
+    tar --format=gnu -C <parent> -cf <temp> --owner=0 --group=0
+        --numeric-owner --sort=name --mtime=@0 --mode=u=rwX,go=
+        --use-compress-program='gzip -n -9' -- <dir>
 
-(no ``./``). It extracts that temp archive, requires exactly one
+(no ``./``). Modes are normalized so the SHA-256 does not depend on
+the operator umask or the source file modes. It extracts that temp
+archive with ``-p`` (same permissions), requires exactly one
 top-level real directory, scans that directory as the evidence root
 (so allowlist paths stay ``ui/...png``), name-scans the directory's
 own name, rebuilds with the same flags, and requires a byte-identical
 SHA-256. Only then is the archive renamed into place and recorded in
 ``<name>.tgz.sha256``. Pack and verify need the same tar and gzip
 implementation. A dirty folder or a dirty packed result produces no
-``.tgz``.
+``.tgz``. Failed tar stderr is redacted for pool tokens and
+configured secrets before it is printed.
 
 Verify requires a sidecar line ``^[0-9a-f]{64}  <archive-name>$``,
-extracts, scans the single evidence directory, and requires a
-byte-identical rebuild.
+extracts with ``-p``, scans the single evidence directory, and
+requires a byte-identical rebuild.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import os
 import re
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
@@ -40,9 +51,101 @@ from pathlib import Path
 
 SCANNER = Path(__file__).resolve().parent / "scan_uat_evidence.py"
 TAR_MTIME = "@0"
+TAR_MODE = "u=rwX,go="
+TAR_BIN = "tar"
+GZIP_BIN = "gzip"
 TAR_COMPRESS = "gzip -n -9"
 _CREATE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
 _SIDECAR_RE = re.compile(r"^([0-9a-f]{64})  (.+)$")
+_HOMEBREW_DIRS = (
+    "/opt/homebrew/bin",
+    "/opt/homebrew/opt/gnu-tar/libexec/gnubin",
+    "/opt/homebrew/opt/gzip/libexec/gnubin",
+    "/usr/local/bin",
+    "/usr/local/opt/gnu-tar/libexec/gnubin",
+    "/usr/local/opt/gzip/libexec/gnubin",
+)
+
+
+def _load_scanner():
+    name = "scan_uat_evidence"
+    existing = sys.modules.get(name)
+    if existing is not None:
+        return existing
+    spec = importlib.util.spec_from_file_location(name, SCANNER)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load scan_uat_evidence")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_SCAN = _load_scanner()
+
+
+def _is_gnu(path: str) -> bool:
+    proc = subprocess.run(
+        [path, "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    text = f"{proc.stdout}{proc.stderr}"
+    return proc.returncode == 0 and "GNU" in text
+
+
+def _find_gnu(names: tuple[str, ...]) -> str | None:
+    """Return the first GNU binary among PATH names and Homebrew prefixes."""
+    seen: set[str] = set()
+    candidates: list[str] = []
+    for name in names:
+        path = shutil.which(name)
+        if path:
+            candidates.append(path)
+    for directory in _HOMEBREW_DIRS:
+        for name in names:
+            candidates.append(str(Path(directory) / name))
+    for path in candidates:
+        if path in seen or not os.path.isfile(path):
+            continue
+        if not os.access(path, os.X_OK):
+            continue
+        seen.add(path)
+        if _is_gnu(path):
+            return path
+    return None
+
+
+def require_gnu_tools() -> int:
+    """Refuse unless GNU tar and GNU gzip are available.
+
+    Accepts ``tar``/``gtar`` and ``gzip`` on PATH, including Homebrew
+    ``gnu-tar`` (``gtar``, or ``tar`` via gnubin) and Homebrew ``gzip``.
+    """
+    global TAR_BIN, GZIP_BIN, TAR_COMPRESS
+    tar = _find_gnu(("tar", "gtar"))
+    gzip_path = _find_gnu(("gzip",))
+    if tar is None:
+        print(
+            "ERROR: tar must be GNU tar; run pack and verify on Linux "
+            "or install Homebrew gnu-tar and put /opt/homebrew/bin first "
+            "on PATH",
+            file=sys.stderr,
+        )
+        return 2
+    if gzip_path is None:
+        print(
+            "ERROR: gzip must be GNU gzip; run pack and verify on Linux "
+            "or install Homebrew gzip and put /opt/homebrew/bin first "
+            "on PATH",
+            file=sys.stderr,
+        )
+        return 2
+    TAR_BIN = tar
+    GZIP_BIN = gzip_path
+    TAR_COMPRESS = f"{gzip_path} -n -9"
+    return 0
 
 
 def _after_scan_hook(folder: Path) -> None:
@@ -115,7 +218,8 @@ def _output_error(folder: Path, output: Path) -> str | None:
 def tar_pack_argv(parent: Path, name: str, dest: Path) -> list[str]:
     """Exact GNU tar command used to pack. Tests assert ``--`` stays in place."""
     return [
-        "tar",
+        TAR_BIN,
+        "--format=gnu",
         "-C",
         str(parent),
         "-cf",
@@ -125,13 +229,37 @@ def tar_pack_argv(parent: Path, name: str, dest: Path) -> list[str]:
         "--numeric-owner",
         "--sort=name",
         f"--mtime={TAR_MTIME}",
+        f"--mode={TAR_MODE}",
         f"--use-compress-program={TAR_COMPRESS}",
         "--",
         name,
     ]
 
 
-def _tar_pack(parent: Path, name: str, dest: Path) -> int:
+def _secrets_from_extra(extra: list[str]) -> tuple[str, ...]:
+    secrets_file = None
+    index = 0
+    while index < len(extra):
+        if extra[index] == "--secrets-file" and index + 1 < len(extra):
+            secrets_file = Path(extra[index + 1])
+            index += 2
+            continue
+        index += 1
+    return _SCAN.load_scan_secrets(secrets_file=secrets_file)
+
+
+def _print_tar_stderr(text: str, secrets: tuple[str, ...]) -> None:
+    if not text:
+        return
+    print(_SCAN.redact_text(text, secrets), file=sys.stderr, end="")
+
+
+def _tar_pack(
+    parent: Path,
+    name: str,
+    dest: Path,
+    secrets: tuple[str, ...] = (),
+) -> int:
     built = subprocess.run(
         tar_pack_argv(parent, name, dest),
         check=False,
@@ -139,29 +267,36 @@ def _tar_pack(parent: Path, name: str, dest: Path) -> int:
         text=True,
     )
     if built.returncode != 0:
-        if built.stderr:
-            print(built.stderr, file=sys.stderr, end="")
+        _print_tar_stderr(built.stderr, secrets)
         print("ERROR: tar pack failed", file=sys.stderr)
     return built.returncode
 
 
-def _tar_extract(archive: Path, dest: Path) -> int:
+def tar_extract_argv(archive: Path, dest: Path) -> list[str]:
+    """Extract with ``-p`` so stored modes survive the operator umask."""
+    return [
+        TAR_BIN,
+        "-C",
+        str(dest),
+        "-xpf",
+        str(archive),
+        f"--use-compress-program={TAR_COMPRESS}",
+    ]
+
+
+def _tar_extract(
+    archive: Path,
+    dest: Path,
+    secrets: tuple[str, ...] = (),
+) -> int:
     unpacked = subprocess.run(
-        [
-            "tar",
-            "-C",
-            str(dest),
-            "-xf",
-            str(archive),
-            f"--use-compress-program={TAR_COMPRESS}",
-        ],
+        tar_extract_argv(archive, dest),
         check=False,
         capture_output=True,
         text=True,
     )
     if unpacked.returncode != 0:
-        if unpacked.stderr:
-            print(unpacked.stderr, file=sys.stderr, end="")
+        _print_tar_stderr(unpacked.stderr, secrets)
         print("ERROR: tar extract failed", file=sys.stderr)
     return unpacked.returncode
 
@@ -192,11 +327,12 @@ def _read_sidecar(sidecar: Path, archive_name: str) -> str | None:
 
 def extract_and_scan(archive: Path, extra_scan: list[str]) -> int:
     """Extract, scan the evidence directory, and require a byte-identical rebuild."""
+    secrets = _secrets_from_extra(extra_scan)
     with tempfile.TemporaryDirectory(dir=str(archive.parent)) as tmp:
         work = Path(tmp)
         extract = work / "tree"
         extract.mkdir()
-        if _tar_extract(archive, extract) != 0:
+        if _tar_extract(archive, extract, secrets) != 0:
             return 2
         kids = _top_level_entries(extract)
         if len(kids) != 1:
@@ -217,7 +353,7 @@ def extract_and_scan(archive: Path, extra_scan: list[str]) -> int:
         if code != 0:
             return code
         rebuilt = work / "rebuilt.tgz"
-        if _tar_pack(extract, kids[0].name, rebuilt) != 0:
+        if _tar_pack(extract, kids[0].name, rebuilt, secrets) != 0:
             return 2
         if _sha256_file(rebuilt) != _sha256_file(archive):
             print(
@@ -233,6 +369,9 @@ def pack_folder(
     output: Path,
     extra_scan: list[str],
 ) -> int:
+    tools = require_gnu_tools()
+    if tools != 0:
+        return tools
     try:
         root_st = os.lstat(folder)
     except OSError:
@@ -266,13 +405,14 @@ def pack_folder(
         )
         return 2
     temp = output.parent / f".{output.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+    pack_secrets = _secrets_from_extra(extra_scan)
     try:
         _create_excl(temp)
     except OSError as exc:
         print(f"ERROR: cannot create temp pack: {exc}", file=sys.stderr)
         return 2
     try:
-        built = _tar_pack(parent, name, temp)
+        built = _tar_pack(parent, name, temp, pack_secrets)
         if built != 0:
             return 2
         os.chmod(temp, 0o600)
@@ -301,6 +441,9 @@ def pack_folder(
 
 
 def verify_pack(archive: Path, extra_scan: list[str]) -> int:
+    tools = require_gnu_tools()
+    if tools != 0:
+        return tools
     try:
         st = os.lstat(archive)
     except OSError:

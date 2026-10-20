@@ -20,12 +20,21 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a bcrypt hash marker (``$2a$``, ``$2b$``, ``$2y$``)
 - a ``.dump`` / ``.dump.gz`` name, or the ``PGDMP`` magic
 - an archive or compressed payload (tar, gzip, zlib, xz, bz2, zip,
-  zstd, 7z) detected by signature
+  zstd, 7z, lz4, rar, cpio, lzma, compress ``.Z``, lzip) detected
+  by signature, including a gzip member after junk only when the
+  bytes are ``1f 8b 08``, the FLG reserved bits are zero, and a
+  bounded inflate succeeds, except short or weak signatures in
+  valid UTF-8 text
+- bytes after the IEND chunk of a PNG
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
 - a duplicate identity
 - a symlink, fifo, socket, or device
-- a file that exceeds the 64 MiB size cap (67108864 bytes)
+- a folder whose scanned files exceed the 64 MiB total cap
+  (67108864 bytes)
+- a 200-character or longer hex or Base64 run
+- a JWT under 200 characters (three base64url segments starting
+  ``eyJ``)
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -35,8 +44,9 @@ There are no line entries. A hit is suppressed only when the identity
 tuple matches exactly and that same object's SHA-256 equals the entry
 hash. A sha entry may suppress only refused-binary and password-pool
 hits. It never suppresses configured-secret, bcrypt, dump/PGDMP,
-printed-once, unsafe-name, duplicate, link, archive, size-cap, or
-unreadable hits. Identities are exact one-element tuples: the on-disk
+printed-once, unsafe-name, duplicate, link, archive, size-cap,
+encoded-run, jwt, png-trailing, or unreadable hits. Identities are exact
+one-element tuples: the on-disk
 relative path. No name is normalized. Duplicate or non-canonical
 allowlist paths refuse the whole allowlist (exit 2). There is no
 allow-by-extension.
@@ -61,6 +71,7 @@ import secrets as _secretsmod
 import shlex
 import stat
 import sys
+import zlib
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -78,6 +89,10 @@ SECRET_NAME_RE = re.compile(
 )
 PGDMP_MAGIC = b"PGDMP"
 GZIP_MAGIC = b"\x1f\x8b"
+GZIP_DEFLATE = b"\x1f\x8b\x08"
+GZIP_FLG_RESERVED = 0xE0
+GZIP_PROBE_LIMIT = 8 * 1024
+GZIP_CANDIDATE_CAP = 32
 ZLIB_MAGICS = (b"\x78\x01", b"\x78\x5e", b"\x78\x9c", b"\x78\xda")
 XZ_MAGIC = b"\xfd7zXZ\x00"
 BZ2_MAGIC = b"BZh"
@@ -87,6 +102,18 @@ ZIP_SPAN = b"PK\x07\x08"
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 SEVEN_Z_MAGIC = b"7z\xbc\xaf'\x1c"
 USTAR_MAGIC = b"ustar"
+LZ4_MAGIC = b"\x04\"M\x18"
+RAR_MAGIC = b"Rar!\x1a\x07"
+LZIP_MAGIC = b"LZIP"
+COMPRESS_MAGIC = b"\x1f\x9d"
+CPIO_NEWC = b"070701"
+CPIO_ODC = b"070707"
+CPIO_BIN_BE = b"\xc7\x71"
+CPIO_BIN_LE = b"\x71\xc7"
+LZMA_MAGIC = b"\x5d\x00\x00"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+PNG_IEND = b"\x00\x00\x00\x00IEND"
+WEAK_ARCHIVE = frozenset({"zlib", "lzma", "cpio", "bz2"})
 _POOL = set(DEV_PASSWORD_POOL)
 _SYMBOLS = set("!@#$%^&*-_")
 _SEPARATORS = set("_-")
@@ -107,7 +134,14 @@ KIND_LINK = "link"
 KIND_ARCHIVE = "archive"
 KIND_SIZE_CAP = "size-cap"
 KIND_UNREADABLE = "unreadable"
+KIND_ENCODED = "encoded run"
+KIND_JWT = "jwt"
+KIND_PNG_TRAIL = "png-trailing"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
+HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
+B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
+JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+MAX_JWT_CHARS = 200
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -153,6 +187,55 @@ def redact_name_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
         else:
             shown.append(part)
     return "/".join(shown)
+
+
+def _redact_pool_windows(text: str) -> str:
+    """Replace each strong password-pool window with an HMAC tag."""
+    out: list[str] = []
+    run: list[str] = []
+
+    def flush() -> None:
+        if not run:
+            return
+        chunk = "".join(run)
+        index = 0
+        while index <= len(chunk) - DEV_PASSWORD_LENGTH:
+            window = chunk[index : index + DEV_PASSWORD_LENGTH]
+            if _is_strong_window(window):
+                out.append(_redact_tag(window))
+                index += DEV_PASSWORD_LENGTH
+            else:
+                out.append(chunk[index])
+                index += 1
+        if index < len(chunk):
+            out.append(chunk[index:])
+        run.clear()
+
+    for char in text:
+        if char in _POOL:
+            run.append(char)
+            continue
+        flush()
+        out.append(char)
+    flush()
+    return "".join(out)
+
+
+def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
+    """Redact configured secrets and pool-token windows in arbitrary text."""
+    if not text:
+        return text
+    shown = text
+    needles: list[tuple[str, str]] = []
+    for secret in sorted((item for item in secrets if item), key=len, reverse=True):
+        needles.append((secret, _redact_tag(secret)))
+        encoded = quote(secret, safe="")
+        if encoded and encoded != secret:
+            needles.append((encoded, _redact_tag(secret)))
+    for needle, tag in needles:
+        if needle in shown:
+            shown = shown.replace(needle, tag)
+    return _redact_pool_windows(shown)
 
 
 class Hit:
@@ -270,7 +353,19 @@ def scan_text(
             hits.append(Hit(KIND_POOL, identity, number, secrets))
         if any(configured_secret_on_line(variant, secrets) for variant in variants):
             hits.append(Hit(KIND_CONFIGURED, identity, number, secrets))
+        if any(HEX_RUN_RE.search(variant) or B64_RUN_RE.search(variant) for variant in variants):
+            hits.append(Hit(KIND_ENCODED, identity, number, secrets))
+        if any(jwt_on_line(variant) for variant in variants):
+            hits.append(Hit(KIND_JWT, identity, number, secrets))
     return hits
+
+
+def jwt_on_line(line: str) -> bool:
+    """True when a JWT under 200 characters starts with eyJ and has three segments."""
+    for match in JWT_RE.finditer(line):
+        if len(match.group(0)) < MAX_JWT_CHARS:
+            return True
+    return False
 
 
 def scan_name(
@@ -309,6 +404,9 @@ def load_scan_secrets(
             if text and text not in values:
                 values.append(text)
     if secrets_file is not None:
+        if not secrets_file.is_file():
+            shown = redact_name_path(str(secrets_file), tuple(values))
+            raise SystemExit(f"ERROR: secrets file not found: {shown}")
         for key, text in _read_secrets_file(secrets_file):
             if SECRET_NAME_RE.fullmatch(key) and text and text not in values:
                 values.append(text)
@@ -380,75 +478,87 @@ def is_unsafe_evidence_name(raw: str) -> bool:
     return is_unsafe_name(raw)
 
 
-def load_allowlist(path: Path) -> list[AllowlistEntry]:
+def _allowlist_shown(path: Path, secrets: tuple[str, ...]) -> str:
+    return redact_name_path(str(path), secrets)
+
+
+def load_allowlist(
+    path: Path,
+    secrets: tuple[str, ...] = (),
+) -> list[AllowlistEntry]:
     """Load a reviewed allowlist. Refuses extension/glob and non-canonical paths."""
+    shown = _allowlist_shown(path, secrets)
     if not path.is_file():
-        shown = redact_name_path(str(path), ())
         raise SystemExit(f"ERROR: allowlist not found: {shown}")
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"ERROR: allowlist is not valid JSON: {path}") from exc
+        raise SystemExit(f"ERROR: allowlist is not valid JSON: {shown}") from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
-        raise SystemExit(f"ERROR: allowlist must be an object with entries: {path}")
-    entries = [_parse_allowlist_entry(item, path) for item in raw["entries"]]
+        raise SystemExit(f"ERROR: allowlist must be an object with entries: {shown}")
+    entries = [_parse_allowlist_entry(item, path, secrets) for item in raw["entries"]]
     seen: set[Identity] = set()
     for entry in entries:
         if entry.identity in seen:
-            raise SystemExit(f"ERROR: allowlist has a duplicate path: {path}")
+            raise SystemExit(f"ERROR: allowlist has a duplicate path: {shown}")
         seen.add(entry.identity)
     return entries
 
 
-def _parse_allowlist_entry(item: object, source: Path) -> AllowlistEntry:
+def _parse_allowlist_entry(
+    item: object,
+    source: Path,
+    secrets: tuple[str, ...] = (),
+) -> AllowlistEntry:
+    shown = _allowlist_shown(source, secrets)
     if not isinstance(item, dict):
-        raise SystemExit(f"ERROR: allowlist entry must be an object: {source}")
+        raise SystemExit(f"ERROR: allowlist entry must be an object: {shown}")
     if "extension" in item or "glob" in item:
         raise SystemExit(
-            f"ERROR: allowlist must not allow by extension or glob: {source}"
+            f"ERROR: allowlist must not allow by extension or glob: {shown}"
         )
     if "line" in item:
-        raise SystemExit(f"ERROR: allowlist must not use line entries: {source}")
+        raise SystemExit(f"ERROR: allowlist must not use line entries: {shown}")
     rel = item.get("path")
     if isinstance(rel, str):
         if any(char in rel for char in "*?[]"):
             raise SystemExit(
-                f"ERROR: allowlist must not allow by extension or glob: {source}"
+                f"ERROR: allowlist must not allow by extension or glob: {shown}"
             )
         if not is_canonical_path(rel):
             raise SystemExit(
-                f"ERROR: allowlist path must be a relative file path: {source}"
+                f"ERROR: allowlist path must be a relative file path: {shown}"
             )
         identity: Identity = (rel,)
     elif isinstance(rel, list) and rel and all(isinstance(part, str) for part in rel):
         if any(any(char in part for char in "*?[]") for part in rel):
             raise SystemExit(
-                f"ERROR: allowlist must not allow by extension or glob: {source}"
+                f"ERROR: allowlist must not allow by extension or glob: {shown}"
             )
         if any(not is_canonical_path(part) for part in rel):
             raise SystemExit(
-                f"ERROR: allowlist path must be a relative file path: {source}"
+                f"ERROR: allowlist path must be a relative file path: {shown}"
             )
         identity = tuple(rel)
     else:
         raise SystemExit(
-            f"ERROR: allowlist must not allow by extension or glob: {source}"
+            f"ERROR: allowlist must not allow by extension or glob: {shown}"
         )
     reviewed = item.get("reviewed_by")
     approved = item.get("approved_by")
     date = item.get("date")
     if not isinstance(reviewed, str) or not reviewed.strip():
-        raise SystemExit(f"ERROR: allowlist entry needs reviewed_by: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs reviewed_by: {shown}")
     if not isinstance(approved, str) or not approved.strip():
-        raise SystemExit(f"ERROR: allowlist entry needs approved_by: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs approved_by: {shown}")
     if not isinstance(date, str) or not date.strip():
-        raise SystemExit(f"ERROR: allowlist entry needs date: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs date: {shown}")
     sha = item.get("sha256")
     if sha is None:
-        raise SystemExit(f"ERROR: allowlist entry needs path plus sha256: {source}")
+        raise SystemExit(f"ERROR: allowlist entry needs path plus sha256: {shown}")
     if not isinstance(sha, str) or not _SHA256_RE.fullmatch(sha):
         raise SystemExit(
-            f"ERROR: allowlist sha256 must be 64 hex characters: {source}"
+            f"ERROR: allowlist sha256 must be 64 hex characters: {shown}"
         )
     return AllowlistEntry(
         identity=identity,
@@ -522,6 +632,42 @@ def _is_tar_signature(data: bytes) -> bool:
     return _is_old_style_tar_header(data)
 
 
+def _gzip_header_ok(data: bytes, offset: int) -> bool:
+    if offset + 4 > len(data):
+        return False
+    if data[offset : offset + 3] != GZIP_DEFLATE:
+        return False
+    return (data[offset + 3] & GZIP_FLG_RESERVED) == 0
+
+
+def _gzip_inflates(data: bytes, offset: int) -> bool:
+    if not _gzip_header_ok(data, offset):
+        return False
+    decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    incoming = data[offset : offset + GZIP_PROBE_LIMIT]
+    try:
+        out = decoder.decompress(incoming, max_length=GZIP_PROBE_LIMIT)
+    except zlib.error:
+        return False
+    return bool(out) or bool(decoder.eof)
+
+
+def _has_inflating_gzip(data: bytes) -> bool:
+    """True when a deflate gzip member after junk actually inflates."""
+    tried = 0
+    start = 0
+    while tried < GZIP_CANDIDATE_CAP:
+        pos = data.find(GZIP_DEFLATE, start)
+        if pos < 0:
+            return False
+        if _gzip_header_ok(data, pos):
+            tried += 1
+            if _gzip_inflates(data, pos):
+                return True
+        start = pos + 1
+    return False
+
+
 def archive_kind(data: bytes) -> str | None:
     """Return the signature name when ``data`` is an archive or compressor."""
     if data.startswith(GZIP_MAGIC):
@@ -540,9 +686,38 @@ def archive_kind(data: bytes) -> str | None:
         return "zstd"
     if data.startswith(SEVEN_Z_MAGIC):
         return "7z"
+    if data.startswith(LZ4_MAGIC):
+        return "lz4"
+    if data.startswith(RAR_MAGIC):
+        return "rar"
+    if data.startswith(LZIP_MAGIC):
+        return "lzip"
+    if data.startswith(COMPRESS_MAGIC):
+        return "compress"
+    if (
+        data.startswith(CPIO_NEWC)
+        or data.startswith(CPIO_ODC)
+        or data.startswith(CPIO_BIN_BE)
+        or data.startswith(CPIO_BIN_LE)
+    ):
+        return "cpio"
+    if data.startswith(LZMA_MAGIC):
+        return "lzma"
     if _is_tar_signature(data):
         return "tar"
+    if not data.startswith(PNG_MAGIC) and _has_inflating_gzip(data):
+        return "gzip"
     return None
+
+
+def _png_has_trailing(data: bytes) -> bool:
+    if not data.startswith(PNG_MAGIC):
+        return False
+    pos = data.find(PNG_IEND)
+    if pos < 0:
+        return False
+    end = pos + len(PNG_IEND) + 4
+    return end < len(data)
 
 
 def _looks_text(data: bytes) -> bool:
@@ -609,8 +784,12 @@ def _scan_payload(
         _record_digest(digests, announced, identity, data, hits, secrets)
     if _is_dump_name(identity) or _has_pgdmp_magic(data):
         hits.append(Hit(KIND_DUMP, identity, secrets=secrets))
-    if archive_kind(data) is not None:
+    kind = archive_kind(data)
+    if kind is not None and not (kind in WEAK_ARCHIVE and _looks_text(data)):
         hits.append(Hit(KIND_ARCHIVE, identity, secrets=secrets))
+        return hits
+    if _png_has_trailing(data):
+        hits.append(Hit(KIND_PNG_TRAIL, identity, secrets=secrets))
         return hits
     if _looks_text(data):
         hits.extend(scan_text(identity, data.decode("utf-8"), secrets))
@@ -735,18 +914,21 @@ def scan_path(
     raise SystemExit(f"ERROR: {shown} is not a directory")
 
 
-def _resolve_allowlist(args: argparse.Namespace) -> tuple[AllowlistEntry, ...]:
+def _resolve_allowlist(
+    args: argparse.Namespace,
+    secrets: tuple[str, ...] = (),
+) -> tuple[AllowlistEntry, ...]:
     if args.no_allowlist:
         return ()
     allow_path = (
         Path(args.allowlist).expanduser() if args.allowlist else DEFAULT_ALLOWLIST
     )
     if args.allowlist and not allow_path.is_file():
-        shown = redact_name_path(str(allow_path), ())
+        shown = redact_name_path(str(allow_path), secrets)
         raise SystemExit(f"ERROR: allowlist not found: {shown}")
     if not allow_path.is_file():
         return ()
-    return tuple(load_allowlist(allow_path))
+    return tuple(load_allowlist(allow_path, secrets))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -782,7 +964,7 @@ def main(argv: list[str] | None = None) -> int:
     secrets_path = Path(args.secrets_file).expanduser() if args.secrets_file else None
     try:
         secrets = load_scan_secrets(secrets_file=secrets_path)
-        allowlist = _resolve_allowlist(args)
+        allowlist = _resolve_allowlist(args, secrets)
     except SystemExit as exc:
         message = str(exc)
         if message:
