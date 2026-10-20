@@ -250,6 +250,54 @@ def _jwt_segment_encoded(token: str) -> str:
     return encoded
 
 
+def _assert_no_jwt_windows(
+    stdout: str, stderr: str, token: str, width: int = 24
+) -> None:
+    """Refuse a leftover payload/signature window. Never print the token."""
+    _header, payload, signature = token.split(".")
+    blobs = (stdout, stderr)
+    for source in (payload, signature):
+        if len(source) < width:
+            if source and any(source in blob for blob in blobs):
+                raise AssertionError("planted JWT fragment leaked")
+            continue
+        for index in range(len(source) - width + 1):
+            window = source[index : index + width]
+            if any(window in blob for blob in blobs):
+                raise AssertionError("planted JWT window leaked")
+
+
+def _jwt_quote_layers(token: str, layers: int) -> str:
+    """Fully percent-encode every byte, then nest ``%`` → ``%25``."""
+    encoded = "".join("%{:02X}".format(ord(char)) for char in token)
+    for _ in range(max(0, layers - 1)):
+        encoded = encoded.replace("%", "%25")
+    if encoded == token or "%" not in encoded:
+        raise AssertionError("quoted JWT was not percent-encoded")
+    return encoded
+
+
+def _pyjwt_signature_mark_token() -> str:
+    """Header/payload have no -/_; signature has at least one. Runtime only."""
+    for _ in range(4000):
+        token = _pyjwt_access_token()
+        header, payload, signature = token.split(".")
+        if any(mark in header or mark in payload for mark in "-_"):
+            continue
+        if "-" in signature or "_" in signature:
+            return token
+    raise AssertionError("could not mint a signature-mark token")
+
+
+def _jwt_signature_mark_encoded(token: str) -> str:
+    header, payload, signature = token.split(".")
+    encoded_sig = signature.replace("-", "%2D").replace("_", "%5F")
+    encoded = f"{header}.{payload}.{encoded_sig}"
+    if encoded == token or "%" not in encoded:
+        raise AssertionError("signature-mark JWT was not percent-encoded")
+    return encoded
+
+
 def _assert_no_jwt_grams(stdout: str, stderr: str, token: str) -> None:
     _header, payload, signature = token.split(".")
     blobs = (stdout, stderr)
@@ -2691,8 +2739,86 @@ def test_double_percent_encoded_jwt_is_detected_and_redacted(tmp_path, capsys):
     shown = scan.redact_text(f"tar: {encoded}: Cannot open")
     _assert_jwt_absent("", shown, token)
     _assert_no_jwt_grams("", shown, token)
+    _assert_no_jwt_windows("", shown, token)
     if encoded in shown:
         raise AssertionError("double-encoded JWT leaked")
+
+
+def test_redact_text_signature_mark_encoded_leaves_no_24_window():
+    """R47-F1: %2D/%5F in the signature must not leave a 24-char tail."""
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_signature_mark_token()
+        encoded = _jwt_signature_mark_encoded(token)
+        shown = scan.redact_text(f"tar: {encoded}: Cannot open")
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_grams("", shown, token)
+        _assert_no_jwt_windows("", shown, token)
+        if encoded in shown:
+            raise AssertionError("signature-mark encoded JWT leaked")
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("signature-mark encoded JWT was not redacted")
+
+
+def test_layered_percent_jwt_is_jwt_hit_in_name_and_content(tmp_path, capsys):
+    """R47-F2: %252E, fully double-encoded, and triple-encoded are jwt hits."""
+    cases = (
+        lambda token: token.replace(".", "%252E"),
+        lambda token: _jwt_quote_layers(token, 2),
+        lambda token: token.replace(".", "%25252E"),
+        lambda token: _jwt_quote_layers(token, 3),
+    )
+    for index, encode in enumerate(cases):
+        token = _pyjwt_access_token()
+        encoded = encode(token)
+        evidence = tmp_path / f"evidence-{index}"
+        evidence.mkdir()
+        (evidence / "notes.txt").write_text(f"{encoded}\n", encoding="utf-8")
+        code, out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, encoded)
+        )
+        if code != 1:
+            raise AssertionError("layered percent JWT did not hit content")
+        if _hit("jwt", "notes.txt", line=1) not in err:
+            raise AssertionError("layered percent JWT was not a content jwt hit")
+        if _hit("password-pool token", "notes.txt", line=1) in err:
+            raise AssertionError("layered percent JWT was reported as a pool hit")
+        _assert_jwt_absent(out, err, token)
+        _assert_no_jwt_windows(out, err, token)
+        shown = scan.redact_text(f"tar: {encoded}: Cannot open")
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_windows("", shown, token)
+        if encoded in shown:
+            raise AssertionError("layered percent JWT leaked")
+        name_hits = scan.scan_name((encoded,), encoded)
+        if not any(hit.kind == scan.KIND_JWT for hit in name_hits):
+            raise AssertionError("layered percent JWT name was not a jwt hit")
+        formatted = scan.Hit(scan.KIND_JWT, (encoded,), secrets=()).format()
+        _assert_jwt_absent("", formatted, token)
+        _assert_no_jwt_windows("", formatted, token)
+
+
+def test_info_nfkc_u_percent_and_tar_newline_jwt_are_hits(tmp_path, capsys):
+    """Info: NFKC full-width dot, %u002E, and tar newline-between-segments."""
+    token = _pyjwt_access_token()
+    probes = (
+        token.replace(".", "\uff0e"),
+        token.replace(".", "%u002E"),
+        token.replace(".", r"\n"),
+        token.replace(".", r"\012"),
+    )
+    for probe in probes:
+        if scan.jwt_on_line(probe) is False and not any(
+            scan.jwt_on_line(variant) for variant in scan._text_variants(probe)
+        ):
+            raise AssertionError("info-encoded JWT was not detected")
+        hits = scan.scan_text(("notes.txt",), f"{probe}\n")
+        if not any(hit.kind == scan.KIND_JWT for hit in hits):
+            raise AssertionError("info-encoded JWT was not a content jwt hit")
+        shown = scan.redact_text(f"tar: {probe}: Cannot open")
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_windows("", shown, token)
+        if token in shown:
+            raise AssertionError("info-encoded JWT leaked")
 
 
 def test_tar_octal_escape_jwt_is_detected_and_redacted(tmp_path, capsys):
@@ -2737,6 +2863,21 @@ def test_jwt_signature_over_8192_is_a_hit_and_redacted(tmp_path, capsys):
     shown = scan.redact_text(f"tar: {jwt}: Cannot open")
     if jwt in shown or jwt.split(".")[2] in shown:
         raise AssertionError("long signature was not fully redacted")
+
+
+def test_repeated_eyj_then_dot_a_dot_b_256kib_is_fast():
+    """R47-F3: one eyJ run plus .a.b at 256 KiB stays linear."""
+    size = 256 * 1024
+    header = ("eyJ" * ((size + 2) // 3))[:size]
+    blob = f"{header}.a.b"
+    started = time.perf_counter()
+    assert scan.jwt_on_line(blob) is False
+    shown = scan._redact_jwts(blob)
+    elapsed = time.perf_counter() - started
+    assert shown == blob
+    assert elapsed < 5.0
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    assert scan.jwt_on_line(jwt) is True
 
 
 def test_jwt_header_over_32kib_is_not_a_hit_and_is_fast():
