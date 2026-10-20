@@ -27,9 +27,10 @@ own name, rebuilds with the same flags, and requires a byte-identical
 SHA-256. Only then is the archive renamed into place and recorded in
 ``<name>.tgz.sha256``. Pack and verify need the same tar and gzip
 implementation. A dirty folder or a dirty packed result produces no
-``.tgz``. Failed tar stderr is redacted JWTs first (tar-unescape,
-then raw tokens, then encoded runs after up to 3 percent
-decodes), then configured secrets, then pool windows, before
+``.tgz``. Failed tar stderr is redacted JWTs first (tar-unescape
+and NFKC, then encoded runs after percent-decoding until
+unchanged (max 3, including ``%u002E``), then raw tokens), then
+configured secrets, then pool windows, before
 it is printed. Every printed path goes through
 ``redact_name_path``. An archive or output name that matches a
 secret rule is refused. Sidecar names are redacted the same way.

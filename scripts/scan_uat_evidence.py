@@ -40,16 +40,20 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   an ``alg`` key). Detection finds base64url runs once with a
   compiled ``re.finditer(r"[A-Za-z0-9_-]+")`` and does a
   constant-time check at each ``eyJ`` (Python 3.10; no possessive
-  regex). Header runs longer than 32 KiB (32768) are not JWTs,
-  so a long-header walk stays linear. Payload stays bounded at
-  8192. A signature longer than 8192 is still a hit; the whole
-  signature run is redacted. ``eyJ.a.b`` / ``eyJ+.a.b`` and a
-  header without ``alg`` are not hits. Separators must be a
-  single ``.``; ``..`` between segments is not a JWT. Detection
-  percent-decodes up to 3 times and strips tar escapes
-  (``\\NNN`` octal and backslash escapes) before matching. A
-  JWT line, including a ``%2E``-encoded token, is a jwt hit
-  and not a pool hit.
+  regex). At most 16 ``eyJ`` candidates are examined per
+  base64url run so a repeated-``eyJ`` header cannot go
+  quadratic. Header runs longer than 32 KiB (32768) are not
+  JWTs, so a long-header walk stays linear. Payload stays
+  bounded at 8192. A signature longer than 8192 is still a
+  hit; the whole signature run is redacted. ``eyJ.a.b`` /
+  ``eyJ+.a.b`` and a header without ``alg`` are not hits.
+  Separators must be a single ``.``; ``..`` between segments
+  is not a JWT. Detection percent-decodes until the text
+  stops changing (max 3 passes), including ``%u002E``,
+  applies NFKC, and strips tar escapes (``\\NNN`` octal,
+  backslash, and a newline between segments) before matching.
+  A JWT line, including a ``%2E``/``%252E``-encoded token, is
+  a jwt hit and not a pool hit.
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -72,12 +76,16 @@ configured secret, pool token, or JWT is printed as
 per-run random key, first 8 hex). A parent segment that matches is
 redacted the same way. A secret that contains ``/`` redacts the whole
 path. Tar-error text, name hits, and verify output are redacted
-JWTs first (tar-unescape, then raw tokens, then each
-``[A-Za-z0-9_.%-]+`` run whose form after up to 3 percent
-decodes contains a JWT; the whole raw run is replaced), then
-configured secrets, then pool windows. They do not print the
-secret. Separators must be a single ``.``; ``..`` between
-segments is not a JWT.
+JWTs first (tar-unescape and NFKC, then each
+``[A-Za-z0-9_.%-]+`` run whose form after percent-decoding
+until unchanged (max 3, including ``%u002E``) contains a
+JWT; the whole raw run is replaced, then raw tokens), then
+configured secrets, then pool windows. Encoded runs run
+before raw JWTs so a ``%2D``/``%5F`` signature cannot leave
+a valid ``header.payload.<prefix>`` JWT and a 24-character
+signature tail. They do not print the secret. Separators
+must be a single ``.``; ``..`` between segments is not a
+JWT.
 """
 from __future__ import annotations
 
@@ -93,6 +101,7 @@ import secrets as _secretsmod
 import shlex
 import stat
 import sys
+import unicodedata
 import zlib
 from collections.abc import Iterator
 from pathlib import Path
@@ -166,9 +175,11 @@ B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
 _JWT_PREFIX = "eyJ"
 _JWT_OTHER_MAX = 8192
 _JWT_HEADER_MAX = 32 * 1024
+_JWT_EYJ_PER_RUN = 16
 _DECODE_LAYERS = 3
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
+_U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
 _TAR_SIMPLE_ESCAPES = {
     "a": "\a",
     "b": "\b",
@@ -230,12 +241,24 @@ def _unescape_tar(text: str) -> str:
     return "".join(out)
 
 
+def _decode_u_percent(text: str) -> str:
+    """Decode ``%uXXXX`` / ``%UXXXX`` (JS-style) code points. Linear."""
+    if "%u" not in text and "%U" not in text:
+        return text
+    return _U_PERCENT_RE.sub(lambda match: chr(int(match.group(1), 16)), text)
+
+
+def _percent_once(text: str) -> str:
+    """One percent-decode pass: ``unquote`` then ``%uXXXX``."""
+    return _decode_u_percent(unquote(text))
+
+
 def _decode_layers(text: str, limit: int = _DECODE_LAYERS) -> tuple[str, ...]:
-    """Percent-decode ``text`` up to ``limit`` times; stop when unchanged."""
+    """Percent-decode until unchanged, at most ``limit`` passes."""
     layers: list[str] = [text]
     current = text
     for _ in range(limit):
-        nxt = unquote(current)
+        nxt = _percent_once(current)
         if nxt == current:
             break
         layers.append(nxt)
@@ -243,17 +266,34 @@ def _decode_layers(text: str, limit: int = _DECODE_LAYERS) -> tuple[str, ...]:
     return tuple(layers)
 
 
+def _join_tar_newlines(text: str) -> str:
+    """Treat a newline between JWT segments as ``.``."""
+    if "\n" not in text and "\r" not in text:
+        return text
+    return text.replace("\r", ".").replace("\n", ".")
+
+
 def _text_variants(text: str) -> tuple[str, ...]:
     """Return unique raw, tar-unescaped, and percent-decoded forms.
 
-    Percent-decoding runs up to ``_DECODE_LAYERS`` times. When nothing
-    changes, scanners including the JWT walk run once per line.
+    Percent-decoding repeats until the text stops changing (max
+    ``_DECODE_LAYERS``), including ``%u002E``. NFKC and a newline
+    between segments are extra variants. When nothing changes,
+    scanners including the JWT walk run once per line.
     """
     seen: list[str] = []
-    for base in (text, _unescape_tar(text)):
+    unescaped = _unescape_tar(text)
+    bases = [text]
+    if unescaped != text:
+        bases.append(unescaped)
+    joined = _join_tar_newlines(unescaped)
+    if joined != unescaped:
+        bases.append(joined)
+    for base in bases:
         for layer in _decode_layers(base):
-            if layer not in seen:
-                seen.append(layer)
+            for form in (layer, unicodedata.normalize("NFKC", layer)):
+                if form not in seen:
+                    seen.append(form)
     return tuple(seen)
 
 
@@ -338,9 +378,9 @@ def _redact_percent_jwts(text: str) -> str:
     """Replace each encoded run whose decoded form contains a JWT.
 
     Runs are ``[A-Za-z0-9_.%-]+``. The whole raw run is replaced, not
-    just the decoded token. Linear: one ``finditer``, then up to
-    ``_DECODE_LAYERS`` percent-decodes and ``jwt_on_line`` only on
-    runs that contain ``%``.
+    just the decoded token. Linear: one ``finditer``, then percent
+    decode until unchanged (max ``_DECODE_LAYERS``, including
+    ``%u002E``) and ``jwt_on_line`` only on runs that contain ``%``.
     """
     out: list[str] = []
     start = 0
@@ -361,15 +401,22 @@ def _redact_percent_jwts(text: str) -> str:
 def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     """Redact JWTs, then configured secrets, then pool windows.
 
-    Tar-unescape first, then raw JWTs, then percent-encoded runs
-    (up to 3 decodes), so a pool window, a ``%2E``/``%252E``
-    encoding, or a tar ``\\056`` split cannot leave the payload in
-    the clear. Name hits use the same JWT-then-secret-then-pool
-    check order.
+    Tar-unescape and NFKC first, then percent-encoded runs
+    (decode until unchanged, max 3, including ``%u002E``), then
+    raw JWTs. Encoded-before-raw closes the signature ``%2D``/
+    ``%5F`` hole: a leftover 24-character tail cannot print.
+    A pool window, a ``%2E``/``%252E`` encoding, a ``%u002E``
+    or full-width dot, or a tar ``\\056`` / newline split
+    cannot leave the payload in the clear. Name hits use the
+    same JWT-then-secret-then-pool check order.
     """
     if not text:
         return text
-    shown = _redact_percent_jwts(_redact_jwts(_unescape_tar(text)))
+    prepared = unicodedata.normalize(
+        "NFKC",
+        _join_tar_newlines(_unescape_tar(text)),
+    )
+    shown = _redact_jwts(_redact_percent_jwts(prepared))
     needles: list[tuple[str, str]] = []
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         needles.append((secret, _redact_tag(secret)))
@@ -564,8 +611,10 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
     Lines with no ``eyJ`` return immediately. Base64url runs are walked
     lazily from ``finditer`` (a 3-run window; no materialized list).
     Each ``eyJ`` followed by two dotted segments is an O(1) structure
-    check plus the alg-header decode. A failed ``eyJ`` does not skip a
-    later real token, including one immediately adjacent to the miss.
+    check plus the alg-header decode. At most ``_JWT_EYJ_PER_RUN``
+    (16) ``eyJ`` candidates are examined per base64url run. A failed
+    ``eyJ`` does not skip a later real token, including one
+    immediately adjacent to the miss.
     """
     if _JWT_PREFIX not in text:
         return
@@ -584,7 +633,9 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
             search_from = run_start if run_start >= cursor else cursor
             pos = text.find(_JWT_PREFIX, search_from, run_end)
             found = False
-            while pos != -1:
+            examined = 0
+            while pos != -1 and examined < _JWT_EYJ_PER_RUN:
+                examined += 1
                 token = text[pos:token_end]
                 if _jwt_header_has_alg(token):
                     yield pos, token_end, token
@@ -612,11 +663,13 @@ def jwt_on_line(line: str) -> bool:
     The first segment must base64url-decode to JSON containing ``alg``.
     Lines with no ``eyJ`` return immediately. Detection walks
     base64url runs lazily, then checks each ``eyJ`` in constant time
-    (Python 3.10; no possessive quantifiers). Header runs longer than
-    32 KiB are not JWTs. Payload stays bounded at 8192. A signature
-    longer than 8192 is still a hit and is fully redacted. A failed
-    header check does not skip a later real token, including a no-dot
-    decoy such as ``eyJx`` immediately followed by a real token.
+    (Python 3.10; no possessive quantifiers). At most 16 ``eyJ``
+    candidates are examined per base64url run. Header runs longer
+    than 32 KiB are not JWTs. Payload stays bounded at 8192. A
+    signature longer than 8192 is still a hit and is fully redacted.
+    A failed header check does not skip a later real token, including
+    a no-dot decoy such as ``eyJx`` immediately followed by a real
+    token.
     Separators must be a single ``.``; ``..`` is not a JWT. There is
     no total-length cap: tokens around 200-280 characters still hit.
     """
