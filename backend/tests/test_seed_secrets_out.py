@@ -239,6 +239,16 @@ def test_secrets_file_refuses_invalid_key_names(tmp_path):
     assert not dest.exists()
 
 
+@pytest.mark.parametrize("key", ["PATH", "HOME", "IFS"])
+def test_secrets_file_refuses_reserved_shell_keys(key, tmp_path):
+    dest = tmp_path / "secrets.env"
+    with pytest.raises(seed_dev_passwords.SeedPasswordError, match="Invalid secrets-file key"):
+        seed_dev_passwords.write_secrets_file(
+            dest, [("admin", key, _password("!"))]
+        )
+    assert not dest.exists()
+
+
 def test_secrets_file_missing_parent_is_a_one_line_error(tmp_path):
     dest = tmp_path / "missing" / "secrets.env"
     with pytest.raises(
@@ -470,6 +480,69 @@ def test_main_secrets_out_refuses_symlink(
     assert "not a regular file" in captured.err
     assert dest.is_symlink()
     assert real.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_main_force_symlink_to_outside_decoy_leaves_decoy_unchanged(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.delenv("DEV_SEED_CLIENT_PASSWORD", raising=False)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    decoy = outside / "decoy.env"
+    payload = os.urandom(64)
+    decoy.write_bytes(payload)
+    folder = tmp_path / "folder"
+    folder.mkdir()
+    dest = folder / "uat.env"
+    dest.symlink_to(decoy)
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--force", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code != 0
+    assert captured.out == ""
+    assert "not a regular file" in captured.err
+    assert dest.is_symlink()
+    assert decoy.read_bytes() == payload
+
+
+def test_main_missing_parent_exits_nonzero_when_nothing_generated(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.setenv("DEV_SEED_CLIENT_PASSWORD", _password("!"))
+    dest = tmp_path / "no-such-dir" / "uat.env"
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code != 0
+    assert captured.out == ""
+    assert captured.err.startswith("ERROR: Secrets file parent folder does not exist")
+    assert "Traceback" not in captured.err
+    assert not dest.exists()
+
+
+def test_main_dangling_link_exits_nonzero_when_nothing_generated(
+    db_session, test_org, monkeypatch, capsys, tmp_path
+):
+    _locked_client(db_session, test_org)
+    _mock_connect(monkeypatch, db_session)
+    monkeypatch.setenv("DEV_SEED_CLIENT_PASSWORD", _password("#"))
+    dest = tmp_path / "uat.env"
+    dest.symlink_to(tmp_path / "gone.env")
+    code = seed_dev_passwords.main(
+        ["--apply", "--only", "client", "--secrets-out", str(dest)]
+    )
+    captured = capsys.readouterr()
+    assert code != 0
+    assert captured.out == ""
+    assert "not a regular file" in captured.err
+    assert dest.is_symlink()
+    assert not (tmp_path / "gone.env").exists()
 
 
 def test_missing_header_aborts(capsys):

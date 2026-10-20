@@ -28,7 +28,9 @@ Expect:
 - A second run with the same path and no `--force` exits non-zero and does not change the file.
 - `--force` writes a same-directory temp file (`O_CREAT|O_EXCL|O_NOFOLLOW`, mode `0600`) and replaces the target only after the database commit. A failed commit leaves the target unchanged and removes the temp file.
 - `--force --only client` keeps other accounts' existing keys in that file and replaces only the selected ones.
-- An existing symlink, directory, or fifo at the `--secrets-out` path is refused.
+- An existing symlink, directory, fifo, or dangling link at the `--secrets-out` path is refused, including when `--force` points at a symlink to a file outside the folder. The decoy stays unchanged.
+- A missing parent directory or a dangling `--secrets-out` link exits non-zero even when every selected account already has an env password (nothing generated).
+- Secrets-file keys must match `^DEV_SEED_[A-Z][A-Z0-9_]*$`. `PATH`, `HOME`, and `IFS` are refused.
 
 Load the variables from that file into the shell that runs UAT:
 
