@@ -233,6 +233,45 @@ def _assert_jwt_absent(stdout: str, stderr: str, token: str) -> None:
         raise AssertionError("planted JWT fragment leaked into stdout or stderr")
 
 
+def _jwt_dots_encoded(token: str) -> str:
+    encoded = token.replace(".", "%2E")
+    if encoded == token or "%2E" not in encoded:
+        raise AssertionError("dot-encoded JWT was not percent-encoded")
+    return encoded
+
+
+def _jwt_segment_encoded(token: str) -> str:
+    header, payload, signature = token.split(".")
+    def _enc(part: str) -> str:
+        return part.replace("-", "%2D").replace("_", "%5F").replace("e", "%65")
+    encoded = f"{header}.{_enc(payload)}.{_enc(signature)}"
+    if encoded == token or "%" not in encoded:
+        raise AssertionError("segment-encoded JWT was not percent-encoded")
+    return encoded
+
+
+def _assert_no_jwt_grams(stdout: str, stderr: str, token: str) -> None:
+    _header, payload, signature = token.split(".")
+    blobs = (stdout, stderr)
+    sources = [payload, signature]
+    for part in (payload, signature):
+        quoted = quote(part, safe="")
+        if quoted != part:
+            sources.append(quoted)
+        inner = part.replace("-", "%2D").replace("_", "%5F").replace("e", "%65")
+        if inner != part:
+            sources.append(inner)
+    for source in sources:
+        if len(source) < 8:
+            if source and any(source in blob for blob in blobs):
+                raise AssertionError("planted JWT fragment leaked")
+            continue
+        for index in range(len(source) - 7):
+            gram = source[index : index + 8]
+            if any(gram in blob for blob in blobs):
+                raise AssertionError("planted JWT 8-gram leaked")
+
+
 def _b64url_run(count: int) -> str:
     """A base64url run that is not a 200+ hex or standard-Base64 hit."""
     chars: list[str] = []
@@ -2435,6 +2474,53 @@ def test_failed_eyj_adjacent_to_real_token_is_still_a_hit(tmp_path, capsys):
     assert decoy not in err
 
 
+def test_eyjx_without_dots_adjacent_to_real_token_is_still_a_hit(tmp_path, capsys):
+    """D8: giving up after a failed eyJ must not skip an immediate real token."""
+    token = _runtime_pool_token()
+    decoy = "eyJx"
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    adjacent = f"{decoy}{jwt}"
+    assert decoy + jwt == adjacent
+    assert "." not in decoy
+    assert scan.jwt_on_line(decoy) is False
+    assert scan.jwt_on_line(adjacent) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{adjacent}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, decoy, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert decoy not in out
+    assert decoy not in err
+
+
+def test_double_dot_between_jwt_segments_is_not_a_jwt(tmp_path, capsys):
+    """D16: separators must be a single ``.``; ``..`` is not a JWT."""
+    token = _runtime_pool_token()
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    header, payload, signature = jwt.split(".")
+    probe = f"{header}..{payload}.{signature}"
+    assert scan.jwt_on_line(jwt) is True
+    assert scan.jwt_on_line(probe) is False
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {probe}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, probe, jwt)
+    )
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out
+    assert jwt not in out
+    assert jwt not in err
+    assert probe not in out
+    assert probe not in err
+
+
 def test_redact_text_pyjwt_missing_link_target_does_not_leak():
     for _ in range(JWT_LEAK_TRIALS):
         token = _pyjwt_access_token()
@@ -2474,6 +2560,54 @@ def test_redact_text_pyjwt_before_configured_secret_and_pool():
         _assert_jwt_absent("", shown, token)
         if secret in shown:
             raise AssertionError("configured secret leaked beside a JWT")
+
+
+def test_redact_text_overlapping_configured_secret_still_redacts_jwt():
+    """D13: secrets-before-JWTs would punch a hole in the token."""
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        payload = token.split(".")[1]
+        if len(payload) < 12:
+            raise AssertionError("payload too short for overlap secret")
+        secret = payload[2:14]
+        shown = scan.redact_text(f"tar: {token}", (secret,))
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_grams("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("overlapping-secret JWT was not redacted")
+
+
+def test_redact_text_percent_dot_jwt_does_not_leak_grams():
+    """D15: a missing percent-decoded pass leaks %2E JWTs."""
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        encoded = _jwt_dots_encoded(token)
+        member = f"tar: gone/{encoded}: Cannot hard link to 'round/missing'"
+        target = f"tar: round/link: Cannot hard link to 'missing_{encoded}'"
+        for text in (member, target):
+            shown = scan.redact_text(text)
+            _assert_jwt_absent("", shown, token)
+            _assert_no_jwt_grams("", shown, token)
+            if encoded in shown:
+                raise AssertionError("percent-dot JWT leaked")
+            if "<redacted name hmac:" not in shown:
+                raise AssertionError("percent-dot JWT was not redacted")
+
+
+def test_redact_text_percent_segment_jwt_does_not_leak_grams():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        encoded = _jwt_segment_encoded(token)
+        member = f"tar: gone/{encoded}: Cannot hard link to 'round/missing'"
+        target = f"tar: round/link: Cannot hard link to 'missing_{encoded}'"
+        for text in (member, target):
+            shown = scan.redact_text(text)
+            _assert_jwt_absent("", shown, token)
+            _assert_no_jwt_grams("", shown, token)
+            if encoded in shown:
+                raise AssertionError("percent-segment JWT leaked")
+            if "<redacted name hmac:" not in shown:
+                raise AssertionError("percent-segment JWT was not redacted")
 
 
 def test_pyjwt_name_and_verify_identity_do_not_leak():
