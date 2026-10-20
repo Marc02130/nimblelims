@@ -37,12 +37,16 @@ def _make_list_entry(
     user_id: uuid.UUID,
     code: str | None = None,
 ) -> ListEntry:
-    lst = List(name=f"list_{name}_{uuid.uuid4().hex[:6]}", created_by=user_id, modified_by=user_id)
+    # list_entries.name is globally unique (BaseModel). Idle-tx tests commit
+    # these rows on the shared engine; a hard-coded name then collides with
+    # later tests (CI: list_entries_name_key). Control role is ``code``.
+    unique = f"{name}_{uuid.uuid4().hex[:8]}"
+    lst = List(name=f"list_{unique}", created_by=user_id, modified_by=user_id)
     db.add(lst)
     db.flush()
     entry = ListEntry(
         list_id=lst.id,
-        name=name,
+        name=unique,
         code=code,
         created_by=user_id,
         modified_by=user_id,
@@ -60,7 +64,7 @@ def _make_sample(
 ) -> Sample:
     """Create a minimal Sample row with real ListEntry records for FK-constrained fields."""
     # Project requires a real list_entries.id for status
-    proj_status = _make_list_entry(db, f"proj_status_{uuid.uuid4().hex[:4]}", user_id)
+    proj_status = _make_list_entry(db, f"proj_status_{uuid.uuid4().hex[:8]}", user_id)
     proj = Project(
         name=f"proj_{uuid.uuid4().hex[:6]}",
         client_id=client_id,
@@ -73,9 +77,9 @@ def _make_sample(
     db.flush()
 
     # Sample requires real list_entries.id for sample_type, status, matrix
-    sample_type = _make_list_entry(db, f"stype_{uuid.uuid4().hex[:4]}", user_id)
-    sample_status = _make_list_entry(db, f"sstat_{uuid.uuid4().hex[:4]}", user_id)
-    sample_matrix = _make_list_entry(db, f"smatx_{uuid.uuid4().hex[:4]}", user_id)
+    sample_type = _make_list_entry(db, f"stype_{uuid.uuid4().hex[:8]}", user_id)
+    sample_status = _make_list_entry(db, f"sstat_{uuid.uuid4().hex[:8]}", user_id)
+    sample_matrix = _make_list_entry(db, f"smatx_{uuid.uuid4().hex[:8]}", user_id)
 
     sample = Sample(
         name=f"s_{uuid.uuid4().hex[:6]}",
@@ -940,16 +944,17 @@ def _stock_controls(db: Session, user_id: uuid.UUID):
     )
     db.add(lst)
     db.flush()
+    tag = uuid.uuid4().hex[:8]
     positive = ListEntry(
         list_id=lst.id,
-        name="Positive Control",
+        name=f"Positive Control {tag}",
         code="positive",
         created_by=user_id,
         modified_by=user_id,
     )
     negative = ListEntry(
         list_id=lst.id,
-        name="Negative Control",
+        name=f"Negative Control {tag}",
         code="negative",
         created_by=user_id,
         modified_by=user_id,
