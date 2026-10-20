@@ -2139,6 +2139,33 @@ def test_eyjx_dot_y_dot_z_is_not_a_jwt(tmp_path, capsys):
     assert scan.jwt_on_line(probe) is False
 
 
+def test_eyj_plus_dot_a_dot_b_is_not_a_jwt(tmp_path, capsys):
+    """Zero extra header chars after eyJ is not a JWT; alg still required."""
+    token = _runtime_pool_token()
+    plus_probe = "".join(("eyJ", "+", ".", "a", ".", "b"))
+    zero_probe = "".join(("eyJ", ".", "a", ".", "b"))
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(
+        f"note {plus_probe}\nnote {zero_probe}\n",
+        encoding="utf-8",
+    )
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"],
+        capsys,
+        (token, plus_probe, zero_probe, jwt),
+    )
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out
+    assert scan.jwt_on_line(plus_probe) is False
+    assert scan.jwt_on_line(zero_probe) is False
+    assert scan.jwt_on_line(jwt) is True
+    assert jwt not in out
+    assert jwt not in err
+
+
 def test_jwt_header_without_alg_is_not_a_hit(tmp_path, capsys):
     token = _runtime_pool_token()
     probe = _runtime_header_jwt({"typ": "JWT"})
