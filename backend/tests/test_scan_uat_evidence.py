@@ -192,6 +192,61 @@ def _runtime_jwt(length: int | None = None) -> str:
     return _runtime_header_jwt({"alg": "HS256", "typ": "JWT"}, length)
 
 
+def _b64url_run(count: int) -> str:
+    """A base64url run that is not a 200+ hex or standard-Base64 hit."""
+    chars: list[str] = []
+    for index in range(count):
+        if index % 40 == 0:
+            chars.append("_")
+        elif index % 40 == 1:
+            chars.append("g")
+        else:
+            chars.append("A")
+    return "".join(chars)
+
+
+def _runtime_segment_jwt(payload_len: int, signature_len: int = 12) -> str:
+    first = _b64url(
+        json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode(
+            "ascii"
+        )
+    )
+    token = f"{first}.{_b64url_run(payload_len)}.{_b64url_run(signature_len)}"
+    assert token.startswith("eyJ")
+    assert len(token.split(".")) == 3
+    assert len(token.split(".")[1]) == payload_len
+    assert len(token.split(".")[2]) == signature_len
+    return token
+
+
+def _unpadded_alg_header() -> dict[str, object]:
+    for extra in range(48):
+        header: dict[str, object] = {"alg": "HS256", "n": extra}
+        encoded = _b64url(json.dumps(header, separators=(",", ":")).encode("ascii"))
+        if encoded.startswith("eyJ") and len(encoded) % 4 != 0:
+            return header
+    raise AssertionError(
+        "could not build a header whose base64url length is not a multiple of 4"
+    )
+
+
+def _dotted_eyj_blob(size: int = 256 * 1024, period: int = 8000) -> str:
+    """Repeated eyJ with a dot every ``period`` chars (Günter's superlinear case)."""
+    parts: list[str] = []
+    filled = 0
+    while filled < size:
+        run_len = min(period, size - filled)
+        run = ("eyJ" * ((run_len + 2) // 3))[:run_len]
+        parts.append(run)
+        filled += len(run)
+        if filled < size:
+            parts.append(".")
+            filled += 1
+    blob = "".join(parts)
+    assert len(blob) == size
+    return blob
+
+
 def _gzip_cap_payload(count: int) -> bytes:
     stub = b"\x1f\x8b\x08\x00" + (b"\xff" * 16)
     body = bytearray(b"RAND")
@@ -2213,25 +2268,130 @@ def test_jwt_after_failed_header_is_still_a_hit(tmp_path, capsys):
 
 
 def test_repeated_eyj_jwt_scan_is_linear_time():
-    """About 1 MiB of repeated eyJ must scan well under 1 s.
+    """256 KiB of dotted eyJ must stay well under the CI budget.
 
-    The old regex backtracked (~15 s per MiB, ~16 min at the 64 MiB cap).
-    jwt_on_line and JWT redaction are typically under 10 ms on 1 MiB.
-    The assertion budget is 2.0 s so shared CI runners have slack; this
-    test always runs (no skip). redact_text is not timed here because
-    the password-pool window scan is a separate linear pass.
+    Günter's follow-up: the one-char walk after each failed ``eyJ`` was
+    superlinear. Repeated ``eyJ`` with a dot every ~8000 chars took 71 s
+    on 128 KiB. This test uses 256 KiB of that same shape (2× the repro)
+    so a return to that walk fails by more than an order of magnitude.
+
+    The walk now finds base64url runs once with a compiled
+    ``re.finditer(r"[A-Za-z0-9_-]+")`` and does a constant-time
+    structure check at each ``eyJ``. Measured locally, ``jwt_on_line``
+    plus JWT redaction on this 256 KiB blob takes about 2.1 s (the
+    alg-header decode still runs at each ``eyJ`` that has two dotted
+    followers). The assertion budget is 15.0 s: about 7× that
+    measurement, so a loaded GitHub-hosted runner (often 2–4× slower,
+    sometimes more under contention) still has slack. 15 s is still
+    ~10× faster than the old walk on this input (71 s on 128 KiB,
+    roughly 142 s at 256 KiB), so the regression stays visible. This
+    test always runs (no skip). ``redact_text`` is not timed here
+    because the password-pool window scan is a separate linear pass.
     """
-    blob = "eyJ" * ((1024 * 1024) // 3)
+    blob = _dotted_eyj_blob(256 * 1024, 8000)
     jwt = _runtime_header_jwt({"alg": "HS256"})
     started = time.perf_counter()
     assert scan.jwt_on_line(blob) is False
     shown = scan._redact_jwts(blob)
     elapsed = time.perf_counter() - started
     assert shown == blob
-    assert elapsed < 2.0
+    assert elapsed < 15.0
     assert scan.jwt_on_line(jwt) is True
     assert jwt not in blob
     assert jwt not in shown
+
+
+def test_jwt_payload_over_200_and_near_8192_are_hits(tmp_path, capsys):
+    token = _runtime_pool_token()
+    over_200 = _runtime_segment_jwt(201)
+    near_8192 = _runtime_segment_jwt(8192)
+    over_bound = _runtime_segment_jwt(8193)
+    assert len(over_200.split(".")[1]) == 201
+    assert len(near_8192.split(".")[1]) == 8192
+    assert len(over_bound.split(".")[1]) == 8193
+    assert scan.jwt_on_line(over_200) is True
+    assert scan.jwt_on_line(near_8192) is True
+    assert scan.jwt_on_line(over_bound) is False
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "over200.txt").write_text(f"auth {over_200}\n", encoding="utf-8")
+    (evidence / "near8192.txt").write_text(f"auth {near_8192}\n", encoding="utf-8")
+    (evidence / "overbound.txt").write_text(f"auth {over_bound}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"],
+        capsys,
+        (token, over_200, near_8192, over_bound),
+    )
+    assert code == 1
+    assert _hit("jwt", "over200.txt", line=1) in err
+    assert _hit("jwt", "near8192.txt", line=1) in err
+    assert _hit("jwt", "overbound.txt", line=1) not in err
+    assert over_200 not in out
+    assert over_200 not in err
+    assert near_8192 not in out
+    assert near_8192 not in err
+    assert over_bound not in out
+    assert over_bound not in err
+
+
+def test_jwt_header_length_not_multiple_of_four_is_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    header = _unpadded_alg_header()
+    jwt = _runtime_header_jwt(header)
+    first = jwt.split(".", 1)[0]
+    assert len(first) % 4 != 0
+    assert scan.jwt_on_line(jwt) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_jwt_header_longer_than_8192_is_still_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    header = {"alg": "HS256", "pad": "A" * 7000}
+    first = _b64url(json.dumps(header, separators=(",", ":")).encode("ascii"))
+    jwt = f"{first}.{_b64url_run(12)}.{_b64url_run(12)}"
+    assert first.startswith("eyJ")
+    assert len(first) > 8192
+    assert scan.jwt_on_line(jwt) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_failed_eyj_adjacent_to_real_token_is_still_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    decoy = "".join(("eyJ", "x", ".", "y", ".", "z"))
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    adjacent = f"{decoy}{jwt}"
+    assert decoy + jwt == adjacent
+    assert scan.jwt_on_line(adjacent) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{adjacent}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, decoy, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert decoy not in out
+    assert decoy not in err
 
 
 def test_gzip_candidate_cap_is_unsuppressible_archive(tmp_path, capsys):
