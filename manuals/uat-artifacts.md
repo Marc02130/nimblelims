@@ -57,10 +57,10 @@ The scan refuses (exit 1, list of hits) on:
 - an unsafe name in any directory or file (`|`, `\`, `!`, controls, non-ASCII, leading/trailing whitespace, `.`/`..`/`//`, a drive letter, invalid UTF-8, or a casefold collision)
 - a duplicate identity
 - a symlink, fifo, socket, or device
-- a file that exceeds the size cap
+- a file that exceeds the 64 MiB size cap
 - an unreadable directory or file
 
-Hits name the identity with `json.dumps`. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
+Hits name the identity with `json.dumps`. A name segment that is a configured secret or pool token is printed as `<redacted name sha256:xxxxxxxx>` (the first 8 hex of that segment's SHA-256), including a parent segment that matches. They do not print the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
 
 ### Packing evidence
 
@@ -70,7 +70,7 @@ Scan first. Pack only when the scan is clean. Use [`scripts/pack_uat_evidence.py
 python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz --secrets-file PATH
 ```
 
-The helper runs the folder scan, then `tar -C <parent> -czf <name>.tgz <dir>` (no `./`). A dirty folder produces no `.tgz`. On success it prints the scan result and the `.tgz` SHA-256, and writes `<name>.tgz.sha256`.
+The helper runs the folder scan, then packs into a temp name with `tar -C <parent> -czf <temp> --owner=0 --group=0 --numeric-owner --sort=name --mtime=@0 -- <dir>` (no `./`). It extracts and scans that temp archive. Only a clean result is renamed into place and recorded in `<name>.tgz.sha256`. A dirty folder or a dirty packed result produces no `.tgz` and no sidecar. The `.tgz` and sidecar are mode `0600`, created with `O_EXCL|O_NOFOLLOW`. Output inside the scanned folder, a symlinked output path, or a symlinked evidence root is refused.
 
 Verify before sharing:
 
@@ -78,7 +78,7 @@ Verify before sharing:
 python scripts/pack_uat_evidence.py --verify evidence.tgz --secrets-file PATH
 ```
 
-That is `tar -C <tmp> -xzf <name>.tgz`, then a folder scan of the extracted directory (must be clean), then a hash compare against the sidecar. Do not put an archive back into an evidence folder.
+That requires the sidecar and a matching SHA-256 (a missing or mismatched sidecar fails). Then `tar -C <tmp> -xzf <name>.tgz`, exactly one top-level entry that `lstat` says is a real directory, and a folder scan of the whole extraction root (must be clean). Do not put an archive back into an evidence folder.
 
 ### After each round
 

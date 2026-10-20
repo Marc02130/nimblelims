@@ -122,6 +122,10 @@ def _hit(kind: str, *parts: str, line: int | None = None) -> str:
     return f"HIT {kind}: {loc}:{line}"
 
 
+def _redacted_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
+    return scan.redact_name_path(raw, secrets)
+
+
 def _mixed_token() -> str:
     bang = chr(33)
     return "".join(("A", "a", "1", bang, "b" * (DEV_PASSWORD_LENGTH - 4)))
@@ -1699,17 +1703,47 @@ def test_sha_entry_cannot_hide_archive(tmp_path, capsys):
 def test_name_is_scanned_for_pool_token_and_configured_secret(
     tmp_path, capsys, monkeypatch
 ):
-    leak = _runtime_pool_token()
     token = _token_with_symbol("_")
-    configured = "seedpassw0rd"
+    configured = "seed" + uuid.uuid4().hex[:12]
     monkeypatch.setenv("POSTGRES_PASSWORD", configured)
     evidence = tmp_path / "evidence"
     (evidence / token).mkdir(parents=True)
     (evidence / token / f"{configured}.txt").write_text("ok\n", encoding="utf-8")
-    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (leak,))
+    (evidence / configured).mkdir()
+    (evidence / configured / "notes.txt").write_text("ok\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, configured)
+    )
     assert code == 1
-    assert _hit("password-pool token", token) in err
-    assert _hit("configured secret", f"{token}/{configured}.txt") in err
+    folder_hit = _redacted_path(token, (configured,))
+    file_hit = _redacted_path(f"{token}/{configured}.txt", (configured,))
+    parent_hit = _redacted_path(configured, (configured,))
+    child_hit = _redacted_path(f"{configured}/notes.txt", (configured,))
+    assert _hit("password-pool token", folder_hit) in err
+    assert _hit("configured secret", file_hit) in err
+    assert _hit("configured secret", parent_hit) in err
+    assert _hit("configured secret", child_hit) in err
+    assert "<redacted name sha256:" in err
+    assert token not in out
+    assert token not in err
+    assert configured not in out
+    assert configured not in err
+
+
+def test_content_hit_redacts_secret_parent_segment(tmp_path, capsys):
+    token = _token_with_symbol("_")
+    leak = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    (evidence / token).mkdir(parents=True)
+    (evidence / token / "notes.txt").write_text(_secret_text(leak), encoding="utf-8")
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, leak)
+    )
+    assert code == 1
+    shown = _redacted_path(f"{token}/notes.txt")
+    assert _hit("password-pool token", shown, line=2) in err
+    assert token not in err
+    assert leak not in err
 
 
 def test_regular_file_as_evidence_is_refused(tmp_path, capsys):

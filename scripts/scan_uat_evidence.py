@@ -25,7 +25,7 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - an unsafe name in any directory or file
 - a duplicate identity
 - a symlink, fifo, socket, or device
-- a file that exceeds the size cap
+- a file that exceeds the 64 MiB size cap
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -41,7 +41,11 @@ relative path. No name is normalized. Duplicate or non-canonical
 allowlist paths refuse the whole allowlist (exit 2). There is no
 allow-by-extension.
 
-Hits name the identity with ``json.dumps``. They do not repeat the secret.
+Hits name the identity with ``json.dumps``. A name segment that is a
+configured secret or pool token is printed as
+``<redacted name sha256:xxxxxxxx>`` (the first 8 hex of that segment's
+SHA-256), including a parent segment that matches. They do not print
+the secret.
 """
 from __future__ import annotations
 
@@ -104,6 +108,37 @@ SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 Identity = tuple[str, ...]
 
 
+def _segment_sha8(segment: str) -> str:
+    try:
+        data = os.fsencode(segment)
+    except (UnicodeError, ValueError, OSError):
+        data = segment.encode("utf-8", errors="surrogateescape")
+    return hashlib.sha256(data).hexdigest()[:8]
+
+
+def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
+    if not segment:
+        return False
+    variants = (segment, unquote(segment))
+    if any(pool_token_on_line(variant) for variant in variants):
+        return True
+    return any(configured_secret_on_line(variant, secrets) for variant in variants)
+
+
+def redact_name_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
+    """Replace secret name segments with a sha256 prefix. Keep the parent path."""
+    if not raw:
+        return raw
+    parts = raw.split("/")
+    shown: list[str] = []
+    for part in parts:
+        if _segment_is_secret(part, secrets):
+            shown.append(f"<redacted name sha256:{_segment_sha8(part)}>")
+        else:
+            shown.append(part)
+    return "/".join(shown)
+
+
 class Hit:
     """One structured finding. ``identity`` is never normalized."""
 
@@ -112,16 +147,27 @@ class Hit:
         kind: str,
         identity: Identity,
         line: int | None = None,
+        secrets: tuple[str, ...] = (),
     ) -> None:
         self.kind = kind
         self.identity = identity
         self.line = line
+        self.secrets = secrets
+
+    def display_identity(self) -> Identity:
+        return tuple(redact_name_path(part, self.secrets) for part in self.identity)
 
     def format(self) -> str:
-        loc = json.dumps(list(self.identity))
+        loc = json.dumps(list(self.display_identity()))
         if self.line is None:
             return f"HIT {self.kind}: {loc}"
         return f"HIT {self.kind}: {loc}:{self.line}"
+
+    def __str__(self) -> str:
+        return self.format()
+
+    def __repr__(self) -> str:
+        return self.format()
 
 
 class AllowlistEntry:
@@ -201,13 +247,13 @@ def scan_text(
     for number, line in enumerate(text.splitlines(), start=1):
         variants = (line, unquote(line))
         if any(PRINTED_ONCE_RE.search(variant) for variant in variants):
-            hits.append(Hit(KIND_PRINTED_ONCE, identity, number))
+            hits.append(Hit(KIND_PRINTED_ONCE, identity, number, secrets))
         if any(BCRYPT_RE.search(variant) for variant in variants):
-            hits.append(Hit(KIND_BCRYPT, identity, number))
+            hits.append(Hit(KIND_BCRYPT, identity, number, secrets))
         if any(pool_token_on_line(variant) for variant in variants):
-            hits.append(Hit(KIND_POOL, identity, number))
+            hits.append(Hit(KIND_POOL, identity, number, secrets))
         if any(configured_secret_on_line(variant, secrets) for variant in variants):
-            hits.append(Hit(KIND_CONFIGURED, identity, number))
+            hits.append(Hit(KIND_CONFIGURED, identity, number, secrets))
     return hits
 
 
@@ -225,12 +271,12 @@ def scan_name(
         if any(pool_token_on_line(variant) for variant in variants):
             key = (KIND_POOL, text)
             if key not in seen:
-                hits.append(Hit(KIND_POOL, identity))
+                hits.append(Hit(KIND_POOL, identity, secrets=secrets))
                 seen.add(key)
         if any(configured_secret_on_line(variant, secrets) for variant in variants):
             key = (KIND_CONFIGURED, text)
             if key not in seen:
-                hits.append(Hit(KIND_CONFIGURED, identity))
+                hits.append(Hit(KIND_CONFIGURED, identity, secrets=secrets))
                 seen.add(key)
     return hits
 
@@ -521,12 +567,13 @@ def _record_digest(
     identity: Identity,
     data: bytes,
     hits: list[Hit],
+    secrets: tuple[str, ...],
 ) -> None:
     digest = hashlib.sha256(data).hexdigest()
     if identity in digests:
-        hits.append(Hit(KIND_DUPLICATE, identity))
+        hits.append(Hit(KIND_DUPLICATE, identity, secrets=secrets))
         if identity not in announced:
-            hits.append(Hit(KIND_DUPLICATE, identity))
+            hits.append(Hit(KIND_DUPLICATE, identity, secrets=secrets))
             announced.add(identity)
         return
     digests[identity] = digest
@@ -541,17 +588,17 @@ def _scan_payload(
 ) -> list[Hit]:
     hits: list[Hit] = []
     if identity:
-        _record_digest(digests, announced, identity, data, hits)
+        _record_digest(digests, announced, identity, data, hits, secrets)
     if _is_dump_name(identity) or _has_pgdmp_magic(data):
-        hits.append(Hit(KIND_DUMP, identity))
+        hits.append(Hit(KIND_DUMP, identity, secrets=secrets))
     if archive_kind(data) is not None:
-        hits.append(Hit(KIND_ARCHIVE, identity))
+        hits.append(Hit(KIND_ARCHIVE, identity, secrets=secrets))
         return hits
     if _looks_text(data):
         hits.extend(scan_text(identity, data.decode("utf-8"), secrets))
         return hits
     if not (_is_dump_name(identity) or _has_pgdmp_magic(data)):
-        hits.append(Hit(KIND_BINARY, identity))
+        hits.append(Hit(KIND_BINARY, identity, secrets=secrets))
     return hits
 
 
@@ -585,7 +632,7 @@ def _scan_directory(
     def _onerror(err: OSError) -> None:
         name = getattr(err, "filename", None) or ""
         rel = _rel_path(root, Path(name)) if name else root.name
-        hits.append(Hit(KIND_UNREADABLE, (rel,)))
+        hits.append(Hit(KIND_UNREADABLE, (rel,), secrets=secrets))
 
     for dirpath, dirnames, filenames in os.walk(
         os.fspath(root), followlinks=False, topdown=True, onerror=_onerror
@@ -599,14 +646,14 @@ def _scan_directory(
             rel = _rel_path(root, child)
             identity = (rel,)
             if name in collided or is_unsafe_name(rel):
-                hits.append(Hit(KIND_UNSAFE, identity))
+                hits.append(Hit(KIND_UNSAFE, identity, secrets=secrets))
             hits.extend(scan_name(identity, rel, secrets))
             try:
                 st = os.lstat(child)
             except OSError:
                 continue
             if _special_kind(st.st_mode):
-                hits.append(Hit(KIND_LINK, identity))
+                hits.append(Hit(KIND_LINK, identity, secrets=secrets))
                 continue
             keep.append(name)
         dirnames[:] = keep
@@ -615,32 +662,32 @@ def _scan_directory(
             rel = _rel_path(root, child)
             identity = (rel,)
             if name in collided or is_unsafe_name(rel):
-                hits.append(Hit(KIND_UNSAFE, identity))
+                hits.append(Hit(KIND_UNSAFE, identity, secrets=secrets))
             hits.extend(scan_name(identity, rel, secrets))
             try:
                 st = os.lstat(child)
             except OSError:
                 continue
             if _special_kind(st.st_mode):
-                hits.append(Hit(KIND_LINK, identity))
+                hits.append(Hit(KIND_LINK, identity, secrets=secrets))
                 continue
             if not stat.S_ISREG(st.st_mode):
-                hits.append(Hit(KIND_LINK, identity))
+                hits.append(Hit(KIND_LINK, identity, secrets=secrets))
                 continue
             if st.st_size > MAX_SCAN_BYTES:
-                hits.append(Hit(KIND_SIZE_CAP, identity))
+                hits.append(Hit(KIND_SIZE_CAP, identity, secrets=secrets))
                 continue
             budget[0] += st.st_size
             if budget[0] > MAX_SCAN_BYTES:
-                hits.append(Hit(KIND_SIZE_CAP, identity))
+                hits.append(Hit(KIND_SIZE_CAP, identity, secrets=secrets))
                 continue
             try:
                 data = _read_nofollow(child)
             except OSError as exc:
                 if exc.errno in (errno.ELOOP, errno.ENXIO, errno.EPERM):
-                    hits.append(Hit(KIND_LINK, identity))
+                    hits.append(Hit(KIND_LINK, identity, secrets=secrets))
                     continue
-                hits.append(Hit(KIND_UNREADABLE, identity))
+                hits.append(Hit(KIND_UNREADABLE, identity, secrets=secrets))
                 continue
             hits.extend(_scan_payload(identity, data, secrets, digests, announced))
     return hits
@@ -654,18 +701,19 @@ def scan_path(
     digests: dict[Identity, str] = {}
     announced: set[Identity] = set()
     budget = [0]
+    shown = redact_name_path(str(path), secrets)
     try:
         st = os.lstat(path)
     except OSError as exc:
-        raise SystemExit(f"ERROR: evidence path not found: {path}") from exc
+        raise SystemExit(f"ERROR: evidence path not found: {shown}") from exc
     root_id: Identity = (path.name,)
     if _special_kind(st.st_mode):
-        hits = [Hit(KIND_LINK, root_id)]
+        hits = [Hit(KIND_LINK, root_id, secrets=secrets)]
         return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
     if stat.S_ISDIR(st.st_mode):
         hits = _scan_directory(path, secrets, digests, announced, budget)
         return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
-    raise SystemExit(f"ERROR: {path} is not a directory")
+    raise SystemExit(f"ERROR: {shown} is not a directory")
 
 
 def _resolve_allowlist(args: argparse.Namespace) -> tuple[AllowlistEntry, ...]:
@@ -729,7 +777,7 @@ def main(argv: list[str] | None = None) -> int:
             print(hit, file=sys.stderr)
         print(f"ERROR: {len(hits)} evidence hit(s); refusing to share", file=sys.stderr)
         return 1
-    print(f"evidence scan clean: {target}")
+    print(f"evidence scan clean: {redact_name_path(str(target), secrets)}")
     return 0
 
 
