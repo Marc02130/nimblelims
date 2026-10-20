@@ -42,7 +42,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   constant-time check at each ``eyJ`` (Python 3.10; no possessive
   regex). Header length is not capped; payload and signature
   segments stay bounded at 8192. ``eyJ.a.b`` / ``eyJ+.a.b`` and a
-  header without ``alg`` are not hits
+  header without ``alg`` are not hits. Separators must be a
+  single ``.``; ``..`` between segments is not a JWT
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -65,9 +66,13 @@ configured secret, pool token, or JWT is printed as
 per-run random key, first 8 hex). A parent segment that matches is
 redacted the same way. A secret that contains ``/`` redacts the whole
 path. Tar-error text, name hits, and verify output are redacted
-JWTs first, then configured secrets, then pool windows, so a
-24-character pool window inside a real token cannot leave the
-payload in the clear. They do not print the secret.
+JWTs first (raw tokens, then each ``[A-Za-z0-9_.%-]+`` run whose
+percent-decoded form contains a JWT; the whole raw run is
+replaced), then configured secrets, then pool windows, so a
+24-character pool window or a ``%2E``/``%2D``/``%5F``/``%65``
+encoding cannot leave the payload in the clear. They do not
+print the secret. Separators must be a single ``.``; ``..``
+between segments is not a JWT.
 """
 from __future__ import annotations
 
@@ -156,6 +161,7 @@ B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
 _JWT_PREFIX = "eyJ"
 _JWT_OTHER_MAX = 8192
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
+_PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -262,17 +268,41 @@ def _redact_jwts(text: str) -> str:
     return "".join(out)
 
 
+def _redact_percent_jwts(text: str) -> str:
+    """Replace each encoded run whose decoded form contains a JWT.
+
+    Runs are ``[A-Za-z0-9_.%-]+``. The whole raw run is replaced, not
+    just the decoded token. Linear: one ``finditer``, then
+    ``jwt_on_line`` only on runs that contain ``%``.
+    """
+    out: list[str] = []
+    start = 0
+    for match in _PERCENT_JWT_RUN_RE.finditer(text):
+        raw = match.group(0)
+        if "%" not in raw:
+            continue
+        decoded = unquote(raw)
+        if decoded == raw or not jwt_on_line(decoded):
+            continue
+        out.append(text[start : match.start()])
+        out.append(_redact_tag(raw))
+        start = match.end()
+    out.append(text[start:])
+    return "".join(out)
+
+
 def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     """Redact JWTs, then configured secrets, then pool windows.
 
-    JWT first so a 24-character pool window inside a real token cannot
-    punch a hole that leaves the payload (``sub``, ``username``,
-    ``role``, ``permissions``, ``jti``) in the clear. Name hits use
-    the same JWT-then-secret-then-pool check order.
+    JWT first (raw tokens, then percent-encoded runs) so a
+    24-character pool window or a ``%2E``/``%2D``/``%5F``/``%65``
+    encoding cannot punch a hole that leaves the payload (``sub``,
+    ``username``, ``role``, ``permissions``, ``jti``) in the clear.
+    Name hits use the same JWT-then-secret-then-pool check order.
     """
     if not text:
         return text
-    shown = _redact_jwts(text)
+    shown = _redact_percent_jwts(_redact_jwts(text))
     needles: list[tuple[str, str]] = []
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         needles.append((secret, _redact_tag(secret)))
@@ -424,6 +454,7 @@ def _jwt_triple_end(text: str, runs: list[tuple[int, int]], index: int) -> int |
 
     Payload and signature stay bounded at ``_JWT_OTHER_MAX``. The header
     run is not length-capped. Separators must be a single ``.``.
+    ``eyJheader..payload.sig`` is not a JWT.
     """
     if index + 2 >= len(runs):
         return None
@@ -493,8 +524,11 @@ def jwt_on_line(line: str) -> bool:
     Detection finds base64url runs once, then checks each ``eyJ`` in
     constant time (Python 3.10; no possessive quantifiers). Header
     length is not capped. Payload and signature stay bounded at 8192.
-    A failed header check does not skip a later real token. There is
-    no total-length cap: tokens around 200-280 characters still hit.
+    A failed header check does not skip a later real token, including
+    a no-dot decoy such as ``eyJx`` immediately followed by a real
+    token. Separators must be a single ``.``; ``..`` is not a JWT.
+    There is no total-length cap: tokens around 200-280 characters
+    still hit.
     """
     return next(_iter_jwts(line), None) is not None
 
