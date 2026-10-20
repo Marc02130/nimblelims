@@ -40,17 +40,28 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   an ``alg`` key). Detection finds base64url runs once with a
   compiled ``re.finditer(r"[A-Za-z0-9_-]+")`` and does a
   constant-time check at each ``eyJ`` (Python 3.10; no possessive
-  regex). At most 16 ``eyJ`` candidates are examined per
+  regex).   At most 16 ``eyJ`` candidates are examined per
   base64url run so a repeated-``eyJ`` header cannot go
   quadratic. Reaching that bound is an unsuppressible jwt
-  hit (same pattern as the gzip 32-candidate cap) and the
-  whole run through the dotted triple is redacted, so a
-  real token with 16 or more ``eyJ`` decoys glued in front
-  cannot go silent. Header runs longer than 32 KiB (32768)
-  are not JWTs, so a long-header walk stays linear. Payload stays
+  hit (same pattern as the gzip 32-candidate cap) and
+  redaction covers the whole run through every following
+  dot-joined run, so 16 ``eyJ`` decoys, a ``.``, and a
+  real token cannot leave the signature in the clear.
+  A header run longer than 32 KiB (32768) still
+  searches the last 32 KiB for ``eyJ`` (same 16-candidate
+  bound) so a real token after a long base64url prefix
+  is found. If that window misses, an over-cap header
+  that contains ``eyJ`` and forms a dotted triple takes
+  the bound-hit path (unsuppressible hit plus full-run
+  redaction) so a glued token cannot leak. The walk
+  stays linear. Payload stays
   bounded at 8192. A signature longer than 8192 is still a
   hit; the whole signature run is redacted. ``eyJ.a.b`` /
-  ``eyJ+.a.b`` and a header without ``alg`` are not hits.
+  ``eyJ+.a.b`` and a header without ``alg`` are not hits
+  when the header is at most 32 KiB. An over-cap header
+  that contains ``eyJ`` and forms a dotted triple is a
+  bound hit even when that header does not decode to
+  JSON with ``alg``.
   Separators must be a single ``.``; ``..`` between segments
   is not a JWT. Detection percent-decodes until the text
   stops changing (max 3 passes), including ``%u002E``, and
@@ -187,6 +198,7 @@ _DECODE_LAYERS = 3
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
+_NL_RUN_RE = re.compile(r"\.*[\r\n]+\.*")
 _TAR_SIMPLE_ESCAPES = {
     "a": "\a",
     "b": "\b",
@@ -274,10 +286,14 @@ def _decode_layers(text: str, limit: int = _DECODE_LAYERS) -> tuple[str, ...]:
 
 
 def _join_tar_newlines(text: str) -> str:
-    """Treat a newline between JWT segments as ``.``."""
+    """Collapse a newline and any adjacent dots into one ``.``.
+
+    ``header.\\n payload`` and ``header\\r\\npayload`` must become
+    ``header.payload``, not ``header..payload``.
+    """
     if "\n" not in text and "\r" not in text:
         return text
-    return text.replace("\r", ".").replace("\n", ".")
+    return _NL_RUN_RE.sub(".", text)
 
 
 def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
@@ -576,6 +592,20 @@ def _jwt_header_has_alg(token: str) -> bool:
     return isinstance(data, dict) and "alg" in data
 
 
+def _extend_dot_joined_runs(text: str, end: int) -> int:
+    """Grow ``end`` through every following ``.`` plus base64url run.
+
+    Bound-hit redaction must cover the signature after
+    ``decoys.header.payload`` and any later dotted runs. Linear.
+    """
+    while end < len(text) and text[end] == ".":
+        match = _JWT_RUN_RE.match(text, end + 1)
+        if match is None:
+            break
+        end = match.end()
+    return end
+
+
 def _jwt_triple_from_runs(
     text: str,
     header: tuple[int, int],
@@ -584,17 +614,16 @@ def _jwt_triple_from_runs(
 ) -> int | None:
     """Return the signature end when the three runs form a dotted JWT.
 
-    Header runs longer than ``_JWT_HEADER_MAX`` are rejected so a
-    long-header walk stays linear. Payload stays bounded at
-    ``_JWT_OTHER_MAX``. A longer signature is still a hit; the end is
-    the full signature run so redaction covers every leftover byte.
-    Separators must be a single ``.``.
+    Over-cap headers are not rejected here. ``_iter_jwts`` sends a
+    header longer than ``_JWT_HEADER_MAX`` that contains ``eyJ`` down
+    the bound-hit path so a glued token cannot leak. Payload stays
+    bounded at ``_JWT_OTHER_MAX``. A longer signature is still a hit;
+    the end is the full signature run so redaction covers every
+    leftover byte. Separators must be a single ``.``.
     """
     header_start, header_end = header
     payload_start, payload_end = payload
     signature_start, signature_end = signature
-    if header_end - header_start > _JWT_HEADER_MAX:
-        return None
     if header_end >= len(text) or text[header_end] != ".":
         return None
     if payload_start != header_end + 1:
@@ -626,9 +655,14 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
     check plus the alg-header decode. At most ``_JWT_EYJ_PER_RUN``
     (16) ``eyJ`` candidates are examined per base64url run.
     Reaching that bound is itself a hit: the whole run through
-    the dotted triple is yielded so redaction covers decoys glued
-    to a real token. A failed ``eyJ`` does not skip a later real
-    token, including one immediately adjacent to the miss.
+    every following dot-joined run is yielded so redaction covers
+    decoys, a ``.``, and a real token. A long header still
+    searches its last ``_JWT_HEADER_MAX`` bytes (same 16-candidate
+    bound). If that misses, a header longer than
+    ``_JWT_HEADER_MAX`` that contains ``eyJ`` and forms a dotted
+    triple takes the bound path. A failed ``eyJ`` does not skip
+    a later real token, including one immediately adjacent to
+    the miss.
     """
     if _JWT_PREFIX not in text:
         return
@@ -644,7 +678,10 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
                 pending.pop(0)
                 continue
             run_start, run_end = header
+            over_cap = run_end - run_start > _JWT_HEADER_MAX
             search_from = run_start if run_start >= cursor else cursor
+            if run_end - search_from > _JWT_HEADER_MAX:
+                search_from = max(search_from, run_end - _JWT_HEADER_MAX)
             pos = text.find(_JWT_PREFIX, search_from, run_end)
             found = False
             examined = 0
@@ -660,7 +697,10 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
                 pos = text.find(_JWT_PREFIX, pos + 1, run_end)
             if found:
                 continue
-            if examined >= _JWT_EYJ_PER_RUN:
+            if examined >= _JWT_EYJ_PER_RUN or (
+                over_cap and _JWT_PREFIX in text[run_start:run_end]
+            ):
+                token_end = _extend_dot_joined_runs(text, token_end)
                 span = text[run_start:token_end]
                 yield run_start, token_end, span
                 cursor = token_end
@@ -685,8 +725,12 @@ def jwt_on_line(line: str) -> bool:
     base64url runs lazily, then checks each ``eyJ`` in constant time
     (Python 3.10; no possessive quantifiers). At most 16 ``eyJ``
     candidates are examined per base64url run; reaching the bound
-    is an unsuppressible jwt hit and the whole run is redacted.
-    Header runs longer than 32 KiB are not JWTs. Payload stays bounded at 8192. A
+    is an unsuppressible jwt hit and the whole run through every
+    following dot-joined run is redacted. A long header still
+    searches its last 32 KiB (same 16-candidate bound). A header
+    run longer than 32 KiB that contains ``eyJ`` and forms a
+    dotted triple takes the bound path if that window misses.
+    Payload stays bounded at 8192. A
     signature longer than 8192 is still a hit and is fully redacted.
     A failed header check does not skip a later real token, including
     a no-dot decoy such as ``eyJx`` immediately followed by a real
