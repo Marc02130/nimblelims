@@ -12,6 +12,7 @@ import re
 import socket
 import stat
 import tarfile
+import time
 import uuid
 import zlib
 from pathlib import Path
@@ -2191,6 +2192,46 @@ def test_real_shaped_jwt_header_with_alg_is_a_hit(tmp_path, capsys):
     assert jwt not in out
     assert jwt not in err
     assert scan.jwt_on_line(jwt) is True
+
+
+def test_jwt_after_failed_header_is_still_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    decoy = "".join(("eyJ", "x", ".", "y", ".", "z"))
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{decoy} {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, decoy, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert decoy not in out
+    assert decoy not in err
+
+
+def test_repeated_eyj_jwt_scan_is_linear_time():
+    """About 1 MiB of repeated eyJ must scan well under 1 s.
+
+    The old regex backtracked (~15 s per MiB, ~16 min at the 64 MiB cap).
+    jwt_on_line and JWT redaction are typically under 10 ms on 1 MiB.
+    The assertion budget is 2.0 s so shared CI runners have slack; this
+    test always runs (no skip). redact_text is not timed here because
+    the password-pool window scan is a separate linear pass.
+    """
+    blob = "eyJ" * ((1024 * 1024) // 3)
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    started = time.perf_counter()
+    assert scan.jwt_on_line(blob) is False
+    shown = scan._redact_jwts(blob)
+    elapsed = time.perf_counter() - started
+    assert shown == blob
+    assert elapsed < 2.0
+    assert scan.jwt_on_line(jwt) is True
+    assert jwt not in blob
+    assert jwt not in shown
 
 
 def test_gzip_candidate_cap_is_unsuppressible_archive(tmp_path, capsys):

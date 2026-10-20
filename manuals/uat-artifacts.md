@@ -59,7 +59,7 @@ The scan refuses (exit 1, list of hits) on:
 - a symlink, fifo, socket, or device
 - a folder whose scanned files exceed the 64 MiB total cap (67108864 bytes)
 - a 200-character or longer hex or Base64 run
-- a JWT of any realistic length (three base64url segments starting `eyJ` whose first segment base64url-decodes to JSON containing an `alg` key; each segment is bounded so large files cannot trip catastrophic backtracking). `eyJx.y.z` and a header without `alg` are not hits
+- a JWT of any realistic length (three bounded base64url segments starting `eyJ` whose first segment base64url-decodes to JSON containing an `alg` key). Detection is a linear-time scan (Python 3.10; no possessive regex). `eyJ.a.b` / `eyJ+.a.b`, `eyJx.y.z`, and a header without `alg` are not hits. About 1 MiB of repeated `eyJ` must scan well under 1 s (CI budget 2 s)
 - bytes after the IEND chunk of a PNG
 - an unreadable directory or file
 

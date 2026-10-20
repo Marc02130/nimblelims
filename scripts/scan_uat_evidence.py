@@ -35,9 +35,11 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a folder whose scanned files exceed the 64 MiB total cap
   (67108864 bytes)
 - a 200-character or longer hex or Base64 run
-- a JWT of any realistic length (three base64url segments
+- a JWT of any realistic length (three bounded base64url segments
   starting ``eyJ`` whose first segment base64url-decodes to JSON
-  containing an ``alg`` key)
+  containing an ``alg`` key). Detection is a linear-time scan
+  (Python 3.10; no possessive regex). ``eyJ.a.b`` / ``eyJ+.a.b``
+  and a header without ``alg`` are not hits
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -77,6 +79,7 @@ import shlex
 import stat
 import sys
 import zlib
+from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -145,9 +148,12 @@ KIND_PNG_TRAIL = "png-trailing"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
 B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
-JWT_RE = re.compile(
-    r"eyJ[A-Za-z0-9_-]{0,8192}\.[A-Za-z0-9_-]{1,8192}\.[A-Za-z0-9_-]{1,8192}"
+_JWT_PREFIX = "eyJ"
+_JWT_B64URL = frozenset(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
 )
+_JWT_FIRST_MAX = len(_JWT_PREFIX) + 8192
+_JWT_OTHER_MAX = 8192
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -233,19 +239,11 @@ def _redact_jwts(text: str) -> str:
     """Replace each JWT match with an HMAC tag. Advance one char on a miss."""
     out: list[str] = []
     start = 0
-    while start < len(text):
-        match = JWT_RE.search(text, start)
-        if match is None:
-            out.append(text[start:])
-            break
-        token = match.group(0)
-        if _jwt_header_has_alg(token):
-            out.append(text[start : match.start()])
-            out.append(_redact_tag(token))
-            start = match.end()
-            continue
-        out.append(text[start : match.start() + 1])
-        start = match.start() + 1
+    for begin, end, token in _iter_jwts(text):
+        out.append(text[start:begin])
+        out.append(_redact_tag(token))
+        start = end
+    out.append(text[start:])
     return "".join(out)
 
 
@@ -400,24 +398,78 @@ def _jwt_header_has_alg(token: str) -> bool:
     return isinstance(data, dict) and "alg" in data
 
 
+def _b64url_end(text: str, start: int, limit: int) -> int:
+    """Return the index after a bounded base64url run starting at ``start``."""
+    end = start
+    last = start + limit
+    length = len(text)
+    if last > length:
+        last = length
+    while end < last and text[end] in _JWT_B64URL:
+        end += 1
+    return end
+
+
+def _jwt_token_end(text: str, pos: int) -> int | None:
+    """Return the end index of a three-segment JWT at ``pos``, or None."""
+    end1 = _b64url_end(text, pos, _JWT_FIRST_MAX)
+    if end1 < pos + len(_JWT_PREFIX) or end1 >= len(text) or text[end1] != ".":
+        return None
+    end2 = _b64url_end(text, end1 + 1, _JWT_OTHER_MAX)
+    if end2 <= end1 + 1 or end2 >= len(text) or text[end2] != ".":
+        return None
+    end3 = _b64url_end(text, end2 + 1, _JWT_OTHER_MAX)
+    if end3 <= end2 + 1:
+        return None
+    return end3
+
+
+def _jwt_advance_after_miss(text: str, pos: int) -> int:
+    """Advance past a failed start without rescanning an undotted run."""
+    nxt = pos + 1
+    length = len(text)
+    if nxt >= length:
+        return length
+    dot = text.find(".", pos)
+    if dot < 0:
+        return length
+    earliest = dot - _JWT_FIRST_MAX
+    if earliest > nxt:
+        run_end = _b64url_end(text, pos, earliest - pos)
+        if run_end >= earliest:
+            return earliest
+    return nxt
+
+
+def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
+    """Yield ``(start, end, token)`` for each alg-header JWT. Linear time."""
+    length = len(text)
+    start = 0
+    while start < length:
+        pos = text.find(_JWT_PREFIX, start)
+        if pos < 0:
+            return
+        end = _jwt_token_end(text, pos)
+        if end is not None:
+            token = text[pos:end]
+            if _jwt_header_has_alg(token):
+                yield pos, end, token
+                start = end
+                continue
+        start = _jwt_advance_after_miss(text, pos)
+
+
 def jwt_on_line(line: str) -> bool:
     """True when a JWT starts with eyJ and has three base64url segments.
 
     The first segment must base64url-decode to JSON containing ``alg``.
-    Segment lengths are bounded so a large file cannot trip catastrophic
-    backtracking. A failed header check advances one character so a later
-    real token is not skipped. There is no total-length cap: tokens
-    around 200-280 characters still hit.
+    Detection is a linear-time scan with the same bounded segment lengths
+    as r44 (Python 3.10; no possessive quantifiers). A failed header
+    check advances one character so a later real token is not skipped.
+    There is no total-length cap: tokens around 200-280 characters
+    still hit.
     """
-    start = 0
-    while start < len(line):
-        match = JWT_RE.search(line, start)
-        if match is None:
-            return False
-        if _jwt_header_has_alg(match.group(0)):
-            return True
-        start = match.start() + 1
-    return False
+    return next(_iter_jwts(line), None) is not None
 
 
 def scan_name(

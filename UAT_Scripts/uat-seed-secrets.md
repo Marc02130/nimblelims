@@ -76,7 +76,7 @@ Expect exit 0 and `evidence scan clean`. The default reviewed allowlist is `scri
 7. Unsafe names (trailing space, leading-space folder, `\`, `|`, `!`, `:1`, controls, non-ASCII, casefold collisions) are unsuppressible hits. File and directory names are also scanned for pool tokens, configured secrets, and JWTs. A JWT in a name is printed as `<redacted name hmac:xxxxxxxx>` and never as the token. Symlinks, a directory link, a dangling link, a root link, a fifo, a socket, and a device are hits. An over-budget file and an unreadable dir or file are hits.
 8. Line entries are refused (exit 2). A sha entry whose file later changes no longer matches. Neither a line entry nor a sha entry may suppress a configured secret, bcrypt, or printed-once hit.
 9. Duplicate or non-canonical allowlist paths refuse the whole allowlist (exit 2).
-10. A runtime-built JWT whose first segment base64url-decodes to JSON with `alg` is an unsuppressible hit, including tokens around 220 and 275 characters. `eyJx.y.z` and a header without `alg` are not hits. The r38 clean-lines fixture stays clean.
+10. A runtime-built JWT whose first segment base64url-decodes to JSON with `alg` is an unsuppressible hit, including tokens around 220 and 275 characters. `eyJ.a.b` / `eyJ+.a.b`, `eyJx.y.z`, and a header without `alg` are not hits. About 1 MiB of repeated `eyJ` must scan well under 1 s (CI budget 2 s). The r38 clean-lines fixture stays clean.
 11. When gzip-after-junk scanning reaches the 32-candidate cap, that is an unsuppressible archive hit. A matching sha allowlist entry cannot suppress it (it is not refuse-binary).
 12. Failed tar stderr that echoes a JWT-named member redacts the token with the HMAC tag and never prints it.
 
