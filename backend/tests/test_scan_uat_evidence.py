@@ -18,6 +18,7 @@ import zlib
 from pathlib import Path
 from urllib.parse import quote
 
+import jwt
 import pytest
 
 from app.core.dev_passwords import DEV_PASSWORD_LENGTH, generate_dev_password
@@ -190,6 +191,46 @@ def _runtime_header_jwt(
 
 def _runtime_jwt(length: int | None = None) -> str:
     return _runtime_header_jwt({"alg": "HS256", "typ": "JWT"}, length)
+
+
+# PyJWT is already pinned in backend/requirements.txt (auth stack). Leak
+# tests use it at runtime only; tokens are never committed, printed, or logged.
+JWT_LEAK_TRIALS = 56
+
+
+def _pyjwt_access_token() -> str:
+    """Runtime PyJWT token. Do not print or log the return value."""
+    key = os.urandom(32)
+    claims = {
+        "sub": uuid.uuid4().hex,
+        "username": "u" + uuid.uuid4().hex[:12],
+        "role": "lab-technician",
+        "permissions": ["sample:read", "result:write"],
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(claims, key, algorithm="HS256")
+    if not isinstance(token, str):
+        token = token.decode("ascii")
+    if not (token.startswith("eyJ") and token.count(".") == 2):
+        raise AssertionError("PyJWT produced a malformed test token")
+    return token
+
+
+def _jwt_fragments(token: str) -> tuple[str, str, str]:
+    header, payload, _signature = token.split(".")
+    return token, f"{header}.{payload}", payload
+
+
+def _assert_jwt_absent(stdout: str, stderr: str, token: str) -> None:
+    full, header_payload, payload = _jwt_fragments(token)
+    blobs = (stdout, stderr)
+    if any(
+        fragment in blob
+        for fragment in (full, header_payload, payload)
+        for blob in blobs
+        if fragment
+    ):
+        raise AssertionError("planted JWT fragment leaked into stdout or stderr")
 
 
 def _b64url_run(count: int) -> str:
@@ -2392,6 +2433,114 @@ def test_failed_eyj_adjacent_to_real_token_is_still_a_hit(tmp_path, capsys):
     assert jwt not in err
     assert decoy not in out
     assert decoy not in err
+
+
+def test_redact_text_pyjwt_missing_link_target_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(
+            f"tar: round/link: Cannot hard link to 'missing_{token}': No such file"
+        )
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("missing_ JWT link target was not redacted")
+
+
+def test_redact_text_pyjwt_gone_path_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(
+            f"tar: gone/{token}: Cannot hard link to 'round/missing': No such file"
+        )
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("gone/ JWT path was not redacted")
+
+
+def test_redact_text_pyjwt_bare_token_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(f"tar: {token}: Cannot open: No such file")
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("bare JWT in tar error text was not redacted")
+
+
+def test_redact_text_pyjwt_before_configured_secret_and_pool():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        secret = "seed" + uuid.uuid4().hex[:12]
+        shown = scan.redact_text(f"tar: {token} secret={secret}", (secret,))
+        _assert_jwt_absent("", shown, token)
+        if secret in shown:
+            raise AssertionError("configured secret leaked beside a JWT")
+
+
+def test_pyjwt_name_and_verify_identity_do_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        for raw in (token, f"gone/{token}", f"missing_{token}", f"{token}.txt"):
+            shown = scan.redact_name_path(raw)
+            _assert_jwt_absent("", shown, token)
+            if "<redacted name hmac:" not in shown:
+                raise AssertionError("JWT name path was not redacted")
+            formatted = scan.Hit(scan.KIND_JWT, (raw,), secrets=()).format()
+            _assert_jwt_absent("", formatted, token)
+
+
+def test_pyjwt_content_hit_does_not_leak(tmp_path, capsys):
+    tokens = [_pyjwt_access_token() for _ in range(JWT_LEAK_TRIALS)]
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    for index, token in enumerate(tokens):
+        (evidence / f"notes{index}.txt").write_text(f"auth {token}\n", encoding="utf-8")
+    code = scan_main([str(evidence), "--no-allowlist"])
+    captured = capsys.readouterr()
+    if code != 1:
+        raise AssertionError("PyJWT content files did not hit")
+    for token in tokens:
+        _assert_jwt_absent(captured.out, captured.err, token)
+
+
+def test_jwt_walk_runs_once_per_line(monkeypatch):
+    seen: list[str] = []
+    real = scan._iter_jwts
+
+    def counted(text: str):
+        seen.append(text)
+        yield from real(text)
+
+    monkeypatch.setattr(scan, "_iter_jwts", counted)
+    scan.scan_text(("notes.txt",), "sample id 123\n")
+    if seen != ["sample id 123"]:
+        raise AssertionError("JWT walk was not one pass per line")
+    seen.clear()
+    scan.scan_text(("notes.txt",), "one\ntwo\n")
+    if seen != ["one", "two"]:
+        raise AssertionError("JWT walk was not one pass per two lines")
+
+
+def test_cli_jwt_walk_runs_once_per_content_line(tmp_path, capsys, monkeypatch):
+    line = "sample id 123"
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{line}\n", encoding="utf-8")
+    content_calls = {"n": 0}
+    real = scan._iter_jwts
+
+    def counted(text: str):
+        if text == line:
+            content_calls["n"] += 1
+        yield from real(text)
+
+    monkeypatch.setattr(scan, "_iter_jwts", counted)
+    code, _out, _err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (_runtime_pool_token(),)
+    )
+    if code != 0:
+        raise AssertionError("clean one-line evidence did not scan clean")
+    if content_calls["n"] != 1:
+        raise AssertionError("CLI JWT walk was not one pass per content line")
 
 
 def test_gzip_candidate_cap_is_unsuppressible_archive(tmp_path, capsys):
