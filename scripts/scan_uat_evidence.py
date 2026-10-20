@@ -15,15 +15,22 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - gzip or zlib payloads (decompressed, then scanned)
 - nested tarballs
 - a binary file that is not gzip, zlib, tar, PGDMP, or UTF-8 text
+- an evidence file or tar member whose name changes under normalization
+  or contains ``|`` or ``\\``
+- a duplicate evidence path or duplicate tar member name
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
-suppress a hit. Each entry is an exact evidence-relative path (normalized,
-no ``..``, no absolute path) plus either a line number or a file SHA-256,
-with ``reviewed_by``, ``approved_by``, and ``date``. A hit is suppressed
-only when that same scanned file's own SHA-256 equals the entry hash.
-Tar members are separate paths (``archive.tar!ui/name.png``). A file
-entry never covers a member, and a member entry never covers a file.
-Changed bytes no longer match. There is no allow-by-extension.
+suppress a hit. Each entry is an exact evidence-relative path (normalized
+only on the allowlist side, no ``..``, no absolute path) plus the file's
+SHA-256, with ``reviewed_by``, ``approved_by``, and ``date``. A line
+entry also carries a line number and still requires that SHA-256. A hit
+is suppressed only when that same scanned file's own SHA-256 equals the
+entry hash. Line entries never suppress configured-secret, seed/pool
+password, bcrypt, or dump hits. Tar members are separate paths
+(``archive.tar!ui/name.png``). A file entry never covers a member, and a
+member entry never covers a file. Digests and hits are keyed by the
+exact on-disk path (and the exact member name within each tar). Changed
+bytes no longer match. There is no allow-by-extension.
 
 Hits name the file and the line. They do not repeat the secret.
 """
@@ -65,10 +72,22 @@ _OTHER_SYMBOLS = _SYMBOLS - _SEPARATORS
 MAX_NEST = 8
 DEFAULT_ALLOWLIST = Path(__file__).resolve().parent / "uat_evidence_allowlist.json"
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+_PROCESS_SUFFIXES = ("|gunzip", "|inflate")
+_NEVER_SUPPRESS_PREFIXES = (
+    "HIT unsafe evidence path:",
+    "HIT duplicate evidence path:",
+    "HIT duplicate tar member:",
+)
+_LINE_UNSUPPRESSIBLE_PREFIXES = (
+    "HIT password-pool token:",
+    "HIT configured secret:",
+    "HIT bcrypt hash:",
+    "HIT dump file:",
+)
 
 
 class AllowlistEntry:
-    """One reviewed path. Either ``sha256`` or ``line`` is set, never both."""
+    """One reviewed path. ``sha256`` is required; ``line`` is optional."""
 
     def __init__(
         self,
@@ -76,7 +95,7 @@ class AllowlistEntry:
         reviewed_by: str,
         approved_by: str,
         date: str,
-        sha256: str | None = None,
+        sha256: str,
         line: int | None = None,
     ) -> None:
         self.path = path
@@ -210,19 +229,30 @@ def _normalize_rel_segment(raw: str) -> str:
     return "/".join(parts)
 
 
-def _file_identity(name: str) -> str:
-    return name.split("|", 1)[0]
+def is_unsafe_evidence_name(raw: str) -> bool:
+    """True when a name changes under normalization or contains ``|`` or ``\\``."""
+    if not isinstance(raw, str) or not raw:
+        return True
+    if "|" in raw or "\\" in raw:
+        return True
+    try:
+        return normalize_evidence_path(raw) != raw
+    except ValueError:
+        return True
 
 
 def _member_path(archive_name: str, member_name: str) -> str:
-    archive = _file_identity(archive_name)
-    try:
-        member = _normalize_rel_segment(member_name.replace("\\", "/"))
-    except ValueError:
-        member = member_name.replace("\\", "/").lstrip("/")
-    if archive:
-        return f"{archive}!{member}"
-    return member
+    if archive_name:
+        return f"{archive_name}!{member_name}"
+    return member_name
+
+
+def _leaf_name(name: str) -> str:
+    leaf = name.split("!")[-1]
+    for suffix in _PROCESS_SUFFIXES:
+        if leaf.endswith(suffix):
+            leaf = leaf[: -len(suffix)]
+    return leaf
 
 
 def load_allowlist(path: Path) -> list[AllowlistEntry]:
@@ -266,33 +296,27 @@ def _parse_allowlist_entry(item: object, source: Path) -> AllowlistEntry:
     if not isinstance(date, str) or not date.strip():
         raise SystemExit(f"ERROR: allowlist entry needs date: {source}")
     sha = item.get("sha256")
-    line = item.get("line")
-    has_sha = sha is not None
-    has_line = line is not None
-    if has_sha == has_line:
+    if sha is None:
+        raise SystemExit(f"ERROR: allowlist entry needs path plus sha256: {source}")
+    if not isinstance(sha, str) or not _SHA256_RE.fullmatch(sha):
         raise SystemExit(
-            f"ERROR: allowlist entry needs path plus either line or sha256: {source}"
+            f"ERROR: allowlist sha256 must be 64 hex characters: {source}"
         )
-    if has_sha:
-        if not isinstance(sha, str) or not _SHA256_RE.fullmatch(sha):
+    line = item.get("line")
+    parsed_line: int | None = None
+    if line is not None:
+        if not isinstance(line, int) or isinstance(line, bool) or line < 1:
             raise SystemExit(
-                f"ERROR: allowlist sha256 must be 64 hex characters: {source}"
+                f"ERROR: allowlist line must be a positive integer: {source}"
             )
-        return AllowlistEntry(
-            path=normalized,
-            reviewed_by=reviewed,
-            approved_by=approved,
-            date=date,
-            sha256=sha.lower(),
-        )
-    if not isinstance(line, int) or isinstance(line, bool) or line < 1:
-        raise SystemExit(f"ERROR: allowlist line must be a positive integer: {source}")
+        parsed_line = line
     return AllowlistEntry(
         path=normalized,
         reviewed_by=reviewed,
         approved_by=approved,
         date=date,
-        line=line,
+        sha256=sha.lower(),
+        line=parsed_line,
     )
 
 
@@ -304,39 +328,67 @@ def _hit_location(hit: str) -> tuple[str, int | None]:
     return loc, None
 
 
+def _allowlist_identity(name: str, digests: dict[str, str]) -> str:
+    """Map a hit name to the exact on-disk or member path used for digests."""
+    if name in digests:
+        return name
+    base = name
+    while True:
+        stripped = None
+        for suffix in _PROCESS_SUFFIXES:
+            if base.endswith(suffix):
+                stripped = base[: -len(suffix)]
+                break
+        if stripped is None:
+            return name
+        if stripped in digests:
+            return stripped
+        base = stripped
+
+
+def _entry_suppresses(
+    entry: AllowlistEntry,
+    hit: str,
+    line_no: int | None,
+    digest: str | None,
+) -> bool:
+    if not digest or digest != entry.sha256:
+        return False
+    if entry.line is None:
+        return True
+    if any(hit.startswith(prefix) for prefix in _LINE_UNSUPPRESSIBLE_PREFIXES):
+        return False
+    return line_no == entry.line
+
+
 def filter_allowlist_hits(
     hits: list[str],
     entries: tuple[AllowlistEntry, ...] | list[AllowlistEntry],
     digests: dict[str, str],
 ) -> list[str]:
-    by_path = {entry.path: entry for entry in entries}
+    by_path: dict[str, list[AllowlistEntry]] = {}
+    for entry in entries:
+        by_path.setdefault(entry.path, []).append(entry)
     kept: list[str] = []
     for hit in hits:
+        if any(hit.startswith(prefix) for prefix in _NEVER_SUPPRESS_PREFIXES):
+            kept.append(hit)
+            continue
         name, line_no = _hit_location(hit)
-        identity = _file_identity(name)
-        try:
-            identity = normalize_evidence_path(identity)
-        except ValueError:
+        identity = _allowlist_identity(name, digests)
+        candidates = by_path.get(identity, ())
+        if not candidates:
             kept.append(hit)
             continue
-        entry = by_path.get(identity)
-        if entry is None:
-            kept.append(hit)
-            continue
-        if entry.sha256:
-            digest = digests.get(identity)
-            if digest and digest == entry.sha256:
-                continue
-            kept.append(hit)
-            continue
-        if entry.line is not None and line_no == entry.line:
+        digest = digests.get(identity)
+        if any(_entry_suppresses(entry, hit, line_no, digest) for entry in candidates):
             continue
         kept.append(hit)
     return kept
 
 
 def _is_dump_name(name: str) -> bool:
-    lower = Path(_file_identity(name).split("!")[-1]).name.lower()
+    lower = Path(_leaf_name(name)).name.lower()
     return lower.endswith(".dump") or lower.endswith(".dump.gz")
 
 
@@ -375,14 +427,9 @@ def _looks_text(data: bytes) -> bool:
 
 
 def _record_digest(digests: dict[str, str], name: str, data: bytes) -> None:
-    identity = _file_identity(name)
-    if not identity or identity in digests:
+    if not name or name in digests:
         return
-    try:
-        identity = normalize_evidence_path(identity)
-    except ValueError:
-        return
-    digests[identity] = hashlib.sha256(data).hexdigest()
+    digests[name] = hashlib.sha256(data).hexdigest()
 
 
 def _scan_payload(
@@ -391,8 +438,9 @@ def _scan_payload(
     secrets: tuple[str, ...],
     depth: int = 0,
     digests: dict[str, str] | None = None,
+    record: bool = True,
 ) -> list[str]:
-    if digests is not None and name:
+    if digests is not None and name and record:
         _record_digest(digests, name, data)
     hits: list[str] = []
     if _is_dump_name(name) or _has_pgdmp_magic(data):
@@ -405,7 +453,16 @@ def _scan_payload(
         except OSError:
             hits.append(f"HIT refuse binary: {name}")
             return hits
-        hits.extend(_scan_payload(f"{name}|gunzip", inner, secrets, depth + 1, digests))
+        hits.extend(
+            _scan_payload(
+                f"{name}|gunzip",
+                inner,
+                secrets,
+                depth + 1,
+                digests,
+                record=False,
+            )
+        )
         return hits
     if _is_zlib(data):
         try:
@@ -413,7 +470,16 @@ def _scan_payload(
         except zlib.error:
             hits.append(f"HIT refuse binary: {name}")
             return hits
-        hits.extend(_scan_payload(f"{name}|inflate", inner, secrets, depth + 1, digests))
+        hits.extend(
+            _scan_payload(
+                f"{name}|inflate",
+                inner,
+                secrets,
+                depth + 1,
+                digests,
+                record=False,
+            )
+        )
         return hits
     if _is_tar_bytes(data):
         hits.extend(_scan_tar_bytes(name, data, secrets, depth + 1, digests))
@@ -434,6 +500,7 @@ def _scan_tar_bytes(
     digests: dict[str, str] | None = None,
 ) -> list[str]:
     hits: list[str] = []
+    seen_members: set[str] = set()
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
         for member in archive.getmembers():
             if member.isdir() or not member.isfile():
@@ -442,6 +509,11 @@ def _scan_tar_bytes(
             if extracted is None:
                 continue
             inner_name = _member_path(name, member.name)
+            if member.name in seen_members:
+                hits.append(f"HIT duplicate tar member: {inner_name}")
+            seen_members.add(member.name)
+            if is_unsafe_evidence_name(member.name):
+                hits.append(f"HIT unsafe evidence path: {inner_name}")
             payload = extracted.read()
             hits.extend(_scan_payload(inner_name, payload, secrets, depth, digests))
     return hits
@@ -469,14 +541,16 @@ def _scan_directory(
     digests: dict[str, str],
 ) -> list[str]:
     hits: list[str] = []
+    seen: set[str] = set()
     for file_path in sorted(root.rglob("*")):
         if not file_path.is_file():
             continue
         relative = file_path.relative_to(root).as_posix()
-        try:
-            relative = normalize_evidence_path(relative)
-        except ValueError:
-            relative = file_path.relative_to(root).as_posix()
+        if relative in seen:
+            hits.append(f"HIT duplicate evidence path: {relative}")
+        seen.add(relative)
+        if is_unsafe_evidence_name(relative):
+            hits.append(f"HIT unsafe evidence path: {relative}")
         data = file_path.read_bytes()
         hits.extend(_scan_payload(relative, data, secrets, digests=digests))
     return hits
@@ -513,9 +587,9 @@ def main(argv: list[str] | None = None) -> int:
         "--allowlist",
         default="",
         help=(
-            "Reviewed allowlist JSON (exact path plus line or sha256, with "
-            "reviewed_by, approved_by, and date). Defaults to "
-            "scripts/uat_evidence_allowlist.json."
+            "Reviewed allowlist JSON (exact path plus sha256, optional line "
+            "plus sha256, with reviewed_by, approved_by, and date). Defaults "
+            "to scripts/uat_evidence_allowlist.json."
         ),
     )
     parser.add_argument(

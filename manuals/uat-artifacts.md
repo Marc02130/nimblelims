@@ -42,7 +42,7 @@ python scripts/scan_uat_evidence.py /path/to/evidence --secrets-file PATH
 
 `--secrets-file` is the `--secrets-out` file for the round. The scan also reads `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, `SECRET_KEY`, and `DEV_SEED_*` / `SLICE_*` password variables from the environment.
 
-The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is an exact path relative to the evidence folder (normalized, no `..`, no absolute path) plus either a line number or a file SHA-256, with `reviewed_by`, `approved_by`, and `date`. Every new allowlist entry needs Günter's (CSO) own review and approval, recorded in `reviewed_by` and `approved_by`, keyed by that exact path plus SHA-256 (or line). A hit is suppressed only when that same scanned file's own SHA-256 equals the entry hash. Tar members are separate paths (`archive.tar!ui/name.png`). A file entry never covers a member, and a member entry never covers a file. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
+The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../scripts/uat_evidence_allowlist.json). Each entry is an exact path relative to the evidence folder (no `..`, no absolute path) plus the file's SHA-256, with `reviewed_by`, `approved_by`, and `date`. A line entry adds a line number and still requires that same file SHA-256. Every new allowlist entry needs Günter's (CSO) own review and approval, recorded in `reviewed_by` and `approved_by`. A hit is suppressed only when that same scanned file's own SHA-256 equals the entry hash. Line entries never suppress configured-secret, seed/pool password, bcrypt, or dump hits. Digests and hits are keyed by the exact on-disk path, and by the exact member name within each tar (`archive.tar!ui/name.png`). A file entry never covers a member, and a member entry never covers a file. Names that change under normalization, or that contain `|` or `\`, are refused. Duplicate evidence paths and duplicate tar members are refused. There is no allow-by-extension. Changed bytes no longer match. Pass `--allowlist PATH` to use another file, or `--no-allowlist` to scan with none.
 
 The scan refuses (exit 1, list of hits) on:
 
@@ -53,6 +53,8 @@ The scan refuses (exit 1, list of hits) on:
 - a `.dump` or `.dump.gz` name, or the `PGDMP` magic
 - gzip or zlib payloads (decompressed, then scanned), including nested tarballs
 - a binary file that is not gzip, zlib, tar, PGDMP, UTF-8 text, or an allowlisted SHA-256
+- an evidence file or tar member whose name changes under normalization or contains `|` or `\`
+- a duplicate evidence path or duplicate tar member name
 
 Hits name the file and line. They do not repeat the secret. Hex SHAs, UUIDs, and snake_case identifiers such as `nimblelims_postgres_data` are not pool-token hits. The r38 clean-lines fixture (`backend/tests/data/r38_clean_lines.txt`) must scan clean with `--no-allowlist`.
 

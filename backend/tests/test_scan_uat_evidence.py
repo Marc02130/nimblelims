@@ -4,12 +4,15 @@ from __future__ import annotations
 import gzip
 import hashlib
 import importlib.util
+import io
 import json
 import tarfile
 import uuid
 import zlib
 from pathlib import Path
 from urllib.parse import quote
+
+import pytest
 
 from app.core.dev_passwords import DEV_PASSWORD_LENGTH, generate_dev_password
 
@@ -26,6 +29,86 @@ _SPEC.loader.exec_module(scan)
 
 scan_main = scan.main
 pool_token_on_line = scan.pool_token_on_line
+
+UTC_NAME = "r38_results_UTC.png"
+YORK_NAME = "r38_results_America_New_York.png"
+UTC_REL = f"ui/{UTC_NAME}"
+YORK_REL = f"ui/{YORK_NAME}"
+UTC_PNG = b"\x89PNG\r\n\x1a\n" + b"utc-reviewed-bytes-r38"
+YORK_PNG = b"\x89PNG\r\n\x1a\n" + b"york-reviewed-bytes-r38"
+UTC_SHA = hashlib.sha256(UTC_PNG).hexdigest()
+YORK_SHA = hashlib.sha256(YORK_PNG).hexdigest()
+SPOOF_CASES = (
+    "A01",
+    "A02",
+    "A03",
+    "A04a",
+    "A04b",
+    "A04c",
+    "A04d",
+    "A04e",
+    "A04f",
+    "A04g",
+    "A04h",
+    "A05",
+    "A06",
+    "A07",
+    "B01",
+    "B02",
+    "B03",
+    "B04a",
+    "B04b",
+    "B04c",
+    "B04d",
+    "B04e",
+    "B04f",
+    "B05a",
+    "B05b",
+    "B05c",
+    "B05d",
+    "B05e",
+    "B05f",
+    "B06a",
+    "B06b",
+    "B06c",
+    "B06d",
+    "B06e",
+    "B06f",
+    "B06g",
+    "B07a",
+    "B07b",
+    "B07c",
+    "B07d",
+    "B07e",
+    "B08a",
+    "B08b",
+    "B08c",
+    "B09a",
+    "B09b",
+    "B09c",
+    "B09d",
+    "B09e",
+    "B10a",
+    "B10b",
+    "B10c",
+    "B11a",
+    "B11b",
+    "B11c",
+    "B11d",
+    "B11e",
+    "B11f",
+    "B11g",
+    "B11h",
+    "B11i",
+    "B11j",
+    "B12a",
+    "B12b",
+    "B12c",
+    "B12d",
+    "B13a",
+    "B13b",
+    "B13c",
+)
 
 
 def _mixed_token() -> str:
@@ -51,12 +134,52 @@ def _runtime_pool_token() -> str:
     raise AssertionError("could not generate a pool token")
 
 
+def _runtime_configured_secret() -> str:
+    return "".join(("c", "f", "g", chr(36), "z", "9"))
+
+
 def _write_allowlist(path: Path, entries: list[dict[str, object]]) -> Path:
     for entry in entries:
-        entry.setdefault("reviewed_by", "tester")
-        entry.setdefault("approved_by", "tester")
+        entry.setdefault("reviewed_by", "Günter (CSO)")
+        entry.setdefault("approved_by", "Günter (CSO) 2026-10-19")
+        entry.setdefault("date", "2026-10-19")
     path.write_text(json.dumps({"entries": entries}), encoding="utf-8")
     return path
+
+
+def _reviewed_entries() -> list[dict[str, object]]:
+    return [
+        {
+            "path": YORK_REL,
+            "sha256": YORK_SHA,
+            "reviewed_by": "Günter (CSO), visual review 2026-10-19, no secrets visible",
+            "approved_by": "Günter (CSO) 2026-10-19",
+            "date": "2026-10-19",
+        },
+        {
+            "path": UTC_REL,
+            "sha256": UTC_SHA,
+            "reviewed_by": "Günter (CSO), visual review 2026-10-19, no secrets visible",
+            "approved_by": "Günter (CSO) 2026-10-19",
+            "date": "2026-10-19",
+        },
+    ]
+
+
+def _write_reviewed_pngs(evidence: Path) -> None:
+    (evidence / "ui").mkdir(parents=True, exist_ok=True)
+    (evidence / "ui" / UTC_NAME).write_bytes(UTC_PNG)
+    (evidence / "ui" / YORK_NAME).write_bytes(YORK_PNG)
+
+
+def _secret_text(token: str) -> str:
+    return f"note\n{token}\n"
+
+
+def _add_tar_member(bundle: tarfile.TarFile, name: str, data: bytes) -> None:
+    info = tarfile.TarInfo(name=name)
+    info.size = len(data)
+    bundle.addfile(info, io.BytesIO(data))
 
 
 def test_pool_token_requires_the_generated_password_mix():
@@ -271,14 +394,35 @@ def test_allowlist_file_entry_does_not_cover_tar_member(tmp_path, capsys):
     assert token not in err
 
 
-def test_allowlist_line_entry_skips_that_line_only(tmp_path, capsys):
-    token = _mixed_token()
+def test_allowlist_line_entry_requires_sha256_and_skips_only_that_line(tmp_path, capsys):
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    (evidence / "notes.txt").write_text(
-        f"keep {token}\nsecond {token}\n",
-        encoding="utf-8",
+    text = "PRINTED ONCE\nsecond printed once\n"
+    (evidence / "notes.txt").write_text(text, encoding="utf-8")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [
+            {
+                "path": "notes.txt",
+                "line": 1,
+                "sha256": digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            }
+        ],
     )
+    code = scan_main([str(evidence), "--allowlist", str(allow)])
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "HIT printed-once header: notes.txt:1" not in err
+    assert "HIT printed-once header: notes.txt:2" in err
+
+
+def test_allowlist_line_entry_without_sha256_is_refused(tmp_path, capsys):
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
     allow = _write_allowlist(
         tmp_path / "allow.json",
         [
@@ -292,10 +436,65 @@ def test_allowlist_line_entry_skips_that_line_only(tmp_path, capsys):
     )
     code = scan_main([str(evidence), "--allowlist", str(allow)])
     err = capsys.readouterr().err
+    assert code == 2
+    assert "needs path plus sha256" in err
+
+
+def test_allowlist_line_entry_never_suppresses_pool_or_configured_secret(
+    tmp_path, capsys, monkeypatch
+):
+    token = _runtime_pool_token()
+    configured = _runtime_configured_secret()
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    text = f"keep\n{token}\n{configured}\nstored $2a$06$not-a-real-hash\n"
+    (evidence / "notes.txt").write_text(text, encoding="utf-8")
+    (evidence / "users.dump").write_text("users\n", encoding="utf-8")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    dump_digest = hashlib.sha256(b"users\n").hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [
+            {
+                "path": "notes.txt",
+                "line": 2,
+                "sha256": digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            },
+            {
+                "path": "notes.txt",
+                "line": 3,
+                "sha256": digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            },
+            {
+                "path": "notes.txt",
+                "line": 4,
+                "sha256": digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            },
+            {
+                "path": "users.dump",
+                "line": 1,
+                "sha256": dump_digest,
+                "approved_by": "tester",
+                "date": "2026-10-19",
+            },
+        ],
+    )
+    code = scan_main([str(evidence), "--allowlist", str(allow)])
+    err = capsys.readouterr().err
     assert code == 1
-    assert "HIT password-pool token: notes.txt:1" not in err
     assert "HIT password-pool token: notes.txt:2" in err
+    assert "HIT configured secret: notes.txt:3" in err
+    assert "HIT bcrypt hash: notes.txt:4" in err
+    assert "HIT dump file: users.dump" in err
     assert token not in err
+    assert configured not in err
 
 
 def test_clean_evidence_exits_zero(tmp_path, capsys):
@@ -508,3 +707,421 @@ def test_missing_evidence_exits_nonzero(tmp_path, capsys):
 
 def test_scan_module_path_is_the_repo_script():
     assert Path(scan.__file__).name == "scan_uat_evidence.py"
+
+
+def test_unsafe_evidence_names_are_refused():
+    assert scan.is_unsafe_evidence_name("ui/r38_results_UTC.png ") is True
+    assert scan.is_unsafe_evidence_name("ui\\r38_results_UTC.png") is True
+    assert scan.is_unsafe_evidence_name("ui/r38_results_UTC.png|x") is True
+    assert scan.is_unsafe_evidence_name("./ui/r38_results_UTC.png") is True
+    assert scan.is_unsafe_evidence_name("ui/r38_results_UTC.png") is False
+    assert scan.is_unsafe_evidence_name("ui /r38_results_UTC.png") is False
+
+
+def _setup_spoof_case(
+    case_id: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> tuple[list[str], int, str, str]:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    token = _runtime_pool_token()
+    configured = _runtime_configured_secret()
+    entries = _reviewed_entries()
+    no_allowlist = False
+    planted = token
+
+    if case_id != "B09d":
+        _write_reviewed_pngs(evidence)
+
+    if case_id == "A02":
+        no_allowlist = True
+    elif case_id == "A03":
+        (evidence / "other" / "ui").mkdir(parents=True)
+        (evidence / "other" / "ui" / UTC_NAME).write_bytes(UTC_PNG)
+    elif case_id == "A04a":
+        (evidence / "ui" / f"{UTC_NAME}.bak").write_bytes(UTC_PNG)
+    elif case_id == "A04b":
+        (evidence / "ui" / f"{UTC_NAME}2").write_bytes(UTC_PNG)
+    elif case_id == "A04c":
+        (evidence / "ui" / "r38_results_UTC.pn").write_bytes(UTC_PNG)
+    elif case_id == "A04d":
+        (evidence / "xui").mkdir()
+        (evidence / "xui" / UTC_NAME).write_bytes(UTC_PNG)
+    elif case_id == "A04e":
+        (evidence / "ui" / "sub").mkdir()
+        (evidence / "ui" / "sub" / UTC_NAME).write_bytes(UTC_PNG)
+    elif case_id == "A04f":
+        (evidence / UTC_NAME).write_bytes(UTC_PNG)
+    elif case_id == "A04g":
+        (evidence / "ui" / "r38_results_UTC").write_bytes(UTC_PNG)
+    elif case_id == "A04h":
+        (evidence / "ui" / f"prefix_{UTC_NAME}").write_bytes(UTC_PNG)
+    elif case_id == "A05":
+        (evidence / "ui" / UTC_NAME).write_bytes(YORK_PNG)
+        (evidence / "ui" / YORK_NAME).write_bytes(UTC_PNG)
+    elif case_id == "A06":
+        flipped = bytearray(UTC_PNG)
+        flipped[-1] ^= 0x01
+        (evidence / "ui" / UTC_NAME).write_bytes(bytes(flipped))
+    elif case_id == "A07":
+        (evidence / "ui" / UTC_NAME).write_bytes(UTC_PNG[:-1])
+    elif case_id == "B01":
+        (evidence / "ui" / UTC_NAME).write_bytes(UTC_PNG + token.encode("utf-8"))
+    elif case_id == "B02":
+        (evidence / "ui" / YORK_NAME).write_bytes(YORK_PNG + b"\n" + token.encode("utf-8"))
+    elif case_id == "B03":
+        (evidence / "ui" / UTC_NAME).write_text(_secret_text(token), encoding="utf-8")
+    elif case_id == "B04a":
+        (evidence / "ui" / "r38_results_U\u0422C.png").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B04b":
+        (evidence / "ui" / f"{UTC_NAME} ").write_text(_secret_text(token), encoding="utf-8")
+    elif case_id == "B04c":
+        (evidence / "ui" / "r38_results_UTC\u200b.png").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B04d":
+        (evidence / "ui ").mkdir()
+        (evidence / "ui " / UTC_NAME).write_text(_secret_text(token), encoding="utf-8")
+    elif case_id == "B04e":
+        (evidence / "ui" / "r38_results_\uff35TC.png").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B04f":
+        (evidence / "ui" / f"{UTC_NAME}.txt").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B05a":
+        entries = [
+            {
+                "path": UTC_REL,
+                "sha256": YORK_SHA,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B05b":
+        entries = [
+            {
+                "path": UTC_REL,
+                "sha256": "ab" * 32,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B05c":
+        entries = [
+            {
+                "path": YORK_REL,
+                "sha256": YORK_SHA,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            },
+            {
+                "path": UTC_REL,
+                "sha256": UTC_SHA.upper(),
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            },
+        ]
+    elif case_id == "B05d":
+        entries = [
+            {
+                "path": UTC_REL,
+                "sha256": UTC_SHA,
+                "line": 2,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B05e":
+        entries = [
+            {
+                "path": UTC_REL,
+                "sha256": "a" * 63,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B05f":
+        entries = [
+            {
+                "path": UTC_REL,
+                "sha256": UTC_SHA,
+                "reviewed_by": "Günter (CSO)",
+                "approved_by": "",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B06a":
+        outside = tmp_path / "outside.txt"
+        outside.write_text(_secret_text(token), encoding="utf-8")
+        target = evidence / "ui" / UTC_NAME
+        target.unlink()
+        target.symlink_to(outside)
+    elif case_id == "B06b":
+        changed = UTC_PNG + b"x"
+        outside = tmp_path / "changed.png"
+        outside.write_bytes(changed)
+        target = evidence / "ui" / UTC_NAME
+        target.unlink()
+        target.symlink_to(outside)
+    elif case_id == "B06c":
+        (evidence / "other").mkdir()
+        (evidence / "other" / "link.png").symlink_to(evidence / "ui" / UTC_NAME)
+    elif case_id == "B06d":
+        (evidence / "ui" / f"{UTC_NAME}.lnk").symlink_to(evidence / "ui" / UTC_NAME)
+    elif case_id == "B06e":
+        outside = tmp_path / "genuine.png"
+        outside.write_bytes(UTC_PNG)
+        target = evidence / "ui" / UTC_NAME
+        target.unlink()
+        target.symlink_to(outside)
+    elif case_id == "B06f":
+        outside = tmp_path / "outside_ui"
+        outside.mkdir()
+        (outside / UTC_NAME).write_bytes(UTC_PNG)
+        (outside / YORK_NAME).write_bytes(YORK_PNG)
+        ui_dir = evidence / "ui"
+        for child in ui_dir.iterdir():
+            child.unlink()
+        ui_dir.rmdir()
+        ui_dir.symlink_to(outside)
+    elif case_id == "B06g":
+        (evidence / "dangling.lnk").symlink_to(tmp_path / "missing-target")
+    elif case_id == "B07a":
+        entries[1]["path"] = f"../{UTC_REL}"
+    elif case_id == "B07b":
+        entries[1]["path"] = f"ui/../{UTC_REL}"
+    elif case_id == "B07c":
+        entries[1]["path"] = f"/{UTC_REL}"
+    elif case_id == "B07d":
+        entries[1]["path"] = f"C:/{UTC_REL}"
+    elif case_id == "B07e":
+        entries[1]["path"] = "ui/./../r38_results_UTC.png"
+    elif case_id == "B08a":
+        entries[1]["path"] = f"./{UTC_REL}"
+    elif case_id == "B08b":
+        entries[1]["path"] = "ui//r38_results_UTC.png"
+    elif case_id == "B08c":
+        entries[1]["path"] = "ui\\r38_results_UTC.png"
+    elif case_id == "B09a":
+        (evidence / f"ui\\{UTC_NAME}").write_text(_secret_text(token), encoding="utf-8")
+    elif case_id == "B09b":
+        (evidence / "ui" / f"{UTC_NAME}|x").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B09c":
+        (evidence / "ui" / f"{UTC_NAME}|gunzip").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B09d":
+        (evidence / f"ui\\{UTC_NAME}").write_text(_secret_text(token), encoding="utf-8")
+    elif case_id == "B09e":
+        (evidence / "ui" / f"{UTC_NAME}!x").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B10a":
+        (evidence / "UI").mkdir()
+        (evidence / "UI" / "R38_RESULTS_UTC.PNG").write_bytes(UTC_PNG)
+    elif case_id == "B10b":
+        (evidence / "ui" / "r38_results_utc.png").write_text(
+            _secret_text(token), encoding="utf-8"
+        )
+    elif case_id == "B10c":
+        entries[1]["path"] = "UI/R38_RESULTS_UTC.PNG"
+    elif case_id == "B11a":
+        entries = [{"path": "ui/*.png", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B11b":
+        entries = [{"path": "ui/r38_results_*.png", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B11c":
+        entries = [{"path": "ui/r38_results_UT?.png", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B11d":
+        entries = [
+            {"path": "ui/[r]38_results_UTC.png", "sha256": UTC_SHA, "date": "2026-10-19"}
+        ]
+    elif case_id == "B11e":
+        entries = [{"path": "**", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B11f":
+        entries = [
+            {
+                "path": "ui/x.png",
+                "sha256": UTC_SHA,
+                "extension": ".png",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B11g":
+        entries = [
+            {
+                "path": "ui/x.png",
+                "sha256": UTC_SHA,
+                "glob": "*.png",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B11h":
+        entries = [{"path": "ui", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B11i":
+        entries = [{"path": "ui/", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B11j":
+        entries = [{"path": ".", "sha256": UTC_SHA, "date": "2026-10-19"}]
+    elif case_id == "B12a":
+        archive = evidence / "pack.tar"
+        with tarfile.open(archive, "w") as bundle:
+            _add_tar_member(bundle, UTC_REL, _secret_text(token).encode("utf-8"))
+    elif case_id == "B12b":
+        archive = evidence / "pack.tar"
+        with tarfile.open(archive, "w") as bundle:
+            _add_tar_member(bundle, UTC_REL, UTC_PNG)
+    elif case_id == "B12c":
+        archive = evidence / "pack.tar"
+        with tarfile.open(archive, "w") as bundle:
+            _add_tar_member(bundle, UTC_REL, UTC_PNG)
+            _add_tar_member(bundle, UTC_REL, _secret_text(token).encode("utf-8"))
+        entries = _reviewed_entries() + [
+            {
+                "path": f"pack.tar!{UTC_REL}",
+                "sha256": UTC_SHA,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B12d":
+        archive = evidence / "pack.tar"
+        with tarfile.open(archive, "w") as bundle:
+            _add_tar_member(bundle, UTC_REL, UTC_PNG)
+            _add_tar_member(
+                bundle, f"./{UTC_REL}", _secret_text(token).encode("utf-8")
+            )
+        entries = _reviewed_entries() + [
+            {
+                "path": f"pack.tar!{UTC_REL}",
+                "sha256": UTC_SHA,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B13a":
+        text = _secret_text(token)
+        (evidence / "notes.txt").write_text(text, encoding="utf-8")
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        entries = [
+            {
+                "path": "notes.txt",
+                "line": 2,
+                "sha256": digest,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B13b":
+        planted = configured
+        monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+        text = _secret_text(configured)
+        (evidence / "notes.txt").write_text(text, encoding="utf-8")
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        entries = [
+            {
+                "path": "notes.txt",
+                "line": 2,
+                "sha256": digest,
+                "approved_by": "Günter (CSO) 2026-10-19",
+                "date": "2026-10-19",
+            }
+        ]
+    elif case_id == "B13c":
+        planted = token
+        monkeypatch.setenv("POSTGRES_PASSWORD", token)
+        (evidence / "notes.txt").write_text(_secret_text(token), encoding="utf-8")
+        no_allowlist = True
+
+    argv = [str(evidence)]
+    if no_allowlist:
+        argv.append("--no-allowlist")
+    else:
+        allow = _write_allowlist(tmp_path / "allow.json", entries)
+        argv.extend(["--allowlist", str(allow)])
+    expected_exit, expected_result = _spoof_expectation(case_id)
+    return argv, expected_exit, expected_result, planted
+
+
+def _spoof_expectation(case_id: str) -> tuple[int, str]:
+    clean = {
+        "A01",
+        "B05c",
+        "B06e",
+        "B06f",
+        "B06g",
+        "B08a",
+        "B08b",
+        "B08c",
+    }
+    refused = {
+        "B05e",
+        "B05f",
+        "B07a",
+        "B07b",
+        "B07c",
+        "B07d",
+        "B07e",
+        "B11a",
+        "B11b",
+        "B11c",
+        "B11d",
+        "B11e",
+        "B11f",
+        "B11g",
+        "B11j",
+    }
+    if case_id in clean:
+        return 0, "clean"
+    if case_id in refused:
+        return 2, "refused_allowlist"
+    return 1, "flagged"
+
+
+@pytest.mark.parametrize("case_id", SPOOF_CASES)
+def test_allowlist_spoof_case(case_id, tmp_path, capsys, monkeypatch):
+    argv, expected_exit, expected_result, planted = _setup_spoof_case(
+        case_id, tmp_path, monkeypatch
+    )
+    code = scan_main(argv)
+    captured = capsys.readouterr()
+    err = captured.err
+    assert planted not in err
+    assert planted not in captured.out
+    assert code == expected_exit
+    if expected_result == "clean":
+        assert "clean" in captured.out
+        assert "HIT " not in err
+        return
+    if expected_result == "refused_allowlist":
+        assert "ERROR:" in err
+        assert "HIT " not in err
+        return
+    assert "HIT " in err
+    if case_id == "B04b":
+        assert "HIT unsafe evidence path: ui/r38_results_UTC.png " in err
+    elif case_id == "B09a":
+        assert "HIT unsafe evidence path:" in err
+        assert "\\" in err
+    elif case_id == "B09b":
+        assert "HIT unsafe evidence path: ui/r38_results_UTC.png|x" in err
+    elif case_id == "B09c":
+        assert "HIT unsafe evidence path: ui/r38_results_UTC.png|gunzip" in err
+    elif case_id == "B12c":
+        assert "HIT duplicate tar member: pack.tar!ui/r38_results_UTC.png" in err
+    elif case_id == "B12d":
+        assert "HIT unsafe evidence path: pack.tar!./ui/r38_results_UTC.png" in err
+    elif case_id == "B13a":
+        assert "HIT password-pool token: notes.txt:2" in err
+    elif case_id == "B13b":
+        assert "HIT configured secret: notes.txt:2" in err
+    elif case_id == "B13c":
+        assert "HIT password-pool token: notes.txt:2" in err
+        assert "HIT configured secret: notes.txt:2" in err
+    elif case_id == "B05d":
+        assert "HIT refuse binary: ui/r38_results_UTC.png" in err
