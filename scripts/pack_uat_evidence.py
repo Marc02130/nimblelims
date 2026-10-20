@@ -27,10 +27,12 @@ own name, rebuilds with the same flags, and requires a byte-identical
 SHA-256. Only then is the archive renamed into place and recorded in
 ``<name>.tgz.sha256``. Pack and verify need the same tar and gzip
 implementation. A dirty folder or a dirty packed result produces no
-``.tgz``. Failed tar stderr is redacted JWTs first (raw tokens
-and ``[A-Za-z0-9_.%-]+`` runs whose percent-decoded form
-contains a JWT), then configured secrets, then pool windows,
-before it is printed.
+``.tgz``. Failed tar stderr is redacted JWTs first (tar-unescape,
+then raw tokens, then encoded runs after up to 3 percent
+decodes), then configured secrets, then pool windows, before
+it is printed. Every printed path goes through
+``redact_name_path``. An archive or output name that matches a
+secret rule is refused. Sidecar names are redacted the same way.
 
 Verify requires a sidecar line ``^[0-9a-f]{64}  <archive-name>$``,
 extracts with ``-p``, scans the single evidence directory, and
@@ -84,6 +86,23 @@ def _load_scanner():
 
 
 _SCAN = _load_scanner()
+
+
+def _shown_path(path: Path | str, secrets: tuple[str, ...] = ()) -> str:
+    return _SCAN.redact_name_path(str(path), secrets)
+
+
+def _secret_named(path: Path, secrets: tuple[str, ...]) -> bool:
+    """True when a path name or stem matches a JWT, pool, or secret rule."""
+    names: set[str] = {path.name, path.stem}
+    for part in path.parts:
+        if part in {"/", ".", "..", ""}:
+            continue
+        names.add(part)
+        stem = Path(part).stem
+        if stem:
+            names.add(stem)
+    return any(_SCAN._segment_is_secret(name, secrets) for name in names)
 
 
 def _is_gnu(path: str) -> bool:
@@ -199,22 +218,32 @@ def _path_uses_symlink(path: Path) -> bool:
         current = parent
 
 
-def _output_error(folder: Path, output: Path) -> str | None:
+def _output_error(
+    folder: Path,
+    output: Path,
+    secrets: tuple[str, ...] = (),
+) -> str | None:
     sidecar = Path(str(output) + ".sha256")
+    shown_out = _shown_path(output, secrets)
+    shown_side = _shown_path(sidecar, secrets)
+    if _secret_named(output, secrets):
+        return f"ERROR: refuse output name that matches a secret rule: {shown_out}"
+    if _secret_named(sidecar, secrets):
+        return f"ERROR: refuse sidecar name that matches a secret rule: {shown_side}"
     if output.is_symlink() or os.path.lexists(output):
-        return f"ERROR: output already exists: {output}"
+        return f"ERROR: output already exists: {shown_out}"
     if sidecar.is_symlink() or os.path.lexists(sidecar):
-        return f"ERROR: sidecar already exists: {sidecar}"
+        return f"ERROR: sidecar already exists: {shown_side}"
     if _path_uses_symlink(output):
-        return f"ERROR: refuse output through a symlink: {output}"
+        return f"ERROR: refuse output through a symlink: {shown_out}"
     try:
         dest = output.parent.resolve() / output.name
         dest.relative_to(folder.resolve())
     except ValueError:
         return None
     except OSError:
-        return f"ERROR: cannot resolve output path: {output}"
-    return f"ERROR: refuse output inside the scanned folder: {output}"
+        return f"ERROR: cannot resolve output path: {shown_out}"
+    return f"ERROR: refuse output inside the scanned folder: {shown_out}"
 
 
 def tar_pack_argv(parent: Path, name: str, dest: Path) -> list[str]:
@@ -374,23 +403,31 @@ def pack_folder(
     tools = require_gnu_tools()
     if tools != 0:
         return tools
+    pack_secrets = _secrets_from_extra(extra_scan)
     try:
         root_st = os.lstat(folder)
     except OSError:
-        print(f"ERROR: evidence path not found: {folder}", file=sys.stderr)
+        print(
+            f"ERROR: evidence path not found: {_shown_path(folder, pack_secrets)}",
+            file=sys.stderr,
+        )
         return 2
     if stat.S_ISLNK(root_st.st_mode):
         print("ERROR: refuse to pack a symlinked evidence root", file=sys.stderr)
         return 2
     if not stat.S_ISDIR(root_st.st_mode):
-        print(f"ERROR: evidence path is not a directory: {folder}", file=sys.stderr)
+        print(
+            "ERROR: evidence path is not a directory: "
+            f"{_shown_path(folder, pack_secrets)}",
+            file=sys.stderr,
+        )
         return 2
     folder = folder.resolve()
     if output.is_absolute():
         output = Path(os.fsdecode(os.path.abspath(output)))
     else:
         output = Path.cwd() / output
-    problem = _output_error(folder, output)
+    problem = _output_error(folder, output, pack_secrets)
     if problem:
         print(problem, file=sys.stderr)
         return 2
@@ -402,16 +439,17 @@ def pack_folder(
     name = folder.name
     if name.startswith("./") or name in (".", "..") or "/" in name:
         print(
-            f"ERROR: refuse to pack non-canonical directory name: {name}",
+            "ERROR: refuse to pack non-canonical directory name: "
+            f"{_shown_path(name, pack_secrets)}",
             file=sys.stderr,
         )
         return 2
     temp = output.parent / f".{output.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
-    pack_secrets = _secrets_from_extra(extra_scan)
     try:
         _create_excl(temp)
     except OSError as exc:
-        print(f"ERROR: cannot create temp pack: {exc}", file=sys.stderr)
+        shown_exc = _SCAN.redact_text(str(exc), pack_secrets)
+        print(f"ERROR: cannot create temp pack: {shown_exc}", file=sys.stderr)
         return 2
     try:
         built = _tar_pack(parent, name, temp, pack_secrets)
@@ -424,7 +462,8 @@ def pack_folder(
         try:
             os.link(temp, output)
         except OSError as exc:
-            print(f"ERROR: cannot publish pack: {exc}", file=sys.stderr)
+            shown_exc = _SCAN.redact_text(str(exc), pack_secrets)
+            print(f"ERROR: cannot publish pack: {shown_exc}", file=sys.stderr)
             return 2
         os.chmod(output, 0o600)
         digest = _sha256_file(output)
@@ -433,11 +472,12 @@ def pack_folder(
             _create_excl(sidecar, f"{digest}  {output.name}\n".encode("utf-8"))
         except OSError as exc:
             _unlink_if_exists(output)
-            print(f"ERROR: cannot write sidecar: {exc}", file=sys.stderr)
+            shown_exc = _SCAN.redact_text(str(exc), pack_secrets)
+            print(f"ERROR: cannot write sidecar: {shown_exc}", file=sys.stderr)
             return 2
     finally:
         _unlink_if_exists(temp)
-    print(f"packed: {output}")
+    print(f"packed: {_shown_path(output, pack_secrets)}")
     print(f"sha256: {digest}")
     return 0
 
@@ -446,20 +486,41 @@ def verify_pack(archive: Path, extra_scan: list[str]) -> int:
     tools = require_gnu_tools()
     if tools != 0:
         return tools
+    pack_secrets = _secrets_from_extra(extra_scan)
     try:
         st = os.lstat(archive)
     except OSError:
-        print(f"ERROR: pack not found: {archive}", file=sys.stderr)
+        print(
+            f"ERROR: pack not found: {_shown_path(archive, pack_secrets)}",
+            file=sys.stderr,
+        )
         return 2
     if stat.S_ISLNK(st.st_mode):
         print("ERROR: refuse a symlinked pack", file=sys.stderr)
         return 2
     if not stat.S_ISREG(st.st_mode):
-        print(f"ERROR: pack not found: {archive}", file=sys.stderr)
+        print(
+            f"ERROR: pack not found: {_shown_path(archive, pack_secrets)}",
+            file=sys.stderr,
+        )
+        return 2
+    if _secret_named(archive, pack_secrets):
+        print(
+            "ERROR: refuse archive name that matches a secret rule: "
+            f"{_shown_path(archive, pack_secrets)}",
+            file=sys.stderr,
+        )
         return 2
     archive = archive.resolve()
     digest = _sha256_file(archive)
     sidecar = Path(str(archive) + ".sha256")
+    if _secret_named(sidecar, pack_secrets):
+        print(
+            "ERROR: refuse sidecar name that matches a secret rule: "
+            f"{_shown_path(sidecar, pack_secrets)}",
+            file=sys.stderr,
+        )
+        return 2
     recorded = _read_sidecar(sidecar, archive.name)
     if recorded is None:
         return 1
@@ -469,7 +530,7 @@ def verify_pack(archive: Path, extra_scan: list[str]) -> int:
     code = extract_and_scan(archive, extra_scan)
     if code != 0:
         return code
-    print(f"verify clean: {archive}")
+    print(f"verify clean: {_shown_path(archive, pack_secrets)}")
     print(f"sha256: {digest}")
     return 0
 
