@@ -64,8 +64,10 @@ configured secret, pool token, or JWT is printed as
 ``<redacted name hmac:xxxxxxxx>`` (HMAC-SHA256 of the segment with a
 per-run random key, first 8 hex). A parent segment that matches is
 redacted the same way. A secret that contains ``/`` redacts the whole
-path. Tar-error text is redacted the same way for those tokens.
-They do not print the secret.
+path. Tar-error text, name hits, and verify output are redacted
+JWTs first, then configured secrets, then pool windows, so a
+24-character pool window inside a real token cannot leave the
+payload in the clear. They do not print the secret.
 """
 from __future__ import annotations
 
@@ -170,15 +172,28 @@ def _redact_tag(raw: str) -> str:
     return f"<redacted name hmac:{digest}>"
 
 
+def _text_variants(text: str) -> tuple[str, ...]:
+    """Return unique raw and percent-decoded forms of ``text``.
+
+    Line scanners, including the JWT walk, run once per distinct form.
+    When percent-decoding does not change the text, that is one pass
+    per line.
+    """
+    decoded = unquote(text)
+    if decoded == text:
+        return (text,)
+    return (text, decoded)
+
+
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
     if not segment:
         return False
-    variants = (segment, unquote(segment))
-    if any(pool_token_on_line(variant) for variant in variants):
-        return True
+    variants = _text_variants(segment)
     if any(jwt_on_line(variant) for variant in variants):
         return True
-    return any(configured_secret_on_line(variant, secrets) for variant in variants)
+    if any(configured_secret_on_line(variant, secrets) for variant in variants):
+        return True
+    return any(pool_token_on_line(variant) for variant in variants)
 
 
 def redact_name_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
@@ -236,7 +251,7 @@ def _redact_pool_windows(text: str) -> str:
 
 
 def _redact_jwts(text: str) -> str:
-    """Replace each JWT match with an HMAC tag. Advance one char on a miss."""
+    """Replace each alg-header JWT with an HMAC tag. One walk."""
     out: list[str] = []
     start = 0
     for begin, end, token in _iter_jwts(text):
@@ -248,10 +263,16 @@ def _redact_jwts(text: str) -> str:
 
 
 def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
-    """Redact configured secrets, pool tokens, and JWTs in arbitrary text."""
+    """Redact JWTs, then configured secrets, then pool windows.
+
+    JWT first so a 24-character pool window inside a real token cannot
+    punch a hole that leaves the payload (``sub``, ``username``,
+    ``role``, ``permissions``, ``jti``) in the clear. Name hits use
+    the same JWT-then-secret-then-pool check order.
+    """
     if not text:
         return text
-    shown = text
+    shown = _redact_jwts(text)
     needles: list[tuple[str, str]] = []
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         needles.append((secret, _redact_tag(secret)))
@@ -261,7 +282,7 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     for needle, tag in needles:
         if needle in shown:
             shown = shown.replace(needle, tag)
-    return _redact_jwts(_redact_pool_windows(shown))
+    return _redact_pool_windows(shown)
 
 
 class Hit:
@@ -370,7 +391,7 @@ def scan_text(
 ) -> list[Hit]:
     hits: list[Hit] = []
     for number, line in enumerate(text.splitlines(), start=1):
-        variants = (line, unquote(line))
+        variants = _text_variants(line)
         if any(PRINTED_ONCE_RE.search(variant) for variant in variants):
             hits.append(Hit(KIND_PRINTED_ONCE, identity, number, secrets))
         if any(BCRYPT_RE.search(variant) for variant in variants):
@@ -491,7 +512,7 @@ def scan_name(
     seen: set[tuple[str, str]] = set()
     parts = [raw, *[part for part in raw.split("/") if part]]
     for text in parts:
-        variants = (text, unquote(text))
+        variants = _text_variants(text)
         if any(pool_token_on_line(variant) for variant in variants):
             key = (KIND_POOL, text)
             if key not in seen:
