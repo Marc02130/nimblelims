@@ -25,7 +25,7 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - an unsafe name in any directory or file
 - a duplicate identity
 - a symlink, fifo, socket, or device
-- a file that exceeds the 64 MiB size cap
+- a file that exceeds the 64 MiB size cap (67108864 bytes)
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -43,18 +43,21 @@ allow-by-extension.
 
 Hits name the identity with ``json.dumps``. A name segment that is a
 configured secret or pool token is printed as
-``<redacted name sha256:xxxxxxxx>`` (the first 8 hex of that segment's
-SHA-256), including a parent segment that matches. They do not print
-the secret.
+``<redacted name hmac:xxxxxxxx>`` (HMAC-SHA256 of the segment with a
+per-run random key, first 8 hex). A parent segment that matches is
+redacted the same way. A secret that contains ``/`` redacts the whole
+path. They do not print the secret.
 """
 from __future__ import annotations
 
 import argparse
 import errno
 import hashlib
+import hmac
 import json
 import os
 import re
+import secrets as _secretsmod
 import shlex
 import stat
 import sys
@@ -106,14 +109,19 @@ KIND_SIZE_CAP = "size-cap"
 KIND_UNREADABLE = "unreadable"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 Identity = tuple[str, ...]
+_REDACT_KEY = _secretsmod.token_bytes(32)
 
 
-def _segment_sha8(segment: str) -> str:
+def _name_bytes(raw: str) -> bytes:
     try:
-        data = os.fsencode(segment)
+        return os.fsencode(raw)
     except (UnicodeError, ValueError, OSError):
-        data = segment.encode("utf-8", errors="surrogateescape")
-    return hashlib.sha256(data).hexdigest()[:8]
+        return raw.encode("utf-8", errors="surrogateescape")
+
+
+def _redact_tag(raw: str) -> str:
+    digest = hmac.new(_REDACT_KEY, _name_bytes(raw), hashlib.sha256).hexdigest()[:8]
+    return f"<redacted name hmac:{digest}>"
 
 
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
@@ -126,14 +134,22 @@ def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
 
 
 def redact_name_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
-    """Replace secret name segments with a sha256 prefix. Keep the parent path."""
+    """Replace secret names with a per-run HMAC tag. Keep the parent path."""
     if not raw:
         return raw
+    for secret in secrets:
+        if not secret or "/" not in secret:
+            continue
+        encoded = quote(secret, safe="")
+        if secret in raw or secret in unquote(raw):
+            return _redact_tag(raw)
+        if encoded and encoded != secret and encoded in raw:
+            return _redact_tag(raw)
     parts = raw.split("/")
     shown: list[str] = []
     for part in parts:
         if _segment_is_secret(part, secrets):
-            shown.append(f"<redacted name sha256:{_segment_sha8(part)}>")
+            shown.append(_redact_tag(part))
         else:
             shown.append(part)
     return "/".join(shown)
@@ -301,7 +317,8 @@ def load_scan_secrets(
 
 def _read_secrets_file(path: Path) -> list[tuple[str, str]]:
     if not path.is_file():
-        raise SystemExit(f"ERROR: secrets file not found: {path}")
+        shown = redact_name_path(str(path), ())
+        raise SystemExit(f"ERROR: secrets file not found: {shown}")
     pairs: list[tuple[str, str]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         text = line.strip()
@@ -366,7 +383,8 @@ def is_unsafe_evidence_name(raw: str) -> bool:
 def load_allowlist(path: Path) -> list[AllowlistEntry]:
     """Load a reviewed allowlist. Refuses extension/glob and non-canonical paths."""
     if not path.is_file():
-        raise SystemExit(f"ERROR: allowlist not found: {path}")
+        shown = redact_name_path(str(path), ())
+        raise SystemExit(f"ERROR: allowlist not found: {shown}")
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -711,7 +729,8 @@ def scan_path(
         hits = [Hit(KIND_LINK, root_id, secrets=secrets)]
         return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
     if stat.S_ISDIR(st.st_mode):
-        hits = _scan_directory(path, secrets, digests, announced, budget)
+        hits = scan_name((path.name,), path.name, secrets)
+        hits.extend(_scan_directory(path, secrets, digests, announced, budget))
         return [hit.format() for hit in filter_allowlist_hits(hits, allowlist, digests)]
     raise SystemExit(f"ERROR: {shown} is not a directory")
 
@@ -723,7 +742,8 @@ def _resolve_allowlist(args: argparse.Namespace) -> tuple[AllowlistEntry, ...]:
         Path(args.allowlist).expanduser() if args.allowlist else DEFAULT_ALLOWLIST
     )
     if args.allowlist and not allow_path.is_file():
-        raise SystemExit(f"ERROR: allowlist not found: {allow_path}")
+        shown = redact_name_path(str(allow_path), ())
+        raise SystemExit(f"ERROR: allowlist not found: {shown}")
     if not allow_path.is_file():
         return ()
     return tuple(load_allowlist(allow_path))
@@ -759,13 +779,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     target = Path(args.evidence)
-    if not target.exists() and not os.path.lexists(target):
-        print(f"ERROR: evidence path not found: {target}", file=sys.stderr)
-        return 2
     secrets_path = Path(args.secrets_file).expanduser() if args.secrets_file else None
     try:
         secrets = load_scan_secrets(secrets_file=secrets_path)
         allowlist = _resolve_allowlist(args)
+    except SystemExit as exc:
+        message = str(exc)
+        if message:
+            print(message, file=sys.stderr)
+        return 2
+    if not target.exists() and not os.path.lexists(target):
+        shown = redact_name_path(str(target), secrets)
+        print(f"ERROR: evidence path not found: {shown}", file=sys.stderr)
+        return 2
+    try:
         hits = scan_path(target, secrets, allowlist)
     except SystemExit as exc:
         message = str(exc)

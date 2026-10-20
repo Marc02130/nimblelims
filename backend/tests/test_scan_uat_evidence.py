@@ -1723,7 +1723,7 @@ def test_name_is_scanned_for_pool_token_and_configured_secret(
     assert _hit("configured secret", file_hit) in err
     assert _hit("configured secret", parent_hit) in err
     assert _hit("configured secret", child_hit) in err
-    assert "<redacted name sha256:" in err
+    assert "<redacted name hmac:" in err
     assert token not in out
     assert token not in err
     assert configured not in out
@@ -1744,6 +1744,62 @@ def test_content_hit_redacts_secret_parent_segment(tmp_path, capsys):
     assert _hit("password-pool token", shown, line=2) in err
     assert token not in err
     assert leak not in err
+
+
+def test_slash_secret_redacts_whole_path(tmp_path, capsys, monkeypatch):
+    left = "seed" + uuid.uuid4().hex[:6]
+    right = "part" + uuid.uuid4().hex[:6]
+    configured = f"{left}/{right}"
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / "evidence"
+    (evidence / left).mkdir(parents=True)
+    (evidence / left / right).write_text("ok\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (configured, left, right)
+    )
+    assert code == 1
+    assert _hit("configured secret", _redacted_path(f"{left}/{right}", (configured,))) in err
+    assert configured not in out
+    assert configured not in err
+    assert left not in err
+    assert right not in err
+
+
+def test_missing_evidence_redacts_secret_name(tmp_path, capsys):
+    token = _token_with_symbol("_")
+    missing = tmp_path / token
+    code, out, err = _run([str(missing), "--no-allowlist"], capsys, (token,))
+    assert code == 2
+    assert "not found" in err
+    assert token not in out
+    assert token not in err
+
+
+def test_clean_line_redacts_secret_parent(tmp_path, capsys, monkeypatch):
+    configured = "seed" + uuid.uuid4().hex[:12]
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    parent = tmp_path / configured
+    evidence = parent / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "notes.txt").write_text("sample id 123\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (configured,))
+    assert code == 0
+    assert "clean" in out
+    assert configured not in out
+    assert configured not in err
+    assert "<redacted name hmac:" in out
+
+
+def test_source_scan_refuses_secret_named_root(tmp_path, capsys):
+    token = _token_with_symbol("_")
+    evidence = tmp_path / token
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("password-pool token", _redacted_path(token)) in err
+    assert token not in out
+    assert token not in err
 
 
 def test_regular_file_as_evidence_is_refused(tmp_path, capsys):

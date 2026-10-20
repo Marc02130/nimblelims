@@ -6,24 +6,31 @@ Usage:
     python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz
     python scripts/pack_uat_evidence.py --verify evidence.tgz
 
-The pack step writes a temp archive with
-``tar -C <parent> -czf <temp> --owner=0 --group=0 --numeric-owner
---sort=name --mtime=@0 -- <dir>`` (no ``./``), extracts and scans that
-temp archive, and only then renames it into place and writes the
-sidecar. A dirty folder or a dirty packed result produces no ``.tgz``.
-The SHA-256 of a successful pack is printed next to the scan result and
-written to ``<name>.tgz.sha256``.
+The pack step writes a temp archive with GNU tar and ``gzip -n -9``
+(no name or mtime in the gzip header, compression level 9):
 
-Verify requires the sidecar and a matching SHA-256. It extracts with
-``tar -C <tmp> -xzf <name>.tgz``, requires exactly one top-level entry
-that ``lstat`` says is a real directory, scans the whole extraction
-root (must be clean), and compares the hash.
+    tar -C <parent> -cf <temp> --owner=0 --group=0 --numeric-owner
+        --sort=name --mtime=@0 --use-compress-program='gzip -n -9' -- <dir>
+
+(no ``./``). It extracts that temp archive, requires exactly one
+top-level real directory, scans that directory as the evidence root
+(so allowlist paths stay ``ui/...png``), name-scans the directory's
+own name, rebuilds with the same flags, and requires a byte-identical
+SHA-256. Only then is the archive renamed into place and recorded in
+``<name>.tgz.sha256``. Pack and verify need the same tar and gzip
+implementation. A dirty folder or a dirty packed result produces no
+``.tgz``.
+
+Verify requires a sidecar line ``^[0-9a-f]{64}  <archive-name>$``,
+extracts, scans the single evidence directory, and requires a
+byte-identical rebuild.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import os
+import re
 import secrets
 import stat
 import subprocess
@@ -33,7 +40,9 @@ from pathlib import Path
 
 SCANNER = Path(__file__).resolve().parent / "scan_uat_evidence.py"
 TAR_MTIME = "@0"
+TAR_COMPRESS = "gzip -n -9"
 _CREATE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+_SIDECAR_RE = re.compile(r"^([0-9a-f]{64})  (.+)$")
 
 
 def _after_scan_hook(folder: Path) -> None:
@@ -103,22 +112,28 @@ def _output_error(folder: Path, output: Path) -> str | None:
     return f"ERROR: refuse output inside the scanned folder: {output}"
 
 
+def tar_pack_argv(parent: Path, name: str, dest: Path) -> list[str]:
+    """Exact GNU tar command used to pack. Tests assert ``--`` stays in place."""
+    return [
+        "tar",
+        "-C",
+        str(parent),
+        "-cf",
+        str(dest),
+        "--owner=0",
+        "--group=0",
+        "--numeric-owner",
+        "--sort=name",
+        f"--mtime={TAR_MTIME}",
+        f"--use-compress-program={TAR_COMPRESS}",
+        "--",
+        name,
+    ]
+
+
 def _tar_pack(parent: Path, name: str, dest: Path) -> int:
     built = subprocess.run(
-        [
-            "tar",
-            "-C",
-            str(parent),
-            "-czf",
-            str(dest),
-            "--owner=0",
-            "--group=0",
-            "--numeric-owner",
-            "--sort=name",
-            f"--mtime={TAR_MTIME}",
-            "--",
-            name,
-        ],
+        tar_pack_argv(parent, name, dest),
         check=False,
         capture_output=True,
         text=True,
@@ -130,24 +145,58 @@ def _tar_pack(parent: Path, name: str, dest: Path) -> int:
     return built.returncode
 
 
+def _tar_extract(archive: Path, dest: Path) -> int:
+    unpacked = subprocess.run(
+        [
+            "tar",
+            "-C",
+            str(dest),
+            "-xf",
+            str(archive),
+            f"--use-compress-program={TAR_COMPRESS}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if unpacked.returncode != 0:
+        if unpacked.stderr:
+            print(unpacked.stderr, file=sys.stderr, end="")
+        print("ERROR: tar extract failed", file=sys.stderr)
+    return unpacked.returncode
+
+
 def _top_level_entries(root: Path) -> list[Path]:
     return [root / name for name in sorted(os.listdir(root))]
 
 
+def _read_sidecar(sidecar: Path, archive_name: str) -> str | None:
+    try:
+        side_st = os.lstat(sidecar)
+    except OSError:
+        print("ERROR: pack sidecar is missing", file=sys.stderr)
+        return None
+    if stat.S_ISLNK(side_st.st_mode) or not stat.S_ISREG(side_st.st_mode):
+        print("ERROR: pack sidecar is missing", file=sys.stderr)
+        return None
+    lines = sidecar.read_text(encoding="utf-8").splitlines()
+    if len(lines) != 1:
+        print("ERROR: pack sidecar is not a single hash line", file=sys.stderr)
+        return None
+    matched = _SIDECAR_RE.fullmatch(lines[0])
+    if matched is None or matched.group(2) != archive_name:
+        print("ERROR: pack sidecar is not a valid hash line", file=sys.stderr)
+        return None
+    return matched.group(1)
+
+
 def extract_and_scan(archive: Path, extra_scan: list[str]) -> int:
-    """Extract ``archive`` and scan the whole extraction root."""
+    """Extract, scan the evidence directory, and require a byte-identical rebuild."""
     with tempfile.TemporaryDirectory(dir=str(archive.parent)) as tmp:
-        extract = Path(tmp)
-        unpacked = subprocess.run(
-            ["tar", "-C", str(extract), "-xzf", str(archive)],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if unpacked.returncode != 0:
-            if unpacked.stderr:
-                print(unpacked.stderr, file=sys.stderr, end="")
-            print("ERROR: tar extract failed", file=sys.stderr)
+        work = Path(tmp)
+        extract = work / "tree"
+        extract.mkdir()
+        if _tar_extract(archive, extract) != 0:
             return 2
         kids = _top_level_entries(extract)
         if len(kids) != 1:
@@ -164,7 +213,19 @@ def extract_and_scan(archive: Path, extra_scan: list[str]) -> int:
                 file=sys.stderr,
             )
             return 1
-        return _run_scan(extract, extra_scan)
+        code = _run_scan(kids[0], extra_scan)
+        if code != 0:
+            return code
+        rebuilt = work / "rebuilt.tgz"
+        if _tar_pack(extract, kids[0].name, rebuilt) != 0:
+            return 2
+        if _sha256_file(rebuilt) != _sha256_file(archive):
+            print(
+                "ERROR: pack is not a byte-identical rebuild",
+                file=sys.stderr,
+            )
+            return 1
+        return 0
 
 
 def pack_folder(
@@ -240,21 +301,23 @@ def pack_folder(
 
 
 def verify_pack(archive: Path, extra_scan: list[str]) -> int:
-    archive = archive.resolve()
-    if not archive.is_file() or archive.is_symlink():
+    try:
+        st = os.lstat(archive)
+    except OSError:
         print(f"ERROR: pack not found: {archive}", file=sys.stderr)
         return 2
+    if stat.S_ISLNK(st.st_mode):
+        print("ERROR: refuse a symlinked pack", file=sys.stderr)
+        return 2
+    if not stat.S_ISREG(st.st_mode):
+        print(f"ERROR: pack not found: {archive}", file=sys.stderr)
+        return 2
+    archive = archive.resolve()
     digest = _sha256_file(archive)
     sidecar = Path(str(archive) + ".sha256")
-    try:
-        side_st = os.lstat(sidecar)
-    except OSError:
-        print("ERROR: pack sidecar is missing", file=sys.stderr)
+    recorded = _read_sidecar(sidecar, archive.name)
+    if recorded is None:
         return 1
-    if stat.S_ISLNK(side_st.st_mode) or not stat.S_ISREG(side_st.st_mode):
-        print("ERROR: pack sidecar is missing", file=sys.stderr)
-        return 1
-    recorded = sidecar.read_text(encoding="utf-8").split()[0]
     if recorded != digest:
         print("ERROR: pack sha256 does not match sidecar", file=sys.stderr)
         return 1
