@@ -1042,6 +1042,24 @@ def test_verify_percent_dot_jwt_link_target_does_not_leak(tmp_path):
     )
 
 
+def test_verify_eyj_decoy_prefix_16_and_17_does_not_leak(tmp_path):
+    """Bound-prefixed JWT in a member name must not print on --verify."""
+    for decoys in (16, 17):
+        token = _pyjwt_access_token()
+        glued = ("eyJx" * decoys) + token
+        archive = tmp_path / f"bound-{decoys}.tgz"
+        _crafted_hardlink_tgz(archive, f"gone/{glued}", "round/missing-target")
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_jwt_absent(verified.stdout, verified.stderr, token)
+        _assert_no_jwt_windows(verified.stdout, verified.stderr, token)
+        if glued in verified.stdout or glued in verified.stderr:
+            raise AssertionError("bound-prefixed JWT leaked from verify")
+        if verified.returncode == 0:
+            raise AssertionError("bound-prefixed JWT pack verified clean")
+        if token in verified.stdout or token in verified.stderr:
+            raise AssertionError("bound-prefixed JWT printed in full")
+
+
 def test_verify_percent_segment_jwt_member_does_not_leak(tmp_path):
     _verify_encoded_jwt_case(
         tmp_path,
