@@ -2654,6 +2654,125 @@ def test_jwt_walk_runs_once_per_line(monkeypatch):
         raise AssertionError("JWT walk was not one pass per two lines")
 
 
+def test_percent_dot_jwt_is_jwt_hit_not_pool(tmp_path, capsys):
+    """D15: a %2E-encoded token is a JWT hit, not a pool hit."""
+    token = _pyjwt_access_token()
+    encoded = _jwt_dots_encoded(token)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{encoded}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, encoded)
+    )
+    if code != 1:
+        raise AssertionError("%2E JWT did not hit")
+    if _hit("jwt", "notes.txt", line=1) not in err:
+        raise AssertionError("%2E JWT was not reported as jwt")
+    if _hit("password-pool token", "notes.txt", line=1) in err:
+        raise AssertionError("%2E JWT was reported as a pool hit")
+    _assert_jwt_absent(out, err, token)
+
+
+def test_double_percent_encoded_jwt_is_detected_and_redacted(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    encoded = token.replace(".", "%252E")
+    if "%252E" not in encoded:
+        raise AssertionError("double-encoded JWT was not percent-encoded")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{encoded}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, encoded)
+    )
+    if code != 1:
+        raise AssertionError("double-encoded JWT did not hit")
+    if _hit("jwt", "notes.txt", line=1) not in err:
+        raise AssertionError("double-encoded JWT was not reported as jwt")
+    shown = scan.redact_text(f"tar: {encoded}: Cannot open")
+    _assert_jwt_absent("", shown, token)
+    _assert_no_jwt_grams("", shown, token)
+    if encoded in shown:
+        raise AssertionError("double-encoded JWT leaked")
+
+
+def test_tar_octal_escape_jwt_is_detected_and_redacted(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    escaped = token.replace(".", r"\056")
+    if r"\056" not in escaped:
+        raise AssertionError("tar-escaped JWT was not octal-encoded")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{escaped}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, escaped)
+    )
+    if code != 1:
+        raise AssertionError("tar-escaped JWT did not hit")
+    if _hit("jwt", "notes.txt", line=1) not in err:
+        raise AssertionError("tar-escaped JWT was not reported as jwt")
+    shown = scan.redact_text(f"tar: {escaped}: Cannot open")
+    _assert_jwt_absent("", shown, token)
+    _assert_no_jwt_grams("", shown, token)
+    if token.replace(".", ".") in shown and token in shown:
+        raise AssertionError("tar-escaped JWT leaked")
+    if escaped in shown:
+        raise AssertionError("tar-escaped JWT leaked")
+
+
+def test_jwt_signature_over_8192_is_a_hit_and_redacted(tmp_path, capsys):
+    token = _runtime_pool_token()
+    jwt = _runtime_segment_jwt(12, 8193)
+    assert len(jwt.split(".")[2]) == 8193
+    assert scan.jwt_on_line(jwt) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    shown = scan.redact_text(f"tar: {jwt}: Cannot open")
+    if jwt in shown or jwt.split(".")[2] in shown:
+        raise AssertionError("long signature was not fully redacted")
+
+
+def test_jwt_header_over_32kib_is_not_a_hit_and_is_fast():
+    """A header run over 32 KiB is not a JWT; the walk stays linear."""
+    over = scan._JWT_HEADER_MAX + 64
+    header = ("eyJ" * ((over + 2) // 3))[:over]
+    blob = f"{header}.aa.bb"
+    assert len(header) > scan._JWT_HEADER_MAX
+    started = time.perf_counter()
+    assert scan.jwt_on_line(blob) is False
+    shown = scan._redact_jwts(blob)
+    elapsed = time.perf_counter() - started
+    assert shown == blob
+    assert elapsed < 2.0
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    assert scan.jwt_on_line(jwt) is True
+
+
+def test_jwt_walk_skips_finditer_when_line_has_no_eyj(monkeypatch):
+    calls = {"n": 0}
+    real = scan._jwt_run_finditer
+
+    def counted(text: str, *args, **kwargs):
+        calls["n"] += 1
+        return real(text, *args, **kwargs)
+
+    monkeypatch.setattr(scan, "_jwt_run_finditer", counted)
+    assert scan.jwt_on_line("sample id 123") is False
+    if calls["n"] != 0:
+        raise AssertionError("JWT walk did not return early on a line with no eyJ")
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    assert scan.jwt_on_line(jwt) is True
+    if calls["n"] < 1:
+        raise AssertionError("JWT walk did not use finditer on an eyJ line")
+
+
 def test_cli_jwt_walk_runs_once_per_content_line(tmp_path, capsys, monkeypatch):
     line = "sample id 123"
     evidence = tmp_path / "evidence"

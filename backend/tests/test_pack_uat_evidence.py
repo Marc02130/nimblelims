@@ -994,6 +994,70 @@ def test_verify_percent_segment_jwt_member_does_not_leak(tmp_path):
     )
 
 
+def test_pack_refuses_secret_output_name_and_redacts_it(tmp_path):
+    jwt = _runtime_jwt()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / f"{jwt}.tgz"
+    packed = _run_pack_unchecked(
+        [str(evidence), "--output", str(output), "--no-allowlist"]
+    )
+    _assert_jwt_absent(packed.stdout, packed.stderr, jwt)
+    if packed.returncode != 2:
+        raise AssertionError("secret output name was not refused")
+    if "secret rule" not in packed.stderr:
+        raise AssertionError("secret output name was not reported")
+    if "<redacted name hmac:" not in packed.stderr:
+        raise AssertionError("secret output path was not redacted")
+    if output.exists():
+        raise AssertionError("secret-named output was created")
+
+
+def test_pack_refuses_secret_sidecar_name_and_redacts_it(tmp_path):
+    token = _token_with_symbol("_")
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / f"{token}.tgz"
+    packed = _run_pack_unchecked(
+        [str(evidence), "--output", str(output), "--no-allowlist"]
+    )
+    if token in packed.stdout or token in packed.stderr:
+        raise AssertionError("pool output name leaked")
+    if packed.returncode != 2:
+        raise AssertionError("pool output name was not refused")
+    if "secret rule" not in packed.stderr:
+        raise AssertionError("pool output name was not reported")
+    if "<redacted name hmac:" not in packed.stderr:
+        raise AssertionError("pool output path was not redacted")
+
+
+def test_verify_refuses_secret_archive_name_and_redacts_it(tmp_path):
+    jwt = _runtime_jwt()
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        root = tarfile.TarInfo(name="round")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o700
+        bundle.addfile(root)
+        notes = tarfile.TarInfo(name="round/notes.txt")
+        payload = b"ok\n"
+        notes.size = len(payload)
+        bundle.addfile(notes, io.BytesIO(payload))
+    archive = tmp_path / f"{jwt}.tgz"
+    archive.write_bytes(_gzip_n9(raw.getvalue()))
+    _write_sidecar(archive)
+    verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+    _assert_jwt_absent(verified.stdout, verified.stderr, jwt)
+    if verified.returncode != 2:
+        raise AssertionError("secret archive name was not refused")
+    if "secret rule" not in verified.stderr:
+        raise AssertionError("secret archive name was not reported")
+    if "<redacted name hmac:" not in verified.stderr:
+        raise AssertionError("secret archive path was not redacted")
+
+
 def test_verify_percent_segment_jwt_link_target_does_not_leak(tmp_path):
     _verify_encoded_jwt_case(
         tmp_path,
