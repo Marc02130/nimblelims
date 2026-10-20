@@ -15,16 +15,18 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   more ``_``/``-`` separators and no other pool symbol are not hits.
 - a configured compose or seed secret from the environment or
   ``--secrets-file``, matched literally and percent-encoded
-- a configured secret or pool token in a file or directory name (whole
-  path and each segment)
+- a configured secret, pool token, or JWT in a file or directory
+  name (whole path and each segment)
 - a bcrypt hash marker (``$2a$``, ``$2b$``, ``$2y$``)
 - a ``.dump`` / ``.dump.gz`` name, or the ``PGDMP`` magic
 - an archive or compressed payload (tar, gzip, zlib, xz, bz2, zip,
   zstd, 7z, lz4, rar, cpio, lzma, compress ``.Z``, lzip) detected
-  by signature, including a gzip member after junk only when the
-  bytes are ``1f 8b 08``, the FLG reserved bits are zero, and a
-  bounded inflate succeeds, except short or weak signatures in
-  valid UTF-8 text
+  by signature, including a gzip member after junk when the bytes
+  are ``1f 8b 08``, the FLG reserved bits are zero, and a bounded
+  inflate succeeds, or when gzip-after-junk scanning reaches the
+  32-candidate cap (an unsuppressible archive hit, not
+  refuse-binary), except short or weak signatures in valid UTF-8
+  text
 - bytes after the IEND chunk of a PNG
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
@@ -34,7 +36,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   (67108864 bytes)
 - a 200-character or longer hex or Base64 run
 - a JWT of any realistic length (three base64url segments
-  starting ``eyJ``)
+  starting ``eyJ`` whose first segment base64url-decodes to JSON
+  containing an ``alg`` key)
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -52,15 +55,17 @@ allowlist paths refuse the whole allowlist (exit 2). There is no
 allow-by-extension.
 
 Hits name the identity with ``json.dumps``. A name segment that is a
-configured secret or pool token is printed as
+configured secret, pool token, or JWT is printed as
 ``<redacted name hmac:xxxxxxxx>`` (HMAC-SHA256 of the segment with a
 per-run random key, first 8 hex). A parent segment that matches is
 redacted the same way. A secret that contains ``/`` redacts the whole
-path. They do not print the secret.
+path. Tar-error text is redacted the same way for those tokens.
+They do not print the secret.
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import errno
 import hashlib
 import hmac
@@ -165,6 +170,8 @@ def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
     variants = (segment, unquote(segment))
     if any(pool_token_on_line(variant) for variant in variants):
         return True
+    if any(jwt_on_line(variant) for variant in variants):
+        return True
     return any(configured_secret_on_line(variant, secrets) for variant in variants)
 
 
@@ -222,8 +229,28 @@ def _redact_pool_windows(text: str) -> str:
     return "".join(out)
 
 
+def _redact_jwts(text: str) -> str:
+    """Replace each JWT match with an HMAC tag. Advance one char on a miss."""
+    out: list[str] = []
+    start = 0
+    while start < len(text):
+        match = JWT_RE.search(text, start)
+        if match is None:
+            out.append(text[start:])
+            break
+        token = match.group(0)
+        if _jwt_header_has_alg(token):
+            out.append(text[start : match.start()])
+            out.append(_redact_tag(token))
+            start = match.end()
+            continue
+        out.append(text[start : match.start() + 1])
+        start = match.start() + 1
+    return "".join(out)
+
+
 def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
-    """Redact configured secrets and pool-token windows in arbitrary text."""
+    """Redact configured secrets, pool tokens, and JWTs in arbitrary text."""
     if not text:
         return text
     shown = text
@@ -236,7 +263,7 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     for needle, tag in needles:
         if needle in shown:
             shown = shown.replace(needle, tag)
-    return _redact_pool_windows(shown)
+    return _redact_jwts(_redact_pool_windows(shown))
 
 
 class Hit:
@@ -361,14 +388,36 @@ def scan_text(
     return hits
 
 
+def _jwt_header_has_alg(token: str) -> bool:
+    """True when the first JWT segment decodes to JSON that has ``alg``."""
+    header = token.split(".", 1)[0]
+    padded = header + ("=" * (-len(header) % 4))
+    try:
+        raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+        data = json.loads(raw)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return isinstance(data, dict) and "alg" in data
+
+
 def jwt_on_line(line: str) -> bool:
     """True when a JWT starts with eyJ and has three base64url segments.
 
+    The first segment must base64url-decode to JSON containing ``alg``.
     Segment lengths are bounded so a large file cannot trip catastrophic
-    backtracking. There is no total-length cap: tokens around 200-280
-    characters still hit.
+    backtracking. A failed header check advances one character so a later
+    real token is not skipped. There is no total-length cap: tokens
+    around 200-280 characters still hit.
     """
-    return JWT_RE.search(line) is not None
+    start = 0
+    while start < len(line):
+        match = JWT_RE.search(line, start)
+        if match is None:
+            return False
+        if _jwt_header_has_alg(match.group(0)):
+            return True
+        start = match.start() + 1
+    return False
 
 
 def scan_name(
@@ -376,7 +425,10 @@ def scan_name(
     raw: str,
     secrets: tuple[str, ...] = (),
 ) -> list[Hit]:
-    """Content-scan a file or directory name, whole and per segment."""
+    """Content-scan a file or directory name, whole and per segment.
+
+    Pool tokens, configured secrets, and JWTs in the name are hits.
+    """
     hits: list[Hit] = []
     seen: set[tuple[str, str]] = set()
     parts = [raw, *[part for part in raw.split("/") if part]]
@@ -391,6 +443,11 @@ def scan_name(
             key = (KIND_CONFIGURED, text)
             if key not in seen:
                 hits.append(Hit(KIND_CONFIGURED, identity, secrets=secrets))
+                seen.add(key)
+        if any(jwt_on_line(variant) for variant in variants):
+            key = (KIND_JWT, text)
+            if key not in seen:
+                hits.append(Hit(KIND_JWT, identity, secrets=secrets))
                 seen.add(key)
     return hits
 
@@ -656,7 +713,11 @@ def _gzip_inflates(data: bytes, offset: int) -> bool:
 
 
 def _has_inflating_gzip(data: bytes) -> bool:
-    """True when a deflate gzip member after junk actually inflates."""
+    """True when a deflate gzip member after junk actually inflates.
+
+    Reaching the 32-candidate cap is an unsuppressible archive hit, not
+    refuse-binary. A sha allowlist entry cannot hide that case.
+    """
     tried = 0
     start = 0
     while tried < GZIP_CANDIDATE_CAP:
@@ -668,7 +729,7 @@ def _has_inflating_gzip(data: bytes) -> bool:
             if _gzip_inflates(data, pos):
                 return True
         start = pos + 1
-    return False
+    return True
 
 
 def archive_kind(data: bytes) -> str | None:

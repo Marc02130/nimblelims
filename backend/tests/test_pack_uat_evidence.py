@@ -1,6 +1,7 @@
 """The pack helper scans first and never writes a dirty .tgz."""
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import importlib.util
@@ -41,6 +42,20 @@ def _runtime_pool_token() -> str:
             return token
         token = generate_dev_password()
     raise AssertionError("could not generate a pool token")
+
+
+def _runtime_jwt() -> str:
+    header = {"alg": "HS256", "typ": "JWT"}
+    first = base64.urlsafe_b64encode(
+        json.dumps(header, separators=(",", ":")).encode("ascii")
+    ).decode("ascii").rstrip("=")
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+    body = "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(24))
+    sig = "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(20))
+    token = f"{first}.{body}.{sig}"
+    assert token.startswith("eyJ")
+    assert len(token.split(".")) == 3
+    return token
 
 
 def _token_with_symbol(symbol: str) -> str:
@@ -745,3 +760,29 @@ def test_verify_failed_hardlink_redacts_tar_stderr(tmp_path):
     assert verified.returncode == 2
     assert "tar extract failed" in verified.stderr
     assert "<redacted name hmac:" in verified.stderr
+
+
+def test_verify_failed_hardlink_redacts_jwt_in_tar_stderr(tmp_path):
+    jwt = _runtime_jwt()
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        root = tarfile.TarInfo(name="round")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o700
+        bundle.addfile(root)
+        leak = tarfile.TarInfo(name=f"round/{jwt}")
+        leak.type = tarfile.LNKTYPE
+        leak.linkname = "round/missing-target"
+        bundle.addfile(leak)
+    archive = tmp_path / "jwt-named.tgz"
+    archive.write_bytes(_gzip_n9(raw.getvalue()))
+    _write_sidecar(archive)
+    verified = _run_pack(
+        ["--verify", str(archive), "--no-allowlist"],
+        (jwt,),
+    )
+    assert verified.returncode == 2
+    assert "tar extract failed" in verified.stderr
+    assert "<redacted name hmac:" in verified.stderr
+    assert jwt not in verified.stdout
+    assert jwt not in verified.stderr
