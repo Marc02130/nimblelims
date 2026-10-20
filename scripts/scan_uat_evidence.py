@@ -42,16 +42,23 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   constant-time check at each ``eyJ`` (Python 3.10; no possessive
   regex). At most 16 ``eyJ`` candidates are examined per
   base64url run so a repeated-``eyJ`` header cannot go
-  quadratic. Header runs longer than 32 KiB (32768) are not
-  JWTs, so a long-header walk stays linear. Payload stays
+  quadratic. Reaching that bound is an unsuppressible jwt
+  hit (same pattern as the gzip 32-candidate cap) and the
+  whole run through the dotted triple is redacted, so a
+  real token with 16 or more ``eyJ`` decoys glued in front
+  cannot go silent. Header runs longer than 32 KiB (32768)
+  are not JWTs, so a long-header walk stays linear. Payload stays
   bounded at 8192. A signature longer than 8192 is still a
   hit; the whole signature run is redacted. ``eyJ.a.b`` /
   ``eyJ+.a.b`` and a header without ``alg`` are not hits.
   Separators must be a single ``.``; ``..`` between segments
   is not a JWT. Detection percent-decodes until the text
-  stops changing (max 3 passes), including ``%u002E``,
-  applies NFKC, and strips tar escapes (``\\NNN`` octal,
-  backslash, and a newline between segments) before matching.
+  stops changing (max 3 passes), including ``%u002E``, and
+  applies NFKC. Tar unescaping (``\\NNN`` octal, backslash,
+  and a newline between segments) applies only to names
+  and tar output, never to file content, so JSON
+  ``\\uXXXX`` in a file cannot become a pool false
+  positive.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -273,22 +280,25 @@ def _join_tar_newlines(text: str) -> str:
     return text.replace("\r", ".").replace("\n", ".")
 
 
-def _text_variants(text: str) -> tuple[str, ...]:
-    """Return unique raw, tar-unescaped, and percent-decoded forms.
+def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
+    """Return unique raw and percent-decoded forms.
 
     Percent-decoding repeats until the text stops changing (max
-    ``_DECODE_LAYERS``), including ``%u002E``. NFKC and a newline
-    between segments are extra variants. When nothing changes,
-    scanners including the JWT walk run once per line.
+    ``_DECODE_LAYERS``), including ``%u002E``. NFKC is an extra
+    variant. Tar unescaping (and a newline between segments) is
+    only for names and tar output (``unescape=True``), never file
+    content. When nothing changes, scanners including the JWT
+    walk run once per line.
     """
     seen: list[str] = []
-    unescaped = _unescape_tar(text)
     bases = [text]
-    if unescaped != text:
-        bases.append(unescaped)
-    joined = _join_tar_newlines(unescaped)
-    if joined != unescaped:
-        bases.append(joined)
+    if unescape:
+        unescaped = _unescape_tar(text)
+        if unescaped != text:
+            bases.append(unescaped)
+        joined = _join_tar_newlines(unescaped)
+        if joined != unescaped:
+            bases.append(joined)
     for base in bases:
         for layer in _decode_layers(base):
             for form in (layer, unicodedata.normalize("NFKC", layer)):
@@ -300,7 +310,7 @@ def _text_variants(text: str) -> tuple[str, ...]:
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
     if not segment:
         return False
-    variants = _text_variants(segment)
+    variants = _text_variants(segment, unescape=True)
     if any(jwt_on_line(variant) for variant in variants):
         return True
     if any(configured_secret_on_line(variant, secrets) for variant in variants):
@@ -407,8 +417,10 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     ``%5F`` hole: a leftover 24-character tail cannot print.
     A pool window, a ``%2E``/``%252E`` encoding, a ``%u002E``
     or full-width dot, or a tar ``\\056`` / newline split
-    cannot leave the payload in the clear. Name hits use the
-    same JWT-then-secret-then-pool check order.
+    cannot leave the payload in the clear. Tar unescaping here
+    is for tar stderr and names only; file content is not
+    unescaped. Name hits use the same JWT-then-secret-then-pool
+    check order.
     """
     if not text:
         return text
@@ -612,9 +624,11 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
     lazily from ``finditer`` (a 3-run window; no materialized list).
     Each ``eyJ`` followed by two dotted segments is an O(1) structure
     check plus the alg-header decode. At most ``_JWT_EYJ_PER_RUN``
-    (16) ``eyJ`` candidates are examined per base64url run. A failed
-    ``eyJ`` does not skip a later real token, including one
-    immediately adjacent to the miss.
+    (16) ``eyJ`` candidates are examined per base64url run.
+    Reaching that bound is itself a hit: the whole run through
+    the dotted triple is yielded so redaction covers decoys glued
+    to a real token. A failed ``eyJ`` does not skip a later real
+    token, including one immediately adjacent to the miss.
     """
     if _JWT_PREFIX not in text:
         return
@@ -646,6 +660,12 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
                 pos = text.find(_JWT_PREFIX, pos + 1, run_end)
             if found:
                 continue
+            if examined >= _JWT_EYJ_PER_RUN:
+                span = text[run_start:token_end]
+                yield run_start, token_end, span
+                cursor = token_end
+                pending = [item for item in pending if item[1] > cursor]
+                continue
             pending.pop(0)
 
     for match in _jwt_run_finditer(text):
@@ -664,8 +684,9 @@ def jwt_on_line(line: str) -> bool:
     Lines with no ``eyJ`` return immediately. Detection walks
     base64url runs lazily, then checks each ``eyJ`` in constant time
     (Python 3.10; no possessive quantifiers). At most 16 ``eyJ``
-    candidates are examined per base64url run. Header runs longer
-    than 32 KiB are not JWTs. Payload stays bounded at 8192. A
+    candidates are examined per base64url run; reaching the bound
+    is an unsuppressible jwt hit and the whole run is redacted.
+    Header runs longer than 32 KiB are not JWTs. Payload stays bounded at 8192. A
     signature longer than 8192 is still a hit and is fully redacted.
     A failed header check does not skip a later real token, including
     a no-dot decoy such as ``eyJx`` immediately followed by a real
@@ -689,7 +710,7 @@ def scan_name(
     seen: set[tuple[str, str]] = set()
     parts = [raw, *[part for part in raw.split("/") if part]]
     for text in parts:
-        variants = _text_variants(text)
+        variants = _text_variants(text, unescape=True)
         is_jwt = any(jwt_on_line(variant) for variant in variants)
         if not is_jwt and any(pool_token_on_line(variant) for variant in variants):
             key = (KIND_POOL, text)
