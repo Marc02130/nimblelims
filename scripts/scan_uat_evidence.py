@@ -20,12 +20,17 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a bcrypt hash marker (``$2a$``, ``$2b$``, ``$2y$``)
 - a ``.dump`` / ``.dump.gz`` name, or the ``PGDMP`` magic
 - an archive or compressed payload (tar, gzip, zlib, xz, bz2, zip,
-  zstd, 7z) detected by signature
+  zstd, 7z, lz4, rar, cpio, lzma, compress ``.Z``, lzip) detected
+  by signature, including gzip magic after junk, except short or
+  weak signatures in valid UTF-8 text
+- bytes after the IEND chunk of a PNG
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
 - a duplicate identity
 - a symlink, fifo, socket, or device
-- a file that exceeds the 64 MiB size cap (67108864 bytes)
+- a folder whose scanned files exceed the 64 MiB total cap
+  (67108864 bytes)
+- a 200-character or longer hex or Base64 run
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -35,8 +40,9 @@ There are no line entries. A hit is suppressed only when the identity
 tuple matches exactly and that same object's SHA-256 equals the entry
 hash. A sha entry may suppress only refused-binary and password-pool
 hits. It never suppresses configured-secret, bcrypt, dump/PGDMP,
-printed-once, unsafe-name, duplicate, link, archive, size-cap, or
-unreadable hits. Identities are exact one-element tuples: the on-disk
+printed-once, unsafe-name, duplicate, link, archive, size-cap,
+encoded-run, png-trailing, or unreadable hits. Identities are exact
+one-element tuples: the on-disk
 relative path. No name is normalized. Duplicate or non-canonical
 allowlist paths refuse the whole allowlist (exit 2). There is no
 allow-by-extension.
@@ -87,6 +93,18 @@ ZIP_SPAN = b"PK\x07\x08"
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 SEVEN_Z_MAGIC = b"7z\xbc\xaf'\x1c"
 USTAR_MAGIC = b"ustar"
+LZ4_MAGIC = b"\x04\"M\x18"
+RAR_MAGIC = b"Rar!\x1a\x07"
+LZIP_MAGIC = b"LZIP"
+COMPRESS_MAGIC = b"\x1f\x9d"
+CPIO_NEWC = b"070701"
+CPIO_ODC = b"070707"
+CPIO_BIN_BE = b"\xc7\x71"
+CPIO_BIN_LE = b"\x71\xc7"
+LZMA_MAGIC = b"\x5d\x00\x00"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+PNG_IEND = b"\x00\x00\x00\x00IEND"
+WEAK_ARCHIVE = frozenset({"zlib", "lzma", "cpio", "bz2"})
 _POOL = set(DEV_PASSWORD_POOL)
 _SYMBOLS = set("!@#$%^&*-_")
 _SEPARATORS = set("_-")
@@ -107,7 +125,11 @@ KIND_LINK = "link"
 KIND_ARCHIVE = "archive"
 KIND_SIZE_CAP = "size-cap"
 KIND_UNREADABLE = "unreadable"
+KIND_ENCODED = "encoded run"
+KIND_PNG_TRAIL = "png-trailing"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
+HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
+B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -270,6 +292,8 @@ def scan_text(
             hits.append(Hit(KIND_POOL, identity, number, secrets))
         if any(configured_secret_on_line(variant, secrets) for variant in variants):
             hits.append(Hit(KIND_CONFIGURED, identity, number, secrets))
+        if any(HEX_RUN_RE.search(variant) or B64_RUN_RE.search(variant) for variant in variants):
+            hits.append(Hit(KIND_ENCODED, identity, number, secrets))
     return hits
 
 
@@ -309,6 +333,9 @@ def load_scan_secrets(
             if text and text not in values:
                 values.append(text)
     if secrets_file is not None:
+        if not secrets_file.is_file():
+            shown = redact_name_path(str(secrets_file), tuple(values))
+            raise SystemExit(f"ERROR: secrets file not found: {shown}")
         for key, text in _read_secrets_file(secrets_file):
             if SECRET_NAME_RE.fullmatch(key) and text and text not in values:
                 values.append(text)
@@ -380,10 +407,13 @@ def is_unsafe_evidence_name(raw: str) -> bool:
     return is_unsafe_name(raw)
 
 
-def load_allowlist(path: Path) -> list[AllowlistEntry]:
+def load_allowlist(
+    path: Path,
+    secrets: tuple[str, ...] = (),
+) -> list[AllowlistEntry]:
     """Load a reviewed allowlist. Refuses extension/glob and non-canonical paths."""
     if not path.is_file():
-        shown = redact_name_path(str(path), ())
+        shown = redact_name_path(str(path), secrets)
         raise SystemExit(f"ERROR: allowlist not found: {shown}")
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -540,9 +570,38 @@ def archive_kind(data: bytes) -> str | None:
         return "zstd"
     if data.startswith(SEVEN_Z_MAGIC):
         return "7z"
+    if data.startswith(LZ4_MAGIC):
+        return "lz4"
+    if data.startswith(RAR_MAGIC):
+        return "rar"
+    if data.startswith(LZIP_MAGIC):
+        return "lzip"
+    if data.startswith(COMPRESS_MAGIC):
+        return "compress"
+    if (
+        data.startswith(CPIO_NEWC)
+        or data.startswith(CPIO_ODC)
+        or data.startswith(CPIO_BIN_BE)
+        or data.startswith(CPIO_BIN_LE)
+    ):
+        return "cpio"
+    if data.startswith(LZMA_MAGIC):
+        return "lzma"
     if _is_tar_signature(data):
         return "tar"
+    if not data.startswith(PNG_MAGIC) and GZIP_MAGIC in data:
+        return "gzip"
     return None
+
+
+def _png_has_trailing(data: bytes) -> bool:
+    if not data.startswith(PNG_MAGIC):
+        return False
+    pos = data.find(PNG_IEND)
+    if pos < 0:
+        return False
+    end = pos + len(PNG_IEND) + 4
+    return end < len(data)
 
 
 def _looks_text(data: bytes) -> bool:
@@ -609,8 +668,12 @@ def _scan_payload(
         _record_digest(digests, announced, identity, data, hits, secrets)
     if _is_dump_name(identity) or _has_pgdmp_magic(data):
         hits.append(Hit(KIND_DUMP, identity, secrets=secrets))
-    if archive_kind(data) is not None:
+    kind = archive_kind(data)
+    if kind is not None and not (kind in WEAK_ARCHIVE and _looks_text(data)):
         hits.append(Hit(KIND_ARCHIVE, identity, secrets=secrets))
+        return hits
+    if _png_has_trailing(data):
+        hits.append(Hit(KIND_PNG_TRAIL, identity, secrets=secrets))
         return hits
     if _looks_text(data):
         hits.extend(scan_text(identity, data.decode("utf-8"), secrets))
@@ -735,18 +798,21 @@ def scan_path(
     raise SystemExit(f"ERROR: {shown} is not a directory")
 
 
-def _resolve_allowlist(args: argparse.Namespace) -> tuple[AllowlistEntry, ...]:
+def _resolve_allowlist(
+    args: argparse.Namespace,
+    secrets: tuple[str, ...] = (),
+) -> tuple[AllowlistEntry, ...]:
     if args.no_allowlist:
         return ()
     allow_path = (
         Path(args.allowlist).expanduser() if args.allowlist else DEFAULT_ALLOWLIST
     )
     if args.allowlist and not allow_path.is_file():
-        shown = redact_name_path(str(allow_path), ())
+        shown = redact_name_path(str(allow_path), secrets)
         raise SystemExit(f"ERROR: allowlist not found: {shown}")
     if not allow_path.is_file():
         return ()
-    return tuple(load_allowlist(allow_path))
+    return tuple(load_allowlist(allow_path, secrets))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -782,7 +848,7 @@ def main(argv: list[str] | None = None) -> int:
     secrets_path = Path(args.secrets_file).expanduser() if args.secrets_file else None
     try:
         secrets = load_scan_secrets(secrets_file=secrets_path)
-        allowlist = _resolve_allowlist(args)
+        allowlist = _resolve_allowlist(args, secrets)
     except SystemExit as exc:
         message = str(exc)
         if message:

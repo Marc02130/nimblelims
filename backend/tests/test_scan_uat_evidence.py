@@ -1663,12 +1663,19 @@ def test_archive_signatures_in_folder_are_hits(tmp_path, capsys):
         "ustar.tar": _tar_bytes([("notes.txt", b"ok\n")]),
         "oldstyle.tar": _old_style_tar("notes.txt", b"ok\n"),
         "note.gz": gzip.compress(b"ok\n"),
-        "z78_01.bin": b"\x78\x01" + b"pad",
-        "z78_5e.bin": b"\x78\x5e" + b"pad",
-        "z78_9c.bin": b"\x78\x9c" + b"pad",
-        "z78_da.bin": b"\x78\xda" + b"pad",
+        "z78_01.bin": b"\x78\x01" + b"pad\x00",
+        "z78_5e.bin": b"\x78\x5e" + b"pad\x00",
+        "z78_9c.bin": b"\x78\x9c" + b"pad\x00",
+        "z78_da.bin": b"\x78\xda" + b"pad\x00",
         "note.xz": b"\xfd7zXZ\x00" + b"pad",
-        "note.bz2": b"BZh" + b"pad",
+        "note.bz2": b"BZh" + b"pad\x00",
+        "note.lz4": b"\x04\"M\x18" + b"pad",
+        "note.rar": b"Rar!\x1a\x07" + b"pad",
+        "note.lzip": b"LZIP" + b"pad\x00",
+        "note.Z": b"\x1f\x9d" + b"pad",
+        "note.cpio": b"070701" + b"pad\x00",
+        "note.lzma": b"\x5d\x00\x00" + b"pad\x00",
+        "junk.gz": b"xxxx" + b"\x1f\x8b" + b"pad",
         "note.zip": b"PK\x03\x04" + b"pad",
         "empty.zip": b"PK\x05\x06" + b"pad",
         "span.zip": b"PK\x07\x08" + b"pad",
@@ -1800,6 +1807,111 @@ def test_source_scan_refuses_secret_named_root(tmp_path, capsys):
     assert _hit("password-pool token", _redacted_path(token)) in err
     assert token not in out
     assert token not in err
+
+
+def test_missing_allowlist_redacts_configured_secret(tmp_path, capsys, monkeypatch):
+    configured = "seed" + uuid.uuid4().hex[:12]
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    missing = tmp_path / configured / "allow.json"
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(missing)], capsys, (configured,)
+    )
+    assert code == 2
+    assert "allowlist not found" in err
+    assert configured not in out
+    assert configured not in err
+
+
+def test_missing_secrets_file_redacts_configured_secret(
+    tmp_path, capsys, monkeypatch
+):
+    configured = "seed" + uuid.uuid4().hex[:12]
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    missing = tmp_path / configured / "secrets.env"
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist", "--secrets-file", str(missing)],
+        capsys,
+        (configured,),
+    )
+    assert code == 2
+    assert "secrets file not found" in err
+    assert configured not in out
+    assert configured not in err
+
+
+def test_hmac_tag_is_not_plain_sha256_and_differs_across_runs():
+    name = "seed" + uuid.uuid4().hex[:12]
+    tag = scan._redact_tag(name)
+    plain = hashlib.sha256(os.fsencode(name)).hexdigest()[:8]
+    assert tag.startswith("<redacted name hmac:")
+    assert plain not in tag
+    previous = scan._REDACT_KEY
+    try:
+        scan._REDACT_KEY = os.urandom(32)
+        other = scan._redact_tag(name)
+        assert other != tag
+        assert plain not in other
+    finally:
+        scan._REDACT_KEY = previous
+
+
+def test_root_named_configured_secret_is_a_hit(tmp_path, capsys, monkeypatch):
+    configured = "seed" + uuid.uuid4().hex[:12]
+    monkeypatch.setenv("POSTGRES_PASSWORD", configured)
+    evidence = tmp_path / configured
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (configured,))
+    assert code == 1
+    assert _hit("configured secret", _redacted_path(configured, (configured,))) in err
+    assert configured not in out
+    assert configured not in err
+
+
+def test_hex_and_base64_runs_of_200_are_hits(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    hex_run = ("ab" * 100)
+    b64_run = ("A" * 200) + "=="
+    assert len(hex_run) == 200
+    (evidence / "hex.txt").write_text(f"id {hex_run}\n", encoding="utf-8")
+    (evidence / "b64.txt").write_text(f"blob {b64_run}\n", encoding="utf-8")
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, hex_run, b64_run)
+    )
+    assert code == 1
+    assert _hit("encoded run", "hex.txt", line=1) in err
+    assert _hit("encoded run", "b64.txt", line=1) in err
+
+
+def test_weak_signature_in_utf8_text_is_not_archive(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("x^ just a note\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "archive" not in err
+    assert "clean" in out
+
+
+def test_png_bytes_after_iend_are_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    iend = b"\x00\x00\x00\x00IEND" + b"\x11\x22\x33\x44"
+    png = b"\x89PNG\r\n\x1a\n" + b"idat" + iend + token.encode("utf-8")
+    (evidence / "shot.png").write_bytes(png)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("png-trailing", "shot.png") in err
 
 
 def test_regular_file_as_evidence_is_refused(tmp_path, capsys):

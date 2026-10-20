@@ -463,7 +463,11 @@ def test_tar_pack_argv_keeps_dash_dash_before_name():
     argv = pack.tar_pack_argv(Path("/parent"), "-f", Path("/out.tgz"))
     assert "--" in argv
     assert argv[argv.index("--") + 1] == "-f"
-    assert "--use-compress-program=gzip -n -9" in argv
+    assert "--format=gnu" in argv
+    assert any(
+        item.startswith("--use-compress-program=") and "-n" in item and "gzip" in item
+        for item in argv
+    )
 
 
 def test_pack_dash_named_folder_succeeds(tmp_path):
@@ -559,6 +563,49 @@ def test_verify_sidecar_wrong_name_fails(tmp_path):
     verified = _run_pack(["--verify", str(output), "--no-allowlist"], (token,))
     assert verified.returncode == 1
     assert "valid hash line" in verified.stderr
+
+
+def test_pack_refuses_non_gnu_tar(tmp_path, monkeypatch, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / "round.tgz"
+    monkeypatch.setattr(pack, "_is_gnu", lambda _path: False)
+    code = pack.pack_folder(evidence, output, ["--no-allowlist"])
+    captured = capsys.readouterr()
+    assert token not in captured.out
+    assert token not in captured.err
+    assert code == 2
+    assert "GNU tar" in captured.err
+    assert not output.exists()
+
+
+def test_verify_bytes_after_tar_end_inside_gzip_fails(tmp_path):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    output = tmp_path / "round.tgz"
+    packed = _run_pack(
+        [str(evidence), "--output", str(output), "--no-allowlist"],
+        (token,),
+    )
+    assert packed.returncode == 0
+    unzipped = subprocess.run(
+        ["gzip", "-n", "-d", "-c", str(output)],
+        check=True,
+        capture_output=True,
+    )
+    mutated = unzipped.stdout + (b"\x00" * 512) + token.encode("utf-8")
+    output.write_bytes(_gzip_n9(mutated))
+    _write_sidecar(output)
+    verified = _run_pack(["--verify", str(output), "--no-allowlist"], (token,))
+    assert verified.returncode != 0
+    assert (
+        "byte-identical" in verified.stderr
+        or "tar extract failed" in verified.stderr
+    )
 
 
 def test_verify_refuses_symlinked_archive(tmp_path):

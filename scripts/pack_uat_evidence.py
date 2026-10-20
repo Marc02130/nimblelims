@@ -6,11 +6,15 @@ Usage:
     python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz
     python scripts/pack_uat_evidence.py --verify evidence.tgz
 
-The pack step writes a temp archive with GNU tar and ``gzip -n -9``
-(no name or mtime in the gzip header, compression level 9):
+The pack step requires GNU tar and GNU gzip (``tar --version`` and
+``gzip --version``). On macOS put ``gtar`` and ``ggzip`` first on
+``PATH``. It writes a temp archive with ``--format=gnu`` and
+``gzip -n -9`` (no name or mtime in the gzip header, compression
+level 9):
 
-    tar -C <parent> -cf <temp> --owner=0 --group=0 --numeric-owner
-        --sort=name --mtime=@0 --use-compress-program='gzip -n -9' -- <dir>
+    tar --format=gnu -C <parent> -cf <temp> --owner=0 --group=0
+        --numeric-owner --sort=name --mtime=@0
+        --use-compress-program='gzip -n -9' -- <dir>
 
 (no ``./``). It extracts that temp archive, requires exactly one
 top-level real directory, scans that directory as the evidence root
@@ -32,6 +36,7 @@ import hashlib
 import os
 import re
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
@@ -40,9 +45,57 @@ from pathlib import Path
 
 SCANNER = Path(__file__).resolve().parent / "scan_uat_evidence.py"
 TAR_MTIME = "@0"
+TAR_BIN = "tar"
+GZIP_BIN = "gzip"
 TAR_COMPRESS = "gzip -n -9"
 _CREATE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
 _SIDECAR_RE = re.compile(r"^([0-9a-f]{64})  (.+)$")
+
+
+def _is_gnu(path: str) -> bool:
+    proc = subprocess.run(
+        [path, "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    text = f"{proc.stdout}{proc.stderr}"
+    return proc.returncode == 0 and "GNU" in text
+
+
+def require_gnu_tools() -> int:
+    """Refuse unless GNU tar and GNU gzip are on PATH (gtar/ggzip allowed)."""
+    global TAR_BIN, GZIP_BIN, TAR_COMPRESS
+    tar = None
+    for name in ("tar", "gtar"):
+        path = shutil.which(name)
+        if path and _is_gnu(path):
+            tar = path
+            break
+    gzip_path = None
+    for name in ("gzip", "ggzip"):
+        path = shutil.which(name)
+        if path and _is_gnu(path):
+            gzip_path = path
+            break
+    if tar is None:
+        print(
+            "ERROR: tar must be GNU tar; run pack and verify on Linux "
+            "or put gtar first on PATH",
+            file=sys.stderr,
+        )
+        return 2
+    if gzip_path is None:
+        print(
+            "ERROR: gzip must be GNU gzip; run pack and verify on Linux "
+            "or put ggzip first on PATH",
+            file=sys.stderr,
+        )
+        return 2
+    TAR_BIN = tar
+    GZIP_BIN = gzip_path
+    TAR_COMPRESS = f"{gzip_path} -n -9"
+    return 0
 
 
 def _after_scan_hook(folder: Path) -> None:
@@ -115,7 +168,8 @@ def _output_error(folder: Path, output: Path) -> str | None:
 def tar_pack_argv(parent: Path, name: str, dest: Path) -> list[str]:
     """Exact GNU tar command used to pack. Tests assert ``--`` stays in place."""
     return [
-        "tar",
+        TAR_BIN,
+        "--format=gnu",
         "-C",
         str(parent),
         "-cf",
@@ -148,7 +202,7 @@ def _tar_pack(parent: Path, name: str, dest: Path) -> int:
 def _tar_extract(archive: Path, dest: Path) -> int:
     unpacked = subprocess.run(
         [
-            "tar",
+            TAR_BIN,
             "-C",
             str(dest),
             "-xf",
@@ -233,6 +287,9 @@ def pack_folder(
     output: Path,
     extra_scan: list[str],
 ) -> int:
+    tools = require_gnu_tools()
+    if tools != 0:
+        return tools
     try:
         root_st = os.lstat(folder)
     except OSError:
@@ -301,6 +358,9 @@ def pack_folder(
 
 
 def verify_pack(archive: Path, extra_scan: list[str]) -> int:
+    tools = require_gnu_tools()
+    if tools != 0:
+        return tools
     try:
         st = os.lstat(archive)
     except OSError:
