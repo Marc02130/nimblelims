@@ -18,6 +18,7 @@ import zlib
 from pathlib import Path
 from urllib.parse import quote
 
+import jwt
 import pytest
 
 from app.core.dev_passwords import DEV_PASSWORD_LENGTH, generate_dev_password
@@ -190,6 +191,140 @@ def _runtime_header_jwt(
 
 def _runtime_jwt(length: int | None = None) -> str:
     return _runtime_header_jwt({"alg": "HS256", "typ": "JWT"}, length)
+
+
+# PyJWT is already pinned in backend/requirements.txt (auth stack). Leak
+# tests use it at runtime only; tokens are never committed, printed, or logged.
+JWT_LEAK_TRIALS = 56
+
+
+def _pyjwt_access_token() -> str:
+    """Runtime PyJWT token. Do not print or log the return value."""
+    key = os.urandom(32)
+    claims = {
+        "sub": uuid.uuid4().hex,
+        "username": "u" + uuid.uuid4().hex[:12],
+        "role": "lab-technician",
+        "permissions": ["sample:read", "result:write"],
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(claims, key, algorithm="HS256")
+    if not isinstance(token, str):
+        token = token.decode("ascii")
+    if not (token.startswith("eyJ") and token.count(".") == 2):
+        raise AssertionError("PyJWT produced a malformed test token")
+    return token
+
+
+def _jwt_fragments(token: str) -> tuple[str, str, str]:
+    header, payload, _signature = token.split(".")
+    return token, f"{header}.{payload}", payload
+
+
+def _assert_jwt_absent(stdout: str, stderr: str, token: str) -> None:
+    full, header_payload, payload = _jwt_fragments(token)
+    blobs = (stdout, stderr)
+    if any(
+        fragment in blob
+        for fragment in (full, header_payload, payload)
+        for blob in blobs
+        if fragment
+    ):
+        raise AssertionError("planted JWT fragment leaked into stdout or stderr")
+
+
+def _jwt_dots_encoded(token: str) -> str:
+    encoded = token.replace(".", "%2E")
+    if encoded == token or "%2E" not in encoded:
+        raise AssertionError("dot-encoded JWT was not percent-encoded")
+    return encoded
+
+
+def _jwt_segment_encoded(token: str) -> str:
+    header, payload, signature = token.split(".")
+    def _enc(part: str) -> str:
+        return part.replace("-", "%2D").replace("_", "%5F").replace("e", "%65")
+    encoded = f"{header}.{_enc(payload)}.{_enc(signature)}"
+    if encoded == token or "%" not in encoded:
+        raise AssertionError("segment-encoded JWT was not percent-encoded")
+    return encoded
+
+
+def _assert_no_jwt_grams(stdout: str, stderr: str, token: str) -> None:
+    _header, payload, signature = token.split(".")
+    blobs = (stdout, stderr)
+    sources = [payload, signature]
+    for part in (payload, signature):
+        quoted = quote(part, safe="")
+        if quoted != part:
+            sources.append(quoted)
+        inner = part.replace("-", "%2D").replace("_", "%5F").replace("e", "%65")
+        if inner != part:
+            sources.append(inner)
+    for source in sources:
+        if len(source) < 8:
+            if source and any(source in blob for blob in blobs):
+                raise AssertionError("planted JWT fragment leaked")
+            continue
+        for index in range(len(source) - 7):
+            gram = source[index : index + 8]
+            if any(gram in blob for blob in blobs):
+                raise AssertionError("planted JWT 8-gram leaked")
+
+
+def _b64url_run(count: int) -> str:
+    """A base64url run that is not a 200+ hex or standard-Base64 hit."""
+    chars: list[str] = []
+    for index in range(count):
+        if index % 40 == 0:
+            chars.append("_")
+        elif index % 40 == 1:
+            chars.append("g")
+        else:
+            chars.append("A")
+    return "".join(chars)
+
+
+def _runtime_segment_jwt(payload_len: int, signature_len: int = 12) -> str:
+    first = _b64url(
+        json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode(
+            "ascii"
+        )
+    )
+    token = f"{first}.{_b64url_run(payload_len)}.{_b64url_run(signature_len)}"
+    assert token.startswith("eyJ")
+    assert len(token.split(".")) == 3
+    assert len(token.split(".")[1]) == payload_len
+    assert len(token.split(".")[2]) == signature_len
+    return token
+
+
+def _unpadded_alg_header() -> dict[str, object]:
+    for extra in range(48):
+        header: dict[str, object] = {"alg": "HS256", "n": extra}
+        encoded = _b64url(json.dumps(header, separators=(",", ":")).encode("ascii"))
+        if encoded.startswith("eyJ") and len(encoded) % 4 != 0:
+            return header
+    raise AssertionError(
+        "could not build a header whose base64url length is not a multiple of 4"
+    )
+
+
+def _dotted_eyj_blob(size: int = 256 * 1024, period: int = 8000) -> str:
+    """Repeated eyJ with a dot every ``period`` chars (Günter's superlinear case)."""
+    parts: list[str] = []
+    filled = 0
+    while filled < size:
+        run_len = min(period, size - filled)
+        run = ("eyJ" * ((run_len + 2) // 3))[:run_len]
+        parts.append(run)
+        filled += len(run)
+        if filled < size:
+            parts.append(".")
+            filled += 1
+    blob = "".join(parts)
+    assert len(blob) == size
+    return blob
 
 
 def _gzip_cap_payload(count: int) -> bytes:
@@ -2213,25 +2348,333 @@ def test_jwt_after_failed_header_is_still_a_hit(tmp_path, capsys):
 
 
 def test_repeated_eyj_jwt_scan_is_linear_time():
-    """About 1 MiB of repeated eyJ must scan well under 1 s.
+    """256 KiB of dotted eyJ must stay well under the CI budget.
 
-    The old regex backtracked (~15 s per MiB, ~16 min at the 64 MiB cap).
-    jwt_on_line and JWT redaction are typically under 10 ms on 1 MiB.
-    The assertion budget is 2.0 s so shared CI runners have slack; this
-    test always runs (no skip). redact_text is not timed here because
-    the password-pool window scan is a separate linear pass.
+    Günter's follow-up: the one-char walk after each failed ``eyJ`` was
+    superlinear. Repeated ``eyJ`` with a dot every ~8000 chars took 71 s
+    on 128 KiB. This test uses 256 KiB of that same shape (2× the repro)
+    so a return to that walk fails by more than an order of magnitude.
+
+    The walk now finds base64url runs once with a compiled
+    ``re.finditer(r"[A-Za-z0-9_-]+")`` and does a constant-time
+    structure check at each ``eyJ``. Measured locally, ``jwt_on_line``
+    plus JWT redaction on this 256 KiB blob takes about 2.1 s (the
+    alg-header decode still runs at each ``eyJ`` that has two dotted
+    followers). The assertion budget is 15.0 s: about 7× that
+    measurement, so a loaded GitHub-hosted runner (often 2–4× slower,
+    sometimes more under contention) still has slack. 15 s is still
+    ~10× faster than the old walk on this input (71 s on 128 KiB,
+    roughly 142 s at 256 KiB), so the regression stays visible. This
+    test always runs (no skip). ``redact_text`` is not timed here
+    because the password-pool window scan is a separate linear pass.
     """
-    blob = "eyJ" * ((1024 * 1024) // 3)
+    blob = _dotted_eyj_blob(256 * 1024, 8000)
     jwt = _runtime_header_jwt({"alg": "HS256"})
     started = time.perf_counter()
     assert scan.jwt_on_line(blob) is False
     shown = scan._redact_jwts(blob)
     elapsed = time.perf_counter() - started
     assert shown == blob
-    assert elapsed < 2.0
+    assert elapsed < 15.0
     assert scan.jwt_on_line(jwt) is True
     assert jwt not in blob
     assert jwt not in shown
+
+
+def test_jwt_payload_over_200_and_near_8192_are_hits(tmp_path, capsys):
+    token = _runtime_pool_token()
+    over_200 = _runtime_segment_jwt(201)
+    near_8192 = _runtime_segment_jwt(8192)
+    over_bound = _runtime_segment_jwt(8193)
+    assert len(over_200.split(".")[1]) == 201
+    assert len(near_8192.split(".")[1]) == 8192
+    assert len(over_bound.split(".")[1]) == 8193
+    assert scan.jwt_on_line(over_200) is True
+    assert scan.jwt_on_line(near_8192) is True
+    assert scan.jwt_on_line(over_bound) is False
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "over200.txt").write_text(f"auth {over_200}\n", encoding="utf-8")
+    (evidence / "near8192.txt").write_text(f"auth {near_8192}\n", encoding="utf-8")
+    (evidence / "overbound.txt").write_text(f"auth {over_bound}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"],
+        capsys,
+        (token, over_200, near_8192, over_bound),
+    )
+    assert code == 1
+    assert _hit("jwt", "over200.txt", line=1) in err
+    assert _hit("jwt", "near8192.txt", line=1) in err
+    assert _hit("jwt", "overbound.txt", line=1) not in err
+    assert over_200 not in out
+    assert over_200 not in err
+    assert near_8192 not in out
+    assert near_8192 not in err
+    assert over_bound not in out
+    assert over_bound not in err
+
+
+def test_jwt_header_length_not_multiple_of_four_is_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    header = _unpadded_alg_header()
+    jwt = _runtime_header_jwt(header)
+    first = jwt.split(".", 1)[0]
+    assert len(first) % 4 != 0
+    assert scan.jwt_on_line(jwt) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_jwt_header_longer_than_8192_is_still_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    header = {"alg": "HS256", "pad": "A" * 7000}
+    first = _b64url(json.dumps(header, separators=(",", ":")).encode("ascii"))
+    jwt = f"{first}.{_b64url_run(12)}.{_b64url_run(12)}"
+    assert first.startswith("eyJ")
+    assert len(first) > 8192
+    assert scan.jwt_on_line(jwt) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_failed_eyj_adjacent_to_real_token_is_still_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    decoy = "".join(("eyJ", "x", ".", "y", ".", "z"))
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    adjacent = f"{decoy}{jwt}"
+    assert decoy + jwt == adjacent
+    assert scan.jwt_on_line(adjacent) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{adjacent}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, decoy, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert decoy not in out
+    assert decoy not in err
+
+
+def test_eyjx_without_dots_adjacent_to_real_token_is_still_a_hit(tmp_path, capsys):
+    """D8: giving up after a failed eyJ must not skip an immediate real token."""
+    token = _runtime_pool_token()
+    decoy = "eyJx"
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    adjacent = f"{decoy}{jwt}"
+    assert decoy + jwt == adjacent
+    assert "." not in decoy
+    assert scan.jwt_on_line(decoy) is False
+    assert scan.jwt_on_line(adjacent) is True
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{adjacent}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, decoy, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+    assert decoy not in out
+    assert decoy not in err
+
+
+def test_double_dot_between_jwt_segments_is_not_a_jwt(tmp_path, capsys):
+    """D16: separators must be a single ``.``; ``..`` is not a JWT."""
+    token = _runtime_pool_token()
+    jwt = _runtime_header_jwt({"alg": "HS256"})
+    header, payload, signature = jwt.split(".")
+    probe = f"{header}..{payload}.{signature}"
+    assert scan.jwt_on_line(jwt) is True
+    assert scan.jwt_on_line(probe) is False
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {probe}\n", encoding="utf-8")
+    code, out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, probe, jwt)
+    )
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out
+    assert jwt not in out
+    assert jwt not in err
+    assert probe not in out
+    assert probe not in err
+
+
+def test_redact_text_pyjwt_missing_link_target_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(
+            f"tar: round/link: Cannot hard link to 'missing_{token}': No such file"
+        )
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("missing_ JWT link target was not redacted")
+
+
+def test_redact_text_pyjwt_gone_path_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(
+            f"tar: gone/{token}: Cannot hard link to 'round/missing': No such file"
+        )
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("gone/ JWT path was not redacted")
+
+
+def test_redact_text_pyjwt_bare_token_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(f"tar: {token}: Cannot open: No such file")
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("bare JWT in tar error text was not redacted")
+
+
+def test_redact_text_pyjwt_before_configured_secret_and_pool():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        secret = "seed" + uuid.uuid4().hex[:12]
+        shown = scan.redact_text(f"tar: {token} secret={secret}", (secret,))
+        _assert_jwt_absent("", shown, token)
+        if secret in shown:
+            raise AssertionError("configured secret leaked beside a JWT")
+
+
+def test_redact_text_overlapping_configured_secret_still_redacts_jwt():
+    """D13: secrets-before-JWTs would punch a hole in the token."""
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        payload = token.split(".")[1]
+        if len(payload) < 12:
+            raise AssertionError("payload too short for overlap secret")
+        secret = payload[2:14]
+        shown = scan.redact_text(f"tar: {token}", (secret,))
+        _assert_jwt_absent("", shown, token)
+        _assert_no_jwt_grams("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("overlapping-secret JWT was not redacted")
+
+
+def test_redact_text_percent_dot_jwt_does_not_leak_grams():
+    """D15: a missing percent-decoded pass leaks %2E JWTs."""
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        encoded = _jwt_dots_encoded(token)
+        member = f"tar: gone/{encoded}: Cannot hard link to 'round/missing'"
+        target = f"tar: round/link: Cannot hard link to 'missing_{encoded}'"
+        for text in (member, target):
+            shown = scan.redact_text(text)
+            _assert_jwt_absent("", shown, token)
+            _assert_no_jwt_grams("", shown, token)
+            if encoded in shown:
+                raise AssertionError("percent-dot JWT leaked")
+            if "<redacted name hmac:" not in shown:
+                raise AssertionError("percent-dot JWT was not redacted")
+
+
+def test_redact_text_percent_segment_jwt_does_not_leak_grams():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        encoded = _jwt_segment_encoded(token)
+        member = f"tar: gone/{encoded}: Cannot hard link to 'round/missing'"
+        target = f"tar: round/link: Cannot hard link to 'missing_{encoded}'"
+        for text in (member, target):
+            shown = scan.redact_text(text)
+            _assert_jwt_absent("", shown, token)
+            _assert_no_jwt_grams("", shown, token)
+            if encoded in shown:
+                raise AssertionError("percent-segment JWT leaked")
+            if "<redacted name hmac:" not in shown:
+                raise AssertionError("percent-segment JWT was not redacted")
+
+
+def test_pyjwt_name_and_verify_identity_do_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        for raw in (token, f"gone/{token}", f"missing_{token}", f"{token}.txt"):
+            shown = scan.redact_name_path(raw)
+            _assert_jwt_absent("", shown, token)
+            if "<redacted name hmac:" not in shown:
+                raise AssertionError("JWT name path was not redacted")
+            formatted = scan.Hit(scan.KIND_JWT, (raw,), secrets=()).format()
+            _assert_jwt_absent("", formatted, token)
+
+
+def test_pyjwt_content_hit_does_not_leak(tmp_path, capsys):
+    tokens = [_pyjwt_access_token() for _ in range(JWT_LEAK_TRIALS)]
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    for index, token in enumerate(tokens):
+        (evidence / f"notes{index}.txt").write_text(f"auth {token}\n", encoding="utf-8")
+    code = scan_main([str(evidence), "--no-allowlist"])
+    captured = capsys.readouterr()
+    if code != 1:
+        raise AssertionError("PyJWT content files did not hit")
+    for token in tokens:
+        _assert_jwt_absent(captured.out, captured.err, token)
+
+
+def test_jwt_walk_runs_once_per_line(monkeypatch):
+    seen: list[str] = []
+    real = scan._iter_jwts
+
+    def counted(text: str):
+        seen.append(text)
+        yield from real(text)
+
+    monkeypatch.setattr(scan, "_iter_jwts", counted)
+    scan.scan_text(("notes.txt",), "sample id 123\n")
+    if seen != ["sample id 123"]:
+        raise AssertionError("JWT walk was not one pass per line")
+    seen.clear()
+    scan.scan_text(("notes.txt",), "one\ntwo\n")
+    if seen != ["one", "two"]:
+        raise AssertionError("JWT walk was not one pass per two lines")
+
+
+def test_cli_jwt_walk_runs_once_per_content_line(tmp_path, capsys, monkeypatch):
+    line = "sample id 123"
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"{line}\n", encoding="utf-8")
+    content_calls = {"n": 0}
+    real = scan._iter_jwts
+
+    def counted(text: str):
+        if text == line:
+            content_calls["n"] += 1
+        yield from real(text)
+
+    monkeypatch.setattr(scan, "_iter_jwts", counted)
+    code, _out, _err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (_runtime_pool_token(),)
+    )
+    if code != 0:
+        raise AssertionError("clean one-line evidence did not scan clean")
+    if content_calls["n"] != 1:
+        raise AssertionError("CLI JWT walk was not one pass per content line")
 
 
 def test_gzip_candidate_cap_is_unsuppressible_archive(tmp_path, capsys):

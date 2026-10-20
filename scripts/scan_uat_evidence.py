@@ -35,11 +35,15 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a folder whose scanned files exceed the 64 MiB total cap
   (67108864 bytes)
 - a 200-character or longer hex or Base64 run
-- a JWT of any realistic length (three bounded base64url segments
-  starting ``eyJ`` whose first segment base64url-decodes to JSON
-  containing an ``alg`` key). Detection is a linear-time scan
-  (Python 3.10; no possessive regex). ``eyJ.a.b`` / ``eyJ+.a.b``
-  and a header without ``alg`` are not hits
+- a JWT of any realistic length (three base64url segments starting
+  ``eyJ`` whose first segment base64url-decodes to JSON containing
+  an ``alg`` key). Detection finds base64url runs once with a
+  compiled ``re.finditer(r"[A-Za-z0-9_-]+")`` and does a
+  constant-time check at each ``eyJ`` (Python 3.10; no possessive
+  regex). Header length is not capped; payload and signature
+  segments stay bounded at 8192. ``eyJ.a.b`` / ``eyJ+.a.b`` and a
+  header without ``alg`` are not hits. Separators must be a
+  single ``.``; ``..`` between segments is not a JWT
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -61,8 +65,14 @@ configured secret, pool token, or JWT is printed as
 ``<redacted name hmac:xxxxxxxx>`` (HMAC-SHA256 of the segment with a
 per-run random key, first 8 hex). A parent segment that matches is
 redacted the same way. A secret that contains ``/`` redacts the whole
-path. Tar-error text is redacted the same way for those tokens.
-They do not print the secret.
+path. Tar-error text, name hits, and verify output are redacted
+JWTs first (raw tokens, then each ``[A-Za-z0-9_.%-]+`` run whose
+percent-decoded form contains a JWT; the whole raw run is
+replaced), then configured secrets, then pool windows, so a
+24-character pool window or a ``%2E``/``%2D``/``%5F``/``%65``
+encoding cannot leave the payload in the clear. They do not
+print the secret. Separators must be a single ``.``; ``..``
+between segments is not a JWT.
 """
 from __future__ import annotations
 
@@ -149,11 +159,9 @@ SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
 B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
 _JWT_PREFIX = "eyJ"
-_JWT_B64URL = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
-)
-_JWT_FIRST_MAX = len(_JWT_PREFIX) + 8192
 _JWT_OTHER_MAX = 8192
+_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
+_PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -170,15 +178,28 @@ def _redact_tag(raw: str) -> str:
     return f"<redacted name hmac:{digest}>"
 
 
+def _text_variants(text: str) -> tuple[str, ...]:
+    """Return unique raw and percent-decoded forms of ``text``.
+
+    Line scanners, including the JWT walk, run once per distinct form.
+    When percent-decoding does not change the text, that is one pass
+    per line.
+    """
+    decoded = unquote(text)
+    if decoded == text:
+        return (text,)
+    return (text, decoded)
+
+
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
     if not segment:
         return False
-    variants = (segment, unquote(segment))
-    if any(pool_token_on_line(variant) for variant in variants):
-        return True
+    variants = _text_variants(segment)
     if any(jwt_on_line(variant) for variant in variants):
         return True
-    return any(configured_secret_on_line(variant, secrets) for variant in variants)
+    if any(configured_secret_on_line(variant, secrets) for variant in variants):
+        return True
+    return any(pool_token_on_line(variant) for variant in variants)
 
 
 def redact_name_path(raw: str, secrets: tuple[str, ...] = ()) -> str:
@@ -236,7 +257,7 @@ def _redact_pool_windows(text: str) -> str:
 
 
 def _redact_jwts(text: str) -> str:
-    """Replace each JWT match with an HMAC tag. Advance one char on a miss."""
+    """Replace each alg-header JWT with an HMAC tag. One walk."""
     out: list[str] = []
     start = 0
     for begin, end, token in _iter_jwts(text):
@@ -247,11 +268,41 @@ def _redact_jwts(text: str) -> str:
     return "".join(out)
 
 
+def _redact_percent_jwts(text: str) -> str:
+    """Replace each encoded run whose decoded form contains a JWT.
+
+    Runs are ``[A-Za-z0-9_.%-]+``. The whole raw run is replaced, not
+    just the decoded token. Linear: one ``finditer``, then
+    ``jwt_on_line`` only on runs that contain ``%``.
+    """
+    out: list[str] = []
+    start = 0
+    for match in _PERCENT_JWT_RUN_RE.finditer(text):
+        raw = match.group(0)
+        if "%" not in raw:
+            continue
+        decoded = unquote(raw)
+        if decoded == raw or not jwt_on_line(decoded):
+            continue
+        out.append(text[start : match.start()])
+        out.append(_redact_tag(raw))
+        start = match.end()
+    out.append(text[start:])
+    return "".join(out)
+
+
 def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
-    """Redact configured secrets, pool tokens, and JWTs in arbitrary text."""
+    """Redact JWTs, then configured secrets, then pool windows.
+
+    JWT first (raw tokens, then percent-encoded runs) so a
+    24-character pool window or a ``%2E``/``%2D``/``%5F``/``%65``
+    encoding cannot punch a hole that leaves the payload (``sub``,
+    ``username``, ``role``, ``permissions``, ``jti``) in the clear.
+    Name hits use the same JWT-then-secret-then-pool check order.
+    """
     if not text:
         return text
-    shown = text
+    shown = _redact_percent_jwts(_redact_jwts(text))
     needles: list[tuple[str, str]] = []
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         needles.append((secret, _redact_tag(secret)))
@@ -261,7 +312,7 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     for needle, tag in needles:
         if needle in shown:
             shown = shown.replace(needle, tag)
-    return _redact_jwts(_redact_pool_windows(shown))
+    return _redact_pool_windows(shown)
 
 
 class Hit:
@@ -370,7 +421,7 @@ def scan_text(
 ) -> list[Hit]:
     hits: list[Hit] = []
     for number, line in enumerate(text.splitlines(), start=1):
-        variants = (line, unquote(line))
+        variants = _text_variants(line)
         if any(PRINTED_ONCE_RE.search(variant) for variant in variants):
             hits.append(Hit(KIND_PRINTED_ONCE, identity, number, secrets))
         if any(BCRYPT_RE.search(variant) for variant in variants):
@@ -398,74 +449,84 @@ def _jwt_header_has_alg(token: str) -> bool:
     return isinstance(data, dict) and "alg" in data
 
 
-def _b64url_end(text: str, start: int, limit: int) -> int:
-    """Return the index after a bounded base64url run starting at ``start``."""
-    end = start
-    last = start + limit
-    length = len(text)
-    if last > length:
-        last = length
-    while end < last and text[end] in _JWT_B64URL:
-        end += 1
-    return end
+def _jwt_triple_end(text: str, runs: list[tuple[int, int]], index: int) -> int | None:
+    """Return the signature end when run ``index`` has two dotted followers.
 
-
-def _jwt_token_end(text: str, pos: int) -> int | None:
-    """Return the end index of a three-segment JWT at ``pos``, or None."""
-    end1 = _b64url_end(text, pos, _JWT_FIRST_MAX)
-    if end1 < pos + len(_JWT_PREFIX) or end1 >= len(text) or text[end1] != ".":
+    Payload and signature stay bounded at ``_JWT_OTHER_MAX``. The header
+    run is not length-capped. Separators must be a single ``.``.
+    ``eyJheader..payload.sig`` is not a JWT.
+    """
+    if index + 2 >= len(runs):
         return None
-    end2 = _b64url_end(text, end1 + 1, _JWT_OTHER_MAX)
-    if end2 <= end1 + 1 or end2 >= len(text) or text[end2] != ".":
+    header_end = runs[index][1]
+    payload_start, payload_end = runs[index + 1]
+    signature_start, signature_end = runs[index + 2]
+    if header_end >= len(text) or text[header_end] != ".":
         return None
-    end3 = _b64url_end(text, end2 + 1, _JWT_OTHER_MAX)
-    if end3 <= end2 + 1:
+    if payload_start != header_end + 1:
         return None
-    return end3
-
-
-def _jwt_advance_after_miss(text: str, pos: int) -> int:
-    """Advance past a failed start without rescanning an undotted run."""
-    nxt = pos + 1
-    length = len(text)
-    if nxt >= length:
-        return length
-    dot = text.find(".", pos)
-    if dot < 0:
-        return length
-    earliest = dot - _JWT_FIRST_MAX
-    if earliest > nxt:
-        run_end = _b64url_end(text, pos, earliest - pos)
-        if run_end >= earliest:
-            return earliest
-    return nxt
+    if payload_end >= len(text) or text[payload_end] != ".":
+        return None
+    if signature_start != payload_end + 1:
+        return None
+    payload_len = payload_end - payload_start
+    signature_len = signature_end - signature_start
+    if payload_len < 1 or payload_len > _JWT_OTHER_MAX:
+        return None
+    if signature_len < 1 or signature_len > _JWT_OTHER_MAX:
+        return None
+    return signature_end
 
 
 def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
-    """Yield ``(start, end, token)`` for each alg-header JWT. Linear time."""
-    length = len(text)
-    start = 0
-    while start < length:
-        pos = text.find(_JWT_PREFIX, start)
-        if pos < 0:
-            return
-        end = _jwt_token_end(text, pos)
-        if end is not None:
-            token = text[pos:end]
+    """Yield ``(start, end, token)`` for each alg-header JWT. Linear time.
+
+    Base64url runs are found once with ``_JWT_RUN_RE.finditer``. Each
+    ``eyJ`` in a run that is followed by two bounded dotted segments is
+    an O(1) structure check plus the alg-header decode. A failed
+    ``eyJ`` does not skip a later real token, including one immediately
+    adjacent to the miss.
+    """
+    runs = [(match.start(), match.end()) for match in _JWT_RUN_RE.finditer(text)]
+    cursor = 0
+    index = 0
+    while index < len(runs):
+        run_start, run_end = runs[index]
+        if run_end <= cursor:
+            index += 1
+            continue
+        token_end = _jwt_triple_end(text, runs, index)
+        if token_end is None:
+            index += 1
+            continue
+        search_from = run_start if run_start >= cursor else cursor
+        pos = text.find(_JWT_PREFIX, search_from, run_end)
+        found = False
+        while pos != -1:
+            token = text[pos:token_end]
             if _jwt_header_has_alg(token):
-                yield pos, end, token
-                start = end
-                continue
-        start = _jwt_advance_after_miss(text, pos)
+                yield pos, token_end, token
+                cursor = token_end
+                found = True
+                break
+            pos = text.find(_JWT_PREFIX, pos + 1, run_end)
+        if found:
+            while index < len(runs) and runs[index][1] <= cursor:
+                index += 1
+            continue
+        index += 1
 
 
 def jwt_on_line(line: str) -> bool:
     """True when a JWT starts with eyJ and has three base64url segments.
 
     The first segment must base64url-decode to JSON containing ``alg``.
-    Detection is a linear-time scan with the same bounded segment lengths
-    as r44 (Python 3.10; no possessive quantifiers). A failed header
-    check advances one character so a later real token is not skipped.
+    Detection finds base64url runs once, then checks each ``eyJ`` in
+    constant time (Python 3.10; no possessive quantifiers). Header
+    length is not capped. Payload and signature stay bounded at 8192.
+    A failed header check does not skip a later real token, including
+    a no-dot decoy such as ``eyJx`` immediately followed by a real
+    token. Separators must be a single ``.``; ``..`` is not a JWT.
     There is no total-length cap: tokens around 200-280 characters
     still hit.
     """
@@ -485,7 +546,7 @@ def scan_name(
     seen: set[tuple[str, str]] = set()
     parts = [raw, *[part for part in raw.split("/") if part]]
     for text in parts:
-        variants = (text, unquote(text))
+        variants = _text_variants(text)
         if any(pool_token_on_line(variant) for variant in variants):
             key = (KIND_POOL, text)
             if key not in seen:

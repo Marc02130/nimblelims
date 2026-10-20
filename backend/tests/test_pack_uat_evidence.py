@@ -13,9 +13,13 @@ import shutil
 import subprocess
 import tarfile
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
+import jwt
 import pytest
+from urllib.parse import quote
+
 from app.core.dev_passwords import DEV_PASSWORD_LENGTH, generate_dev_password
 
 REPO = Path(__file__).resolve().parents[2]
@@ -56,6 +60,110 @@ def _runtime_jwt() -> str:
     assert token.startswith("eyJ")
     assert len(token.split(".")) == 3
     return token
+
+
+# PyJWT is already pinned in backend/requirements.txt (auth stack). Leak
+# tests use it at runtime only; tokens are never committed, printed, or logged.
+JWT_LEAK_TRIALS = 56
+
+
+def _pyjwt_access_token() -> str:
+    """Runtime PyJWT token. Do not print or log the return value."""
+    key = os.urandom(32)
+    claims = {
+        "sub": uuid.uuid4().hex,
+        "username": "u" + uuid.uuid4().hex[:12],
+        "role": "lab-technician",
+        "permissions": ["sample:read", "result:write"],
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(claims, key, algorithm="HS256")
+    if not isinstance(token, str):
+        token = token.decode("ascii")
+    if not (token.startswith("eyJ") and token.count(".") == 2):
+        raise AssertionError("PyJWT produced a malformed test token")
+    return token
+
+
+def _jwt_fragments(token: str) -> tuple[str, str, str]:
+    header, payload, _signature = token.split(".")
+    return token, f"{header}.{payload}", payload
+
+
+def _assert_jwt_absent(stdout: str, stderr: str, token: str) -> None:
+    full, header_payload, payload = _jwt_fragments(token)
+    blobs = (stdout, stderr)
+    if any(
+        fragment in blob
+        for fragment in (full, header_payload, payload)
+        for blob in blobs
+        if fragment
+    ):
+        raise AssertionError("planted JWT fragment leaked into stdout or stderr")
+
+
+def _jwt_dots_encoded(token: str) -> str:
+    encoded = token.replace(".", "%2E")
+    if encoded == token or "%2E" not in encoded:
+        raise AssertionError("dot-encoded JWT was not percent-encoded")
+    return encoded
+
+
+def _jwt_segment_encoded(token: str) -> str:
+    header, payload, signature = token.split(".")
+    def _enc(part: str) -> str:
+        return part.replace("-", "%2D").replace("_", "%5F").replace("e", "%65")
+    encoded = f"{header}.{_enc(payload)}.{_enc(signature)}"
+    if encoded == token or "%" not in encoded:
+        raise AssertionError("segment-encoded JWT was not percent-encoded")
+    return encoded
+
+
+def _assert_no_jwt_grams(stdout: str, stderr: str, token: str) -> None:
+    _header, payload, signature = token.split(".")
+    blobs = (stdout, stderr)
+    sources = [payload, signature]
+    for part in (payload, signature):
+        quoted = quote(part, safe="")
+        if quoted != part:
+            sources.append(quoted)
+        inner = part.replace("-", "%2D").replace("_", "%5F").replace("e", "%65")
+        if inner != part:
+            sources.append(inner)
+    for source in sources:
+        if len(source) < 8:
+            if source and any(source in blob for blob in blobs):
+                raise AssertionError("planted JWT fragment leaked")
+            continue
+        for index in range(len(source) - 7):
+            gram = source[index : index + 8]
+            if any(gram in blob for blob in blobs):
+                raise AssertionError("planted JWT 8-gram leaked")
+
+
+def _run_pack_unchecked(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", str(PACK), *args],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _crafted_hardlink_tgz(path: Path, member: str, linkname: str) -> Path:
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        root = tarfile.TarInfo(name="round")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o700
+        bundle.addfile(root)
+        leak = tarfile.TarInfo(name=member)
+        leak.type = tarfile.LNKTYPE
+        leak.linkname = linkname
+        bundle.addfile(leak)
+    path.write_bytes(_gzip_n9(raw.getvalue()))
+    _write_sidecar(path)
+    return path
 
 
 def _token_with_symbol(symbol: str) -> str:
@@ -786,3 +894,111 @@ def test_verify_failed_hardlink_redacts_jwt_in_tar_stderr(tmp_path):
     assert "<redacted name hmac:" in verified.stderr
     assert jwt not in verified.stdout
     assert jwt not in verified.stderr
+
+
+def test_verify_missing_pyjwt_link_target_does_not_leak(tmp_path):
+    for index in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        archive = tmp_path / f"missing-{index}.tgz"
+        _crafted_hardlink_tgz(archive, "round/link", f"missing_{token}")
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_jwt_absent(verified.stdout, verified.stderr, token)
+        if verified.returncode != 2:
+            raise AssertionError("crafted missing_ JWT pack did not fail verify")
+        if "tar extract failed" not in verified.stderr:
+            raise AssertionError("verify did not report tar extract failed")
+        if "<redacted name hmac:" not in verified.stderr:
+            raise AssertionError("tar stderr was not redacted")
+
+
+def test_verify_gone_pyjwt_member_does_not_leak(tmp_path):
+    for index in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        archive = tmp_path / f"gone-{index}.tgz"
+        _crafted_hardlink_tgz(archive, f"gone/{token}", "round/missing-target")
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_jwt_absent(verified.stdout, verified.stderr, token)
+        if verified.returncode != 2:
+            raise AssertionError("crafted gone/ JWT pack did not fail verify")
+        if "tar extract failed" not in verified.stderr:
+            raise AssertionError("verify did not report tar extract failed")
+        if "<redacted name hmac:" not in verified.stderr:
+            raise AssertionError("tar stderr was not redacted")
+
+
+def test_verify_bare_pyjwt_in_tar_error_text_does_not_leak():
+    for _ in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        shown = scan.redact_text(f"tar: {token}: Cannot open: No such file")
+        _assert_jwt_absent("", shown, token)
+        if "<redacted name hmac:" not in shown:
+            raise AssertionError("bare JWT in tar error text was not redacted")
+
+
+def _verify_encoded_jwt_case(
+    tmp_path: Path,
+    encode: Callable[[str], str],
+    member: str,
+    linkname: str,
+    label: str,
+) -> None:
+    for index in range(JWT_LEAK_TRIALS):
+        token = _pyjwt_access_token()
+        encoded = encode(token)
+        archive = tmp_path / f"{label}-{index}.tgz"
+        _crafted_hardlink_tgz(
+            archive,
+            member.format(jwt=encoded),
+            linkname.format(jwt=encoded),
+        )
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_jwt_absent(verified.stdout, verified.stderr, token)
+        _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+        if encoded in verified.stdout or encoded in verified.stderr:
+            raise AssertionError("percent-encoded JWT leaked")
+        if verified.returncode != 2:
+            raise AssertionError("crafted percent-encoded JWT pack did not fail verify")
+        if "tar extract failed" not in verified.stderr:
+            raise AssertionError("verify did not report tar extract failed")
+        if "<redacted name hmac:" not in verified.stderr:
+            raise AssertionError("tar stderr was not redacted")
+
+
+def test_verify_percent_dot_jwt_member_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        _jwt_dots_encoded,
+        "gone/{jwt}",
+        "round/missing-target",
+        "dot-member",
+    )
+
+
+def test_verify_percent_dot_jwt_link_target_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        _jwt_dots_encoded,
+        "round/link",
+        "missing_{jwt}",
+        "dot-target",
+    )
+
+
+def test_verify_percent_segment_jwt_member_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        _jwt_segment_encoded,
+        "gone/{jwt}",
+        "round/missing-target",
+        "seg-member",
+    )
+
+
+def test_verify_percent_segment_jwt_link_target_does_not_leak(tmp_path):
+    _verify_encoded_jwt_case(
+        tmp_path,
+        _jwt_segment_encoded,
+        "round/link",
+        "missing_{jwt}",
+        "seg-target",
+    )
