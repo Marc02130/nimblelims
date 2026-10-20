@@ -7,8 +7,10 @@ Usage:
     python scripts/pack_uat_evidence.py --verify evidence.tgz
 
 The pack step requires GNU tar and GNU gzip (``tar --version`` and
-``gzip --version``). On macOS put ``gtar`` and ``ggzip`` first on
-``PATH``. It writes a temp archive with ``--format=gnu`` and
+``gzip --version``). On macOS install Homebrew ``gnu-tar`` and
+``gzip`` and put ``/opt/homebrew/bin`` first on ``PATH`` (Homebrew
+gzip is ``gzip``; gnu-tar is ``gtar``, or ``tar`` via gnubin). It
+writes a temp archive with ``--format=gnu`` and
 ``gzip -n -9`` (no name or mtime in the gzip header, compression
 level 9):
 
@@ -55,6 +57,14 @@ GZIP_BIN = "gzip"
 TAR_COMPRESS = "gzip -n -9"
 _CREATE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
 _SIDECAR_RE = re.compile(r"^([0-9a-f]{64})  (.+)$")
+_HOMEBREW_DIRS = (
+    "/opt/homebrew/bin",
+    "/opt/homebrew/opt/gnu-tar/libexec/gnubin",
+    "/opt/homebrew/opt/gzip/libexec/gnubin",
+    "/usr/local/bin",
+    "/usr/local/opt/gnu-tar/libexec/gnubin",
+    "/usr/local/opt/gzip/libexec/gnubin",
+)
 
 
 def _load_scanner():
@@ -85,32 +95,50 @@ def _is_gnu(path: str) -> bool:
     return proc.returncode == 0 and "GNU" in text
 
 
+def _find_gnu(names: tuple[str, ...]) -> str | None:
+    """Return the first GNU binary among PATH names and Homebrew prefixes."""
+    seen: set[str] = set()
+    candidates: list[str] = []
+    for name in names:
+        path = shutil.which(name)
+        if path:
+            candidates.append(path)
+    for directory in _HOMEBREW_DIRS:
+        for name in names:
+            candidates.append(str(Path(directory) / name))
+    for path in candidates:
+        if path in seen or not os.path.isfile(path):
+            continue
+        if not os.access(path, os.X_OK):
+            continue
+        seen.add(path)
+        if _is_gnu(path):
+            return path
+    return None
+
+
 def require_gnu_tools() -> int:
-    """Refuse unless GNU tar and GNU gzip are on PATH (gtar/ggzip allowed)."""
+    """Refuse unless GNU tar and GNU gzip are available.
+
+    Accepts ``tar``/``gtar`` and ``gzip`` on PATH, including Homebrew
+    ``gnu-tar`` (``gtar``, or ``tar`` via gnubin) and Homebrew ``gzip``.
+    """
     global TAR_BIN, GZIP_BIN, TAR_COMPRESS
-    tar = None
-    for name in ("tar", "gtar"):
-        path = shutil.which(name)
-        if path and _is_gnu(path):
-            tar = path
-            break
-    gzip_path = None
-    for name in ("gzip", "ggzip"):
-        path = shutil.which(name)
-        if path and _is_gnu(path):
-            gzip_path = path
-            break
+    tar = _find_gnu(("tar", "gtar"))
+    gzip_path = _find_gnu(("gzip",))
     if tar is None:
         print(
             "ERROR: tar must be GNU tar; run pack and verify on Linux "
-            "or put gtar first on PATH",
+            "or install Homebrew gnu-tar and put /opt/homebrew/bin first "
+            "on PATH",
             file=sys.stderr,
         )
         return 2
     if gzip_path is None:
         print(
             "ERROR: gzip must be GNU gzip; run pack and verify on Linux "
-            "or put ggzip first on PATH",
+            "or install Homebrew gzip and put /opt/homebrew/bin first "
+            "on PATH",
             file=sys.stderr,
         )
         return 2

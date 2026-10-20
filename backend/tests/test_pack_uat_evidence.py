@@ -8,6 +8,7 @@ import io
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import tarfile
 import uuid
@@ -608,6 +609,22 @@ def test_pack_refuses_non_gnu_tar(tmp_path, monkeypatch, capsys):
     assert code == 2
     assert "GNU tar" in captured.err
     assert not output.exists()
+
+
+def test_find_gnu_accepts_homebrew_gtar_and_gzip(tmp_path, monkeypatch):
+    token = _runtime_pool_token()
+    gtar = tmp_path / "gtar"
+    gzip_bin = tmp_path / "gzip"
+    gtar.write_text("#!/bin/sh\necho GNU tar\n", encoding="utf-8")
+    gzip_bin.write_text("#!/bin/sh\necho GNU gzip\n", encoding="utf-8")
+    gtar.chmod(0o755)
+    gzip_bin.chmod(0o755)
+    monkeypatch.setattr(pack, "_HOMEBREW_DIRS", (str(tmp_path),))
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    assert pack._find_gnu(("tar", "gtar")) == str(gtar)
+    assert pack._find_gnu(("gzip",)) == str(gzip_bin)
+    assert token not in str(gtar)
+    assert token not in str(gzip_bin)
 
 
 def test_verify_bytes_after_tar_end_inside_gzip_fails(tmp_path):

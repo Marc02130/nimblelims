@@ -1,6 +1,7 @@
 """The evidence scan refuses secrets before a folder is shared."""
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import importlib.util
@@ -147,6 +148,35 @@ def _runtime_pool_token() -> str:
             return token
         token = generate_dev_password()
     raise AssertionError("could not generate a pool token")
+
+
+def _runtime_jwt() -> str:
+    def part(nbytes: int, prefix: str = "") -> str:
+        raw = os.urandom(nbytes)
+        text = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+        return prefix + text
+
+    token = f"{part(12, 'eyJ')}.{part(18)}.{part(16)}"
+    assert token.startswith("eyJ")
+    assert len(token.split(".")) == 3
+    assert len(token) < 200
+    return token
+
+
+def _binary_with_stray_gzip(prefix: bytes, size: int = 64 * 1024) -> bytes:
+    body = bytearray(prefix)
+    pad = b"\x11\x22\x33\x44"
+    while len(body) < size:
+        body.extend(pad)
+    del body[size:]
+    body[1024:1026] = b"\x1f\x8b"
+    body[1026] = 0x00
+    body[2048:2051] = b"\x1f\x8b\x08"
+    body[2051] = 0xE0
+    body[3072:3075] = b"\x1f\x8b\x08"
+    body[3075] = 0x00
+    body[3076:3092] = b"\xff" * 16
+    return bytes(body)
 
 
 def _runtime_configured_secret() -> str:
@@ -1675,7 +1705,7 @@ def test_archive_signatures_in_folder_are_hits(tmp_path, capsys):
         "note.Z": b"\x1f\x9d" + b"pad",
         "note.cpio": b"070701" + b"pad\x00",
         "note.lzma": b"\x5d\x00\x00" + b"pad\x00",
-        "junk.gz": b"xxxx" + b"\x1f\x8b" + b"pad",
+        "junk.gz": b"xxxx" + gzip.compress(b"ok\n"),
         "note.zip": b"PK\x03\x04" + b"pad",
         "empty.zip": b"PK\x05\x06" + b"pad",
         "span.zip": b"PK\x07\x08" + b"pad",
@@ -1953,3 +1983,70 @@ def test_regular_file_as_evidence_is_refused(tmp_path, capsys):
     code, _out, err = _run([str(target), "--no-allowlist"], capsys, (token,))
     assert code == 2
     assert "not a directory" in err
+    assert "not a directory" in err
+
+
+def test_stray_gzip_magic_in_binary_and_pdf_is_not_archive(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    random_bin = _binary_with_stray_gzip(b"RAND")
+    pdf_like = _binary_with_stray_gzip(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
+    assert b"\x1f\x8b" in random_bin
+    assert b"\x1f\x8b\x08" in random_bin
+    assert b"\x1f\x8b" in pdf_like
+    assert b"\x1f\x8b\x08" in pdf_like
+    assert scan.archive_kind(random_bin) is None
+    assert scan.archive_kind(pdf_like) is None
+    (evidence / "blob.bin").write_bytes(random_bin)
+    (evidence / "note.pdf").write_bytes(pdf_like)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("archive", "blob.bin") not in err
+    assert _hit("archive", "note.pdf") not in err
+    assert "archive" not in err
+
+
+def test_junk_then_real_gzip_is_still_an_archive_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    payload = b"xxxx" + gzip.compress(b"ok\n")
+    (evidence / "junk.gz").write_bytes(payload)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("archive", "junk.gz") in err
+
+
+def test_runtime_jwt_is_an_unsuppressible_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    jwt = _runtime_jwt()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"auth {jwt}\n", encoding="utf-8")
+    digest = hashlib.sha256((evidence / "notes.txt").read_bytes()).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "notes.txt", "sha256": digest}],
+    )
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token, jwt)
+    )
+    assert code == 1
+    assert _hit("jwt", "notes.txt", line=1) in err
+    assert jwt not in out
+    assert jwt not in err
+
+
+def test_eyj_text_without_three_segments_is_not_a_jwt(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(
+        "eyJ just a note about headers\neyJabc.def\n",
+        encoding="utf-8",
+    )
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "jwt" not in err
+    assert "clean" in out

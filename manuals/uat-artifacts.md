@@ -52,13 +52,14 @@ The scan refuses (exit 1, list of hits) on:
 - a configured secret or pool token in a file or directory name (whole path and each segment)
 - a bcrypt marker (`$2a$`, `$2b$`, `$2y$`)
 - a `.dump` or `.dump.gz` name, or the `PGDMP` magic
-- an archive or compressed file detected by signature (tar ustar at offset 257 or an old-style tar checksum, gzip `1f8b` including after junk, zlib `78 01/5e/9c/da`, xz, bz2 `BZh`, zip `PK\x03\x04` plus empty `PK\x05\x06` and spanned `PK\x07\x08`, zstd, 7z, lz4, rar, cpio, lzma, compress `.Z`, lzip). Short or weak signatures in valid UTF-8 text are not hits. A sha entry cannot hide an archive hit
+- an archive or compressed file detected by signature (tar ustar at offset 257 or an old-style tar checksum, gzip `1f 8b` at offset 0, or gzip after junk only when the bytes are `1f 8b 08`, the FLG reserved bits are zero, and a bounded inflate succeeds, zlib `78 01/5e/9c/da`, xz, bz2 `BZh`, zip `PK\x03\x04` plus empty `PK\x05\x06` and spanned `PK\x07\x08`, zstd, 7z, lz4, rar, cpio, lzma, compress `.Z`, lzip). Short or weak signatures in valid UTF-8 text are not hits. A sha entry cannot hide an archive hit
 - a binary file that is not PGDMP or UTF-8 text (a matching sha entry may suppress this hit)
 - an unsafe name in any directory or file (`|`, `\`, `!`, controls, non-ASCII, leading/trailing whitespace, `.`/`..`/`//`, a drive letter, invalid UTF-8, or a casefold collision)
 - a duplicate identity
 - a symlink, fifo, socket, or device
 - a folder whose scanned files exceed the 64 MiB total cap (67108864 bytes)
 - a 200-character or longer hex or Base64 run
+- a JWT under 200 characters (three base64url segments starting `eyJ`)
 - bytes after the IEND chunk of a PNG
 - an unreadable directory or file
 
@@ -72,7 +73,7 @@ Scan first. Pack only when the scan is clean. Use [`scripts/pack_uat_evidence.py
 python scripts/pack_uat_evidence.py /path/to/evidence --output evidence.tgz --secrets-file PATH
 ```
 
-The helper requires GNU tar and GNU gzip (`tar --version`, `gzip --version`). On macOS put `gtar` and `ggzip` first on `PATH`. It then packs into a temp name with `--format=gnu` and `gzip -n -9` (no name or mtime in the gzip header): `tar --format=gnu -C <parent> -cf <temp> --owner=0 --group=0 --numeric-owner --sort=name --mtime=@0 --mode=u=rwX,go= --use-compress-program='gzip -n -9' -- <dir>` (no `./`). `--mode=u=rwX,go=` normalizes member modes so the SHA-256 does not depend on the operator umask or the source file modes. It extracts that temp archive with `-p` (same permissions), requires exactly one top-level real directory, scans that directory as the evidence root (allowlist paths stay `ui/...png`), name-scans the directory's own name, rebuilds with the same flags, and requires a byte-identical SHA-256. Only then is the archive published and recorded in `<name>.tgz.sha256`. Pack and verify need the same GNU tar and gzip. A dirty folder or a dirty packed result produces no `.tgz` and no sidecar. The `.tgz` and sidecar are mode `0600`, created with `O_EXCL|O_NOFOLLOW`. Output inside the scanned folder, a symlinked output path, or a symlinked evidence root is refused. Failed tar stderr is redacted for pool tokens and configured secrets.
+The helper requires GNU tar and GNU gzip (`tar --version`, `gzip --version`). On macOS install Homebrew `gnu-tar` and `gzip` and put `/opt/homebrew/bin` first on `PATH` (Homebrew gzip is `gzip`; gnu-tar is `gtar`, or `tar` via gnubin). It then packs into a temp name with `--format=gnu` and `gzip -n -9` (no name or mtime in the gzip header): `tar --format=gnu -C <parent> -cf <temp> --owner=0 --group=0 --numeric-owner --sort=name --mtime=@0 --mode=u=rwX,go= --use-compress-program='gzip -n -9' -- <dir>` (no `./`). `--mode=u=rwX,go=` normalizes member modes so the SHA-256 does not depend on the operator umask or the source file modes. It extracts that temp archive with `-p` (same permissions), requires exactly one top-level real directory, scans that directory as the evidence root (allowlist paths stay `ui/...png`), name-scans the directory's own name, rebuilds with the same flags, and requires a byte-identical SHA-256. Only then is the archive published and recorded in `<name>.tgz.sha256`. Pack and verify need the same GNU tar and gzip. A dirty folder or a dirty packed result produces no `.tgz` and no sidecar. The `.tgz` and sidecar are mode `0600`, created with `O_EXCL|O_NOFOLLOW`. Output inside the scanned folder, a symlinked output path, or a symlinked evidence root is refused. Failed tar stderr is redacted for pool tokens and configured secrets.
 
 Verify before sharing:
 

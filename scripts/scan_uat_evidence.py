@@ -21,8 +21,10 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a ``.dump`` / ``.dump.gz`` name, or the ``PGDMP`` magic
 - an archive or compressed payload (tar, gzip, zlib, xz, bz2, zip,
   zstd, 7z, lz4, rar, cpio, lzma, compress ``.Z``, lzip) detected
-  by signature, including gzip magic after junk, except short or
-  weak signatures in valid UTF-8 text
+  by signature, including a gzip member after junk only when the
+  bytes are ``1f 8b 08``, the FLG reserved bits are zero, and a
+  bounded inflate succeeds, except short or weak signatures in
+  valid UTF-8 text
 - bytes after the IEND chunk of a PNG
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
@@ -31,6 +33,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a folder whose scanned files exceed the 64 MiB total cap
   (67108864 bytes)
 - a 200-character or longer hex or Base64 run
+- a JWT under 200 characters (three base64url segments starting
+  ``eyJ``)
 - an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
@@ -41,7 +45,7 @@ tuple matches exactly and that same object's SHA-256 equals the entry
 hash. A sha entry may suppress only refused-binary and password-pool
 hits. It never suppresses configured-secret, bcrypt, dump/PGDMP,
 printed-once, unsafe-name, duplicate, link, archive, size-cap,
-encoded-run, png-trailing, or unreadable hits. Identities are exact
+encoded-run, jwt, png-trailing, or unreadable hits. Identities are exact
 one-element tuples: the on-disk
 relative path. No name is normalized. Duplicate or non-canonical
 allowlist paths refuse the whole allowlist (exit 2). There is no
@@ -67,6 +71,7 @@ import secrets as _secretsmod
 import shlex
 import stat
 import sys
+import zlib
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -84,6 +89,10 @@ SECRET_NAME_RE = re.compile(
 )
 PGDMP_MAGIC = b"PGDMP"
 GZIP_MAGIC = b"\x1f\x8b"
+GZIP_DEFLATE = b"\x1f\x8b\x08"
+GZIP_FLG_RESERVED = 0xE0
+GZIP_PROBE_LIMIT = 8 * 1024
+GZIP_CANDIDATE_CAP = 32
 ZLIB_MAGICS = (b"\x78\x01", b"\x78\x5e", b"\x78\x9c", b"\x78\xda")
 XZ_MAGIC = b"\xfd7zXZ\x00"
 BZ2_MAGIC = b"BZh"
@@ -126,10 +135,13 @@ KIND_ARCHIVE = "archive"
 KIND_SIZE_CAP = "size-cap"
 KIND_UNREADABLE = "unreadable"
 KIND_ENCODED = "encoded run"
+KIND_JWT = "jwt"
 KIND_PNG_TRAIL = "png-trailing"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 HEX_RUN_RE = re.compile(r"[0-9a-fA-F]{200,}")
 B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
+JWT_RE = re.compile(r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+MAX_JWT_CHARS = 200
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
 
@@ -343,7 +355,17 @@ def scan_text(
             hits.append(Hit(KIND_CONFIGURED, identity, number, secrets))
         if any(HEX_RUN_RE.search(variant) or B64_RUN_RE.search(variant) for variant in variants):
             hits.append(Hit(KIND_ENCODED, identity, number, secrets))
+        if any(jwt_on_line(variant) for variant in variants):
+            hits.append(Hit(KIND_JWT, identity, number, secrets))
     return hits
+
+
+def jwt_on_line(line: str) -> bool:
+    """True when a JWT under 200 characters starts with eyJ and has three segments."""
+    for match in JWT_RE.finditer(line):
+        if len(match.group(0)) < MAX_JWT_CHARS:
+            return True
+    return False
 
 
 def scan_name(
@@ -610,6 +632,42 @@ def _is_tar_signature(data: bytes) -> bool:
     return _is_old_style_tar_header(data)
 
 
+def _gzip_header_ok(data: bytes, offset: int) -> bool:
+    if offset + 4 > len(data):
+        return False
+    if data[offset : offset + 3] != GZIP_DEFLATE:
+        return False
+    return (data[offset + 3] & GZIP_FLG_RESERVED) == 0
+
+
+def _gzip_inflates(data: bytes, offset: int) -> bool:
+    if not _gzip_header_ok(data, offset):
+        return False
+    decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    incoming = data[offset : offset + GZIP_PROBE_LIMIT]
+    try:
+        out = decoder.decompress(incoming, max_length=GZIP_PROBE_LIMIT)
+    except zlib.error:
+        return False
+    return bool(out) or bool(decoder.eof)
+
+
+def _has_inflating_gzip(data: bytes) -> bool:
+    """True when a deflate gzip member after junk actually inflates."""
+    tried = 0
+    start = 0
+    while tried < GZIP_CANDIDATE_CAP:
+        pos = data.find(GZIP_DEFLATE, start)
+        if pos < 0:
+            return False
+        if _gzip_header_ok(data, pos):
+            tried += 1
+            if _gzip_inflates(data, pos):
+                return True
+        start = pos + 1
+    return False
+
+
 def archive_kind(data: bytes) -> str | None:
     """Return the signature name when ``data`` is an archive or compressor."""
     if data.startswith(GZIP_MAGIC):
@@ -647,7 +705,7 @@ def archive_kind(data: bytes) -> str | None:
         return "lzma"
     if _is_tar_signature(data):
         return "tar"
-    if not data.startswith(PNG_MAGIC) and GZIP_MAGIC in data:
+    if not data.startswith(PNG_MAGIC) and _has_inflating_gzip(data):
         return "gzip"
     return None
 
