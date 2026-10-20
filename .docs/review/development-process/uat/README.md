@@ -51,7 +51,7 @@ Before sharing a folder or tarball:
 python scripts/scan_uat_evidence.py /path/to/evidence
 ```
 
-Share only when the scan exits 0. A non-zero exit lists hits (`printed once` in any case, a mixed 24-character pool window, a configured compose or seed secret, `$2[aby]$`, `.dump` / `.dump.gz` / `PGDMP`, nested gzip/zlib/tar, or a non-allowlisted binary) and the pack is not shared.
+Share only when the scan exits 0. The default reviewed allowlist is [`scripts/uat_evidence_allowlist.json`](../../../../scripts/uat_evidence_allowlist.json) (exact evidence-relative path plus line or SHA-256; never by extension or path suffix; tar members use `archive.tar!path`). A non-zero exit lists hits (`printed once` in any case, a mixed 24-character pool window, a configured compose or seed secret, `$2[aby]$`, `.dump` / `.dump.gz` / `PGDMP`, nested gzip/zlib/tar, or a binary that is not on that allowlist) and the pack is not shared.
 
 Known limitation: CI API tests connect as the testcontainer superuser, not as `lims_app`.
 
