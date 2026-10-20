@@ -49,9 +49,9 @@ def _runtime_jwt() -> str:
     first = base64.urlsafe_b64encode(
         json.dumps(header, separators=(",", ":")).encode("ascii")
     ).decode("ascii").rstrip("=")
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
-    body = "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(24))
-    sig = "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(20))
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    body = "g" + "".join(alphabet[os.urandom(1)[0] % len(alphabet)] for _ in range(11))
+    sig = "g" + "".join(alphabet[os.urandom(1)[0] % len(alphabet)] for _ in range(11))
     token = f"{first}.{body}.{sig}"
     assert token.startswith("eyJ")
     assert len(token.split(".")) == 3

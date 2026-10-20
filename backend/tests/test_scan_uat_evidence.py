@@ -159,13 +159,19 @@ def _runtime_header_jwt(
     length: int | None = None,
 ) -> str:
     first = _b64url(json.dumps(header, separators=(",", ":")).encode("ascii"))
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
     def part(count: int) -> str:
-        return "".join(alphabet[os.urandom(1)[0] % 64] for _ in range(count))
+        chars: list[str] = []
+        for index in range(count):
+            if index % 40 == 0:
+                chars.append("g")
+                continue
+            chars.append(alphabet[os.urandom(1)[0] % len(alphabet)])
+        return "".join(chars)
 
     if length is None:
-        token = f"{first}.{part(24)}.{part(20)}"
+        token = f"{first}.{part(12)}.{part(12)}"
         assert token.startswith("eyJ")
         assert len(token.split(".")) == 3
         assert len(token) < 200
