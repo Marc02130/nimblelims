@@ -7,6 +7,8 @@ import importlib.util
 import io
 import json
 import os
+import socket
+import stat
 import tarfile
 import uuid
 import zlib
@@ -113,7 +115,7 @@ SPOOF_CASES = (
 
 
 def _hit(kind: str, *parts: str, line: int | None = None) -> str:
-    loc = json.dumps(list(parts), ensure_ascii=False)
+    loc = json.dumps(list(parts))
     if line is None:
         return f"HIT {kind}: {loc}"
     return f"HIT {kind}: {loc}:{line}"
@@ -393,7 +395,7 @@ def test_allowlist_line_entry_is_refused(tmp_path, capsys):
     evidence = tmp_path / "evidence"
     evidence.mkdir()
     token = _runtime_pool_token()
-    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    (evidence / "notes.txt").write_text(_secret_text(token), encoding="utf-8")
     allow = _write_allowlist(
         tmp_path / "allow.json",
         [{"path": "notes.txt", "line": 1, "sha256": "a" * 64}],
@@ -409,7 +411,7 @@ def test_allowlist_line_entry_without_sha256_is_refused(tmp_path, capsys):
     evidence = tmp_path / "evidence"
     evidence.mkdir()
     token = _runtime_pool_token()
-    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    (evidence / "notes.txt").write_text(_secret_text(token), encoding="utf-8")
     allow = _write_allowlist(
         tmp_path / "allow.json",
         [{"path": "notes.txt", "line": 1}],
@@ -990,13 +992,15 @@ def test_spec_leading_space_folder(tmp_path, capsys):
     evidence = tmp_path / "evidence"
     _write_reviewed_pngs(evidence)
     (evidence / " ui").mkdir()
-    (evidence / " ui" / UTC_NAME).write_text(_secret_text(token), encoding="utf-8")
+    (evidence / " ui" / UTC_NAME).write_bytes(UTC_PNG)
+    (evidence / "ui" / UTC_NAME).write_text(_secret_text(token), encoding="utf-8")
     allow = _write_allowlist(tmp_path / "allow.json", _reviewed_entries())
     code, _out, err = _run(
         [str(evidence), "--allowlist", str(allow)], capsys, (token,)
     )
     assert code == 1
     assert _hit("unsafe-name", f" ui/{UTC_NAME}") in err
+    assert _hit("password-pool token", UTC_REL, line=2) in err
 
 
 def test_spec_backslash_name(tmp_path, capsys):
@@ -1032,27 +1036,40 @@ def test_spec_pipe_x_and_gunzip_names(tmp_path, capsys):
 def test_spec_colon_one_binary_and_pgdmp_against_checked_in_allowlist(tmp_path, capsys):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
-    (evidence / "ui").mkdir(parents=True)
+    _write_reviewed_pngs(evidence)
     (evidence / "ui" / f"{UTC_NAME}:1").write_bytes(UTC_PNG)
     (evidence / "ui" / f"{YORK_NAME}:1").write_bytes(b"PGDMP")
-    code, _out, err = _run([str(evidence)], capsys, (token,))
+    (evidence / "hidden.bin").write_bytes(b"\x00" + token.encode("utf-8"))
+    allow = REPO / "scripts" / "uat_evidence_allowlist.json"
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+    )
     assert code == 1
     assert _hit("unsafe-name", f"ui/{UTC_NAME}:1") in err
     assert _hit("unsafe-name", f"ui/{YORK_NAME}:1") in err
     assert _hit("dump file", f"ui/{YORK_NAME}:1") in err
+    assert _hit("refuse binary", "hidden.bin") in err
 
 
 def test_spec_bang_in_folder_name(tmp_path, capsys):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
     evidence.mkdir()
+    _write_tar_with_members(evidence / "pack.tar", [(UTC_REL, UTC_PNG)])
     (evidence / "pack.tar!ui").mkdir()
     (evidence / "pack.tar!ui" / UTC_NAME).write_text(
         _secret_text(token), encoding="utf-8"
     )
-    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": ["pack.tar", UTC_REL], "sha256": UTC_SHA}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+    )
     assert code == 1
     assert _hit("unsafe-name", f"pack.tar!ui/{UTC_NAME}") in err
+    assert _hit("password-pool token", f"pack.tar!ui/{UTC_NAME}", line=2) in err
 
 
 def test_spec_control_character_name(tmp_path, capsys):
@@ -1123,14 +1140,24 @@ def test_spec_invalid_utf8_name(tmp_path, capsys):
 
 
 def _write_tar_with_members(path: Path, members: list[tuple[str, bytes]]) -> None:
-    with tarfile.open(path, "w") as bundle:
+    path.write_bytes(_tar_bytes(members))
+
+
+def _tar_bytes(members: list[tuple[str, bytes]]) -> bytes:
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
         for name, data in members:
             _add_tar_member(bundle, name, data)
+    return raw.getvalue()
 
 
 def test_spec_tar_duplicate_both_orders(tmp_path, capsys):
     token = _runtime_pool_token()
     secret = _secret_text(token).encode("utf-8")
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": ["pack.tar", UTC_REL], "sha256": UTC_SHA}],
+    )
     for order in (
         ((UTC_REL, UTC_PNG), (UTC_REL, secret)),
         ((UTC_REL, secret), (UTC_REL, UTC_PNG)),
@@ -1138,7 +1165,9 @@ def test_spec_tar_duplicate_both_orders(tmp_path, capsys):
         evidence = tmp_path / f"ev-{order[0][1][:4].hex()}"
         evidence.mkdir()
         _write_tar_with_members(evidence / "pack.tar", list(order))
-        code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+        code, _out, err = _run(
+            [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+        )
         assert code == 1
         assert _hit("duplicate", "pack.tar", UTC_REL) in err
 
@@ -1151,15 +1180,22 @@ def test_spec_tar_dot_slash_double_slash_backslash_trailing_space(tmp_path, caps
     _write_tar_with_members(
         evidence / "pack.tar",
         [
-            (UTC_REL, UTC_PNG),
+            (UTC_REL, secret),
             (f"./{UTC_REL}", secret),
             ("a//b.txt", secret),
             (f"ui\\{UTC_NAME}", secret),
             (f"{UTC_REL} ", secret),
         ],
     )
-    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": ["pack.tar", UTC_REL], "sha256": UTC_SHA}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+    )
     assert code == 1
+    assert _hit("password-pool token", "pack.tar", UTC_REL, line=2) in err
     assert _hit("unsafe-name", "pack.tar", f"./{UTC_REL}") in err
     assert _hit("unsafe-name", "pack.tar", "a//b.txt") in err
     assert _hit("unsafe-name", "pack.tar", f"ui\\{UTC_NAME}") in err
@@ -1187,6 +1223,7 @@ def test_spec_tar_link_members(tmp_path, capsys):
     evidence.mkdir()
     archive = evidence / "pack.tar"
     with tarfile.open(archive, "w") as bundle:
+        _add_tar_member(bundle, "ui/notes.txt", _secret_text(token).encode("utf-8"))
         info = tarfile.TarInfo(name="ui/link")
         info.type = tarfile.SYMTYPE
         info.linkname = "target"
@@ -1199,14 +1236,15 @@ def test_spec_tar_link_members(tmp_path, capsys):
     assert code == 1
     assert _hit("link", "pack.tar", "ui/link") in err
     assert _hit("link", "pack.tar", "ui/hard") in err
+    assert _hit("password-pool token", "pack.tar", "ui/notes.txt", line=2) in err
 
 
 def test_spec_allowlist_duplicate_and_non_canonical_paths(tmp_path, capsys):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
-    digest = hashlib.sha256(b"ok\n").hexdigest()
+    (evidence / "notes.txt").write_text(_secret_text(token), encoding="utf-8")
+    digest = hashlib.sha256(_secret_text(token).encode("utf-8")).hexdigest()
     dup = _write_allowlist(
         tmp_path / "dup.json",
         [
@@ -1248,7 +1286,8 @@ def test_spec_decompress_cap(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(scan, "MAX_DECOMPRESSED_BYTES", 16)
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    (evidence / "big.gz").write_bytes(gzip.compress(b"x" * 64))
+    planted = (token + ("x" * 64)).encode("utf-8")
+    (evidence / "big.gz").write_bytes(gzip.compress(planted))
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
     assert _hit("decompress-cap", "big.gz", "gunzip") in err
@@ -1290,3 +1329,327 @@ def test_spec_symlink_exact_path_pack_dir_dangling_root_and_fifo(tmp_path, capsy
     code, _out, err = _run([str(dir_pack), "--no-allowlist"], capsys, (token,))
     assert code == 1
     assert _hit("link", "ui") in err
+
+
+def _wrap_layers(payload: bytes, layers: int, kind: str) -> bytes:
+    for _ in range(layers):
+        payload = gzip.compress(payload) if kind == "gzip" else zlib.compress(payload)
+    return payload
+
+
+def test_spec_secret_appended_to_tar_is_trailing_bytes(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "pack.tar").write_bytes(
+        _tar_bytes([(UTC_REL, UTC_PNG)]) + _secret_text(token).encode("utf-8")
+    )
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("trailing-bytes", "pack.tar", "trailing") in err
+    assert _hit("password-pool token", "pack.tar", "trailing", line=2) in err
+
+
+def test_spec_two_tars_joined_with_cat(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    first = _tar_bytes([(UTC_REL, UTC_PNG)])
+    second = _tar_bytes([("notes.txt", _secret_text(token).encode("utf-8"))])
+    (evidence / "pack.tar").write_bytes(first + second)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("trailing-bytes", "pack.tar", "trailing") in err
+    assert _hit("password-pool token", "pack.tar", "trailing", "notes.txt", line=2) in err
+
+
+def test_spec_tgz_of_joined_tars(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    first = _tar_bytes([(UTC_REL, UTC_PNG)])
+    second = _tar_bytes([("notes.txt", _secret_text(token).encode("utf-8"))])
+    (evidence / "pack.tgz").write_bytes(gzip.compress(first + second))
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("trailing-bytes", "pack.tgz", "gunzip", "trailing") in err
+    assert _hit(
+        "password-pool token", "pack.tgz", "gunzip", "trailing", "notes.txt", line=2
+    ) in err
+
+
+def test_spec_corrupted_second_tar_header(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    first = _tar_bytes([(UTC_REL, UTC_PNG)])
+    second = bytearray(_tar_bytes([("notes.txt", _secret_text(token).encode("utf-8"))]))
+    second[0] ^= 0xFF
+    (evidence / "pack.tar").write_bytes(first + bytes(second))
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("trailing-bytes", "pack.tar", "trailing") in err
+
+
+def test_spec_old_style_dir_member_with_payload(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    payload = _secret_text(token).encode("utf-8")
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as bundle:
+        info = tarfile.TarInfo(name="hidden/")
+        info.size = len(payload)
+        info.type = tarfile.REGTYPE
+        bundle.addfile(info, io.BytesIO(payload))
+    (evidence / "pack.tar").write_bytes(raw.getvalue())
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("dir-payload", "pack.tar", "hidden/") in err
+    assert _hit("password-pool token", "pack.tar", "hidden/", line=2) in err
+
+
+def test_spec_zlib_unused_data_secret(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "note.zlib").write_bytes(
+        zlib.compress(b"ok\n") + _secret_text(token).encode("utf-8")
+    )
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("trailing-bytes", "note.zlib", "inflate") in err
+    assert _hit("password-pool token", "note.zlib", "inflate", "trailing", line=2) in err
+
+
+def test_spec_zlib_unused_data_pgdmp(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "note.zlib").write_bytes(zlib.compress(b"ok\n") + b"PGDMP\x00custom")
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("trailing-bytes", "note.zlib", "inflate") in err
+    assert _hit("dump file", "note.zlib", "inflate", "trailing") in err
+
+
+def test_spec_unreadable_directory_is_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    locked = evidence / "locked"
+    locked.mkdir(parents=True)
+    (locked / "notes.txt").write_text(_secret_text(token), encoding="utf-8")
+    os.chmod(locked, 0)
+    try:
+        try:
+            os.listdir(locked)
+        except OSError:
+            pass
+        else:
+            pytest.skip(
+                "unreadable directories not enforceable here: "
+                "listdir succeeded after chmod 0 (likely running as root)"
+            )
+        code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+        assert code == 1
+        assert _hit("unreadable", "locked") in err
+        assert "Traceback" not in err
+    finally:
+        os.chmod(locked, 0o700)
+
+
+def test_spec_unreadable_file_is_a_hit(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    target = evidence / "notes.txt"
+    target.write_text(_secret_text(token), encoding="utf-8")
+    os.chmod(target, 0)
+    opened = None
+    try:
+        try:
+            opened = os.open(os.fspath(target), os.O_RDONLY)
+        except OSError:
+            opened = None
+        else:
+            pytest.skip(
+                "unreadable files not enforceable here: "
+                "open succeeded after chmod 0 (likely running as root)"
+            )
+        code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+        assert code == 1
+        assert _hit("unreadable", "notes.txt") in err
+        assert "Traceback" not in err
+    finally:
+        if opened is not None:
+            os.close(opened)
+        os.chmod(target, 0o600)
+
+
+def test_spec_max_nest_exact_and_plus_one_gzip_and_zlib(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "exact.gz").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST, "gzip"))
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "clean" in out
+    assert "HIT " not in err
+
+    over = tmp_path / "over-gzip"
+    over.mkdir()
+    (over / "over.gz").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST + 1, "gzip"))
+    code, _out, err = _run([str(over), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert "HIT nesting:" in err
+
+    zexact = tmp_path / "exact-zlib"
+    zexact.mkdir()
+    (zexact / "exact.zlib").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST, "zlib"))
+    code, out, err = _run([str(zexact), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "clean" in out
+
+    zover = tmp_path / "over-zlib"
+    zover.mkdir()
+    (zover / "over.zlib").write_bytes(_wrap_layers(b"ok\n", scan.MAX_NEST + 1, "zlib"))
+    code, _out, err = _run([str(zover), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert "HIT nesting:" in err
+
+
+def test_spec_decompress_cap_exact_multifile_and_zlib(tmp_path, capsys, monkeypatch):
+    token = _runtime_pool_token()
+    monkeypatch.setattr(scan, "MAX_DECOMPRESSED_BYTES", 16)
+    exact = tmp_path / "exact"
+    exact.mkdir()
+    (exact / "exact.gz").write_bytes(gzip.compress(b"x" * 16))
+    code, out, err = _run([str(exact), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "clean" in out
+    assert "HIT " not in err
+
+    multi = tmp_path / "multi"
+    multi.mkdir()
+    (multi / "a.gz").write_bytes(gzip.compress(b"x" * 16))
+    (multi / "b.gz").write_bytes(gzip.compress(b"y"))
+    code, _out, err = _run([str(multi), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("decompress-cap", "b.gz", "gunzip") in err
+
+    zexact = tmp_path / "zexact"
+    zexact.mkdir()
+    (zexact / "exact.zlib").write_bytes(zlib.compress(b"x" * 16))
+    code, out, err = _run([str(zexact), "--no-allowlist"], capsys, (token,))
+    assert code == 0
+    assert "clean" in out
+
+    zover = tmp_path / "zover"
+    zover.mkdir()
+    (zover / "over.zlib").write_bytes(zlib.compress(b"x" * 17))
+    code, _out, err = _run([str(zover), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("decompress-cap", "over.zlib", "inflate") in err
+
+    members = tmp_path / "members"
+    members.mkdir()
+    _write_tar_with_members(
+        members / "pack.tar",
+        [("a.txt", b"x" * 16), ("b.txt", b"y")],
+    )
+    code, _out, err = _run([str(members), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("decompress-cap", "pack.tar", "b.txt") in err
+
+
+def test_spec_sha_entry_cannot_hide_dump(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    payload = b"PGDMP\x00custom-format"
+    (evidence / "backup.bin").write_bytes(payload)
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "backup.bin", "sha256": hashlib.sha256(payload).hexdigest()}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, (token,)
+    )
+    assert code == 1
+    assert _hit("dump file", "backup.bin") in err
+
+
+def test_spec_socket_file_is_a_link_hit(tmp_path, capsys):
+    # Unix sockets need bind; skip with a reason if the OS refuses the path.
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    sock_path = evidence / "svc.sock"
+    handle = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        handle.bind(os.fspath(sock_path))
+    except OSError as exc:
+        pytest.skip(f"unix socket not creatable here: {exc}")
+    finally:
+        handle.close()
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("link", "svc.sock") in err
+
+
+def test_spec_device_file_is_a_link_hit(tmp_path, capsys):
+    # Block devices need mknod/root. Prefer the tar chardev member test when
+    # this skip fires. Never skip silently.
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    dev = evidence / "blkdev"
+    try:
+        os.mknod(dev, 0o600 | stat.S_IFBLK, os.makedev(1, 0))
+    except (OSError, AttributeError, PermissionError) as exc:
+        pytest.skip(
+            f"block device not creatable here (needs root or mknod): {exc}"
+        )
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("link", "blkdev") in err
+
+
+def test_spec_tar_fifo_and_chardev_members(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    archive = evidence / "pack.tar"
+    with tarfile.open(archive, "w") as bundle:
+        _add_tar_member(bundle, "ui/notes.txt", _secret_text(token).encode("utf-8"))
+        fifo = tarfile.TarInfo(name="ui/pipe")
+        fifo.type = tarfile.FIFOTYPE
+        bundle.addfile(fifo)
+        chardev = tarfile.TarInfo(name="ui/tty")
+        chardev.type = tarfile.CHRTYPE
+        chardev.devmajor = 1
+        chardev.devminor = 3
+        bundle.addfile(chardev)
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("link", "pack.tar", "ui/pipe") in err
+    assert _hit("link", "pack.tar", "ui/tty") in err
+    assert _hit("password-pool token", "pack.tar", "ui/notes.txt", line=2) in err
+
+
+def test_spec_tar_casefold_collision_inside_archive(tmp_path, capsys):
+    token = _runtime_pool_token()
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    _write_tar_with_members(
+        evidence / "pack.tar",
+        [
+            ("Note.txt", _secret_text(token).encode("utf-8")),
+            ("note.txt", b"ok\n"),
+        ],
+    )
+    code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
+    assert code == 1
+    assert _hit("unsafe-name", "pack.tar", "Note.txt") in err
+    assert _hit("unsafe-name", "pack.tar", "note.txt") in err
+    assert _hit("password-pool token", "pack.tar", "Note.txt", line=2) in err

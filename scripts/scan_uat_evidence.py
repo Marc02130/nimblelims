@@ -19,6 +19,9 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - a duplicate identity, including duplicate tar members
 - a symlink, fifo, socket, device, or tar link/device member
 - nesting past ``MAX_NEST``, or a total decompressed-size cap
+- non-zero bytes after a tar end marker, zlib unused data, or an
+  old-style ``/`` member with size greater than 0
+- an unreadable directory or file
 
 A reviewed allowlist (default ``scripts/uat_evidence_allowlist.json``) may
 suppress a hit. Each entry is a canonical evidence-relative path plus
@@ -27,8 +30,9 @@ There are no line entries. A hit is suppressed only when the identity
 tuple matches exactly and that same object's SHA-256 equals the entry
 hash. A sha entry may suppress only refused-binary and password-pool
 hits. It never suppresses configured-secret, bcrypt, dump/PGDMP,
-printed-once, unsafe-name, duplicate, link, nesting, or decompress-cap
-hits. Identities are exact tuples: the on-disk relative path, then each
+printed-once, unsafe-name, duplicate, link, nesting, decompress-cap,
+trailing-bytes, dir-payload, or unreadable hits. Identities are exact
+tuples: the on-disk relative path, then each
 tar member as stored, then each decode layer. No name is normalized.
 Tar members need their own identity (``["archive.tar", "ui/name.png"]``).
 A file entry never covers a member. Duplicate or non-canonical allowlist
@@ -90,6 +94,9 @@ KIND_DUPLICATE = "duplicate"
 KIND_LINK = "link"
 KIND_NESTING = "nesting"
 KIND_DECOMPRESS_CAP = "decompress-cap"
+KIND_TRAILING = "trailing-bytes"
+KIND_DIR_PAYLOAD = "dir-payload"
+KIND_UNREADABLE = "unreadable"
 SHA_SUPPRESSIBLE = frozenset({KIND_BINARY, KIND_POOL})
 Identity = tuple[str, ...]
 
@@ -413,7 +420,7 @@ def _is_tar_bytes(data: bytes) -> bool:
         return False
     handle = io.BytesIO(data)
     try:
-        with tarfile.open(fileobj=handle, mode="r:*") as archive:
+        with tarfile.open(fileobj=handle, mode="r:") as archive:
             archive.getmembers()
         return True
     except tarfile.TarError:
@@ -441,14 +448,17 @@ def _special_kind(mode: int) -> bool:
 
 
 def _read_nofollow(path: Path) -> bytes:
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    fd = os.open(os.fspath(path), flags)
     try:
-        fd = os.open(os.fspath(path), os.O_RDONLY | os.O_NOFOLLOW)
-    except OSError as exc:
-        if exc.errno in (errno.ELOOP, getattr(errno, "EPERM", None)):
-            raise
-        raise
-    with os.fdopen(fd, "rb") as handle:
-        return handle.read()
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise OSError(errno.ELOOP, "not a regular file")
+        if opened.st_size <= 0:
+            return b""
+        return os.read(fd, opened.st_size)
+    finally:
+        os.close(fd)
 
 
 def _record_digest(
@@ -518,17 +528,42 @@ def _scan_decode(
     budget: list[int],
     layer: str,
 ) -> list[Hit]:
+    extra = b""
     try:
-        inner = gzip.decompress(data) if layer == "gunzip" else zlib.decompress(data)
+        if layer == "gunzip":
+            inner = gzip.decompress(data)
+        else:
+            decoder = zlib.decompressobj()
+            inner = decoder.decompress(data)
+            extra = decoder.unused_data
+            if extra or not decoder.eof:
+                extra = extra or b"\x00"
     except (OSError, zlib.error):
         return [Hit(KIND_BINARY, identity)]
-    budget[0] += len(inner)
+    hits: list[Hit] = []
     inner_id = identity + (layer,)
+    if extra:
+        hits.append(Hit(KIND_TRAILING, inner_id))
+        if extra != b"\x00":
+            hits.extend(
+                _scan_payload(
+                    inner_id + ("trailing",),
+                    extra,
+                    secrets,
+                    depth + 1,
+                    digests,
+                    announced,
+                    budget,
+                )
+            )
+    budget[0] += len(inner)
     if budget[0] > MAX_DECOMPRESSED_BYTES:
-        return [Hit(KIND_DECOMPRESS_CAP, inner_id)]
-    return _scan_payload(
-        inner_id, inner, secrets, depth + 1, digests, announced, budget
+        hits.append(Hit(KIND_DECOMPRESS_CAP, inner_id))
+        return hits
+    hits.extend(
+        _scan_payload(inner_id, inner, secrets, depth + 1, digests, announced, budget)
     )
+    return hits
 
 
 def _scan_tar_bytes(
@@ -542,10 +577,16 @@ def _scan_tar_bytes(
 ) -> list[Hit]:
     hits: list[Hit] = []
     seen_members: set[str] = set()
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
-        for member in archive.getmembers():
+    handle = io.BytesIO(data)
+    with tarfile.open(fileobj=handle, mode="r:") as archive:
+        members = list(archive.getmembers())
+        # ``r:`` stops at the end marker. ``extractfile`` seeks backward, so
+        # leftover must use this position, not ``tell()`` after reads.
+        end_pos = handle.tell()
+        collided = _casefold_collisions([member.name for member in members])
+        for member in members:
             member_id = identity + (member.name,)
-            if is_unsafe_name(member.name):
+            if is_unsafe_name(member.name) or member.name in collided:
                 hits.append(Hit(KIND_UNSAFE, member_id))
             if member.name in seen_members:
                 hits.append(Hit(KIND_DUPLICATE, member_id))
@@ -554,6 +595,9 @@ def _scan_tar_bytes(
                     announced.add(member_id)
             else:
                 seen_members.add(member.name)
+            dir_payload = member.name.endswith("/") and member.size > 0
+            if dir_payload:
+                hits.append(Hit(KIND_DIR_PAYLOAD, member_id))
             if (
                 member.issym()
                 or member.islnk()
@@ -563,21 +607,44 @@ def _scan_tar_bytes(
             ):
                 hits.append(Hit(KIND_LINK, member_id))
                 continue
-            if member.isdir():
+            if member.isdir() and not dir_payload:
                 continue
-            if not member.isfile():
+            if not member.isfile() and not dir_payload:
                 hits.append(Hit(KIND_LINK, member_id))
                 continue
             extracted = archive.extractfile(member)
             if extracted is None:
+                if dir_payload:
+                    continue
                 hits.append(Hit(KIND_LINK, member_id))
                 continue
             payload = extracted.read()
+            budget[0] += len(payload)
+            if budget[0] > MAX_DECOMPRESSED_BYTES:
+                hits.append(Hit(KIND_DECOMPRESS_CAP, member_id))
+                continue
             hits.extend(
                 _scan_payload(
                     member_id, payload, secrets, depth, digests, announced, budget
                 )
             )
+        leftover = data[end_pos:]
+        if leftover and any(byte != 0 for byte in leftover):
+            trailing_id = identity + ("trailing",)
+            hits.append(Hit(KIND_TRAILING, trailing_id))
+            trailing = leftover.lstrip(b"\x00")
+            if trailing:
+                hits.extend(
+                    _scan_payload(
+                        trailing_id,
+                        trailing,
+                        secrets,
+                        depth,
+                        digests,
+                        announced,
+                        budget,
+                    )
+                )
     return hits
 
 
@@ -607,8 +674,14 @@ def _scan_directory(
     budget: list[int],
 ) -> list[Hit]:
     hits: list[Hit] = []
+
+    def _onerror(err: OSError) -> None:
+        name = getattr(err, "filename", None) or ""
+        rel = _rel_path(root, Path(name)) if name else root.name
+        hits.append(Hit(KIND_UNREADABLE, (rel,)))
+
     for dirpath, dirnames, filenames in os.walk(
-        os.fspath(root), followlinks=False, topdown=True
+        os.fspath(root), followlinks=False, topdown=True, onerror=_onerror
     ):
         dirnames.sort()
         filenames.sort()
@@ -648,10 +721,11 @@ def _scan_directory(
             try:
                 data = _read_nofollow(child)
             except OSError as exc:
-                if exc.errno in (errno.ELOOP, getattr(errno, "EPERM", None)):
+                if exc.errno in (errno.ELOOP, errno.ENXIO, errno.EPERM):
                     hits.append(Hit(KIND_LINK, identity))
                     continue
-                raise
+                hits.append(Hit(KIND_UNREADABLE, identity))
+                continue
             hits.extend(
                 _scan_payload(identity, data, secrets, 0, digests, announced, budget)
             )
