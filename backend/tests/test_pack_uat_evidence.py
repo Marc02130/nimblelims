@@ -1194,3 +1194,31 @@ def test_verify_percent_segment_jwt_link_target_does_not_leak(tmp_path):
         "missing_{jwt}",
         "seg-target",
     )
+
+
+def test_tar_extract_argv_keeps_dash_p():
+    argv = pack.tar_extract_argv(Path("archive.tgz"), Path("dest"))
+    flags = "".join(item[1:] for item in argv if item.startswith("-") and not item.startswith("--"))
+    if "p" not in flags:
+        raise AssertionError("tar extract argv dropped -p")
+
+
+def test_create_flags_include_nofollow():
+    if pack._CREATE_FLAGS & os.O_NOFOLLOW == 0:
+        raise AssertionError("pack create flags dropped O_NOFOLLOW")
+    if pack._CREATE_FLAGS & os.O_EXCL == 0:
+        raise AssertionError("pack create flags dropped O_EXCL")
+
+
+def test_pack_missing_secrets_file_exits_2(tmp_path):
+    evidence = tmp_path / "round"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    missing = tmp_path / "missing-secrets.env"
+    packed = _run_pack_unchecked(
+        [str(evidence), "--output", str(tmp_path / "out.tgz"), "--secrets-file", str(missing)]
+    )
+    if packed.returncode != 2:
+        raise AssertionError("pack missing --secrets-file did not exit 2")
+    if "secrets file not found" not in packed.stderr:
+        raise AssertionError("pack missing --secrets-file was not reported")
