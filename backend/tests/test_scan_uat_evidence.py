@@ -13,6 +13,7 @@ import socket
 import stat
 import tarfile
 import time
+import unicodedata
 import uuid
 import zlib
 from pathlib import Path
@@ -150,6 +151,17 @@ def _runtime_pool_token() -> str:
             return token
         token = generate_dev_password()
     raise AssertionError("could not generate a pool token")
+
+
+def _runtime_digit_first_pool_token() -> str:
+    """Digit-first pool password. Do not print or log the return value."""
+    for _ in range(400):
+        token = generate_dev_password()
+        if not (token[:1].isdigit() and pool_token_on_line(token)):
+            continue
+        if pool_token_on_line("20261020T1200" + token):
+            return token
+    raise AssertionError("could not generate a digit-first pool token")
 
 
 def _b64url(data: bytes) -> str:
@@ -2189,8 +2201,7 @@ def test_png_bytes_after_iend_are_a_hit(tmp_path, capsys):
     token = _runtime_pool_token()
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    iend = b"\x00\x00\x00\x00IEND" + b"\x11\x22\x33\x44"
-    png = b"\x89PNG\r\n\x1a\n" + b"idat" + iend + token.encode("utf-8")
+    png = _chunk_png() + token.encode("utf-8")
     (evidence / "shot.png").write_bytes(png)
     code, _out, err = _run([str(evidence), "--no-allowlist"], capsys, (token,))
     assert code == 1
@@ -3455,7 +3466,7 @@ def test_pool_token_excludes_iso_timestamps():
 
 
 def test_pool_token_excludes_compact_iso_timestamps():
-    compact = "Aa1!20261020T231931xxxxx"
+    compact = "Aa1!20261020T231931!!!!!"
     if len(compact) != DEV_PASSWORD_LENGTH:
         raise AssertionError("compact timestamp fixture is not 24 characters")
     if scan._TIMESTAMP_RE.search("20261020T231931") is None:
@@ -3551,18 +3562,25 @@ def test_redact_text_several_mib_is_linear_time():
     """Several MiB of ``eyJ*17.a.b `` must redact well under the CI budget.
 
     The quadratic rope/per-character path took 177 s at 8 MiB. This
-    uses 4 MiB and the same 15 s budget as the dotted-eyJ walk so a
+    uses 2 MiB and the same 15 s budget as the dotted-eyJ walk so a
     return to that path fails by more than an order of magnitude.
-    A trailing space keeps each unit a separate run.
+    A trailing space keeps each unit a separate run. 2 MiB may not
+    take more than 6x the 512 KiB time of the same shape.
     """
     unit = ("eyJ" * 17) + ".a.b "
-    blob = unit * ((4 * 1024 * 1024) // len(unit))
+    small = unit * ((512 * 1024) // len(unit))
+    blob = unit * ((2 * 1024 * 1024) // len(unit))
+    started = time.perf_counter()
+    small_shown = scan.redact_text(small)
+    small_elapsed = time.perf_counter() - started
     started = time.perf_counter()
     shown = scan.redact_text(blob)
     elapsed = time.perf_counter() - started
     if elapsed >= 15.0:
         raise AssertionError("redact_text on several MiB exceeded 15s")
-    if "<redacted name hmac:" not in shown:
+    if small_elapsed > 0 and elapsed / small_elapsed > 6.0:
+        raise AssertionError("2 MiB redact_text exceeded 6x the 512 KiB time")
+    if "<redacted name hmac:" not in shown or "<redacted name hmac:" not in small_shown:
         raise AssertionError("several-MiB eyJ blob was not redacted")
 
 
@@ -3719,6 +3737,8 @@ def test_png_bad_crc_is_unsuppressible(tmp_path, capsys):
 def test_r38_magic_bytes_png_is_not_a_chunk_stream(tmp_path, capsys):
     if scan._png_disallowed_chunk(UTC_PNG):
         raise AssertionError("r38 magic-plus-bytes PNG was walked as chunks")
+    if scan._png_has_trailing(UTC_PNG):
+        raise AssertionError("r38 magic-plus-bytes PNG became png-trailing")
     evidence = tmp_path / "evidence"
     (evidence / "ui").mkdir(parents=True)
     (evidence / "ui" / UTC_NAME).write_bytes(UTC_PNG)
@@ -3735,3 +3755,322 @@ def test_r38_magic_bytes_png_is_not_a_chunk_stream(tmp_path, capsys):
         raise AssertionError("r38 PNG became png-trailing")
     if "clean" not in out:
         raise AssertionError("r38 PNG evidence did not scan clean")
+
+
+def test_double_escaped_056_redact_leaves_no_8gram():
+    token = _pyjwt_access_token()
+    escaped = token.replace(".", r"\\056")
+    shown = scan.redact_text(f"tar: {escaped}: Cannot open")
+    _assert_no_jwt_grams("", shown, token)
+    if escaped in shown:
+        raise AssertionError("double-escaped JWT run was not redacted")
+
+
+def test_oversized_phys_gama_srgb_are_unsuppressible(tmp_path, capsys):
+    cases = (
+        ("pHYs", b"\x00" * 20),
+        ("gAMA", b"\x00" * 8),
+        ("sRGB", b"\x00\x00"),
+    )
+    for name, payload in cases:
+        chunk = _png_chunk(name.encode("ascii"), payload)
+        data = _chunk_png(chunk)
+        if scan._png_disallowed_chunk(data) is not True:
+            raise AssertionError("oversized allowed chunk was not suspicious")
+        evidence = tmp_path / f"ev-{name}"
+        evidence.mkdir()
+        (evidence / "photo.png").write_bytes(data)
+        digest = hashlib.sha256(data).hexdigest()
+        allow = _write_allowlist(
+            tmp_path / f"allow-{name}.json",
+            [{"path": "photo.png", "sha256": digest}],
+        )
+        code, _out, err = _run(
+            [str(evidence), "--allowlist", str(allow)], capsys, ()
+        )
+        if code != 1 or _hit("png-trailing", "photo.png") not in err:
+            raise AssertionError("oversized allowed chunk was not png-trailing")
+
+
+def test_non_ihdr_first_complete_chunk_is_unsuppressible(tmp_path, capsys):
+    first = _png_chunk(b"IDAT", b"\x00\x01")
+    data = b"\x89PNG\r\n\x1a\n" + first + _png_chunk(b"IEND", b"")
+    if scan._png_disallowed_chunk(data) is not True:
+        raise AssertionError("non-IHDR-first complete chunk was not suspicious")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(data)
+    digest = hashlib.sha256(data).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 1 or _hit("png-trailing", "photo.png") not in err:
+        raise AssertionError("non-IHDR-first PNG was not png-trailing")
+
+
+def test_plte_valid_and_invalid_sizes(tmp_path, capsys):
+    cases = (
+        (b"\x00\x01\x02", True),
+        (b"\x00" * 768, True),
+        (b"", False),
+        (b"\x00", False),
+        (b"\x00\x01\x02\x03", False),
+        (b"\x00" * 769, False),
+    )
+    for payload, ok in cases:
+        data = _chunk_png(_png_chunk(b"PLTE", payload))
+        disallowed = scan._png_disallowed_chunk(data)
+        if ok and disallowed:
+            raise AssertionError("valid PLTE size was treated as disallowed")
+        if not ok and disallowed is not True:
+            raise AssertionError("invalid PLTE size was not suspicious")
+        evidence = tmp_path / f"ev-{len(payload)}-{int(ok)}"
+        evidence.mkdir()
+        (evidence / "photo.png").write_bytes(data)
+        digest = hashlib.sha256(data).hexdigest()
+        allow = _write_allowlist(
+            tmp_path / f"allow-{len(payload)}-{int(ok)}.json",
+            [{"path": "photo.png", "sha256": digest}],
+        )
+        code, out, err = _run(
+            [str(evidence), "--allowlist", str(allow)], capsys, ()
+        )
+        if ok:
+            if code != 0 or "png-trailing" in err or "clean" not in out:
+                raise AssertionError("valid PLTE PNG did not stay suppressible")
+        elif code != 1 or _hit("png-trailing", "photo.png") not in err:
+            raise AssertionError("invalid PLTE size was not png-trailing")
+
+
+def test_unwalkable_png_with_iend_and_tail_is_unsuppressible(tmp_path, capsys):
+    data = (
+        b"\x89PNG\r\n\x1a\n"
+        + b"xxxx"
+        + b"\x00\x00\x00\x00IEND"
+        + b"\x00\x00\x00\x00"
+        + b"tail"
+    )
+    if scan._png_walked_iend_end(data) != -1:
+        raise AssertionError("garbage PNG was walked as an IHDR stream")
+    if scan._png_has_trailing(data) is not True:
+        raise AssertionError("unwalkable PNG with IEND+tail was not trailing")
+    if scan._png_has_trailing(UTC_PNG):
+        raise AssertionError("r38 magic-plus-bytes PNG became png-trailing")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(data)
+    digest = hashlib.sha256(data).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 1 or _hit("png-trailing", "photo.png") not in err:
+        raise AssertionError("unwalkable PNG with IEND+tail was not png-trailing")
+
+
+def test_iend_bytes_inside_idat_are_not_trailing(tmp_path, capsys):
+    inner = _png_chunk(b"IDAT", b"\x00\x00\x00\x00IEND" + b"xxxx")
+    payload = _chunk_png(inner)
+    if scan._png_has_trailing(payload):
+        raise AssertionError("IEND bytes inside IDAT were treated as trailing")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if "png-trailing" in err:
+        raise AssertionError("IEND-in-IDAT PNG was png-trailing")
+    if code != 0 or "clean" not in out:
+        raise AssertionError("IEND-in-IDAT PNG did not stay suppressible")
+
+
+def test_redact_text_nfkc_configured_secret():
+    secret = "seed" + uuid.uuid4().hex[:10] + "\u212a" + uuid.uuid4().hex[:10]
+    folded = unicodedata.normalize("NFKC", secret)
+    if folded == secret:
+        raise AssertionError("NFKC fixture did not change the secret")
+    shown = scan.redact_text(f"tar: {folded}: Cannot hard link", (secret,))
+    if folded in shown or secret in shown:
+        raise AssertionError("NFKC configured secret leaked")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("NFKC configured secret was not redacted")
+
+
+def test_pool_window_overlapping_compact_timestamp_is_dropped():
+    prefix = "Aa1!"
+    stamp = "20261020T231931"
+    tail = "!!!!" + ("b" * 8)
+    line = prefix + stamp + tail
+    if scan._TIMESTAMP_RE.search(stamp) is None:
+        raise AssertionError("bounded compact timestamp regex did not match")
+    if scan.pool_token_on_line(line):
+        raise AssertionError("window overlapping a compact timestamp was a pool hit")
+    token = _runtime_pool_token()
+    if not scan.pool_token_on_line(token):
+        raise AssertionError("runtime pool token was not a hit")
+
+
+def test_digit_first_password_after_timestamp_is_detected():
+    token = _runtime_digit_first_pool_token()
+    line = "20261020T1200" + token
+    if not scan.pool_token_on_line(line):
+        raise AssertionError("digit-first password after T1200 was not a pool hit")
+    shown = scan.redact_text(line)
+    if token in shown:
+        raise AssertionError("digit-first password after T1200 leaked")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("digit-first password after T1200 was not redacted")
+
+
+def test_pool_run_tail_is_redacted():
+    token = _runtime_pool_token()
+    tail = token[:12]
+    shown = scan.redact_text(f"note {token}{tail} end")
+    if token in shown or tail in shown:
+        raise AssertionError("pool-run tail leaked")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("pool run was not redacted")
+
+
+def test_redact_text_raw_backslash_secret():
+    secret = _runtime_env_secret("\\")
+    shown = scan.redact_text(f"note {secret} trailing", (secret,))
+    if secret in shown:
+        raise AssertionError("raw backslash secret leaked")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("raw backslash secret was not redacted")
+
+
+def test_orig_span_end_exactly_at_piece_start():
+    pieces = [(0, 5, 0, 5), (5, 10, 100, 200)]
+    orig = scan._orig_span(pieces, 0, 5)
+    if orig != (0, 5):
+        raise AssertionError("span ending at the next piece start included it")
+
+
+def test_redact_text_newline_split_token_1mib_is_linear_time():
+    token = _pyjwt_access_token()
+    header, rest = token.split(".", 1)
+    for unit in (f"{header}.\n{rest} ", f"{header}.\\n{rest} "):
+        blob = unit * ((1024 * 1024) // len(unit))
+        started = time.perf_counter()
+        shown = scan.redact_text(blob)
+        elapsed = time.perf_counter() - started
+        if elapsed >= 3.0:
+            raise AssertionError("newline-split 1 MiB redact_text exceeded 3s")
+        _assert_no_jwt_grams("", shown, token)
+
+
+def test_redact_text_token_plus_pool_1mib_is_linear_time():
+    token = _pyjwt_access_token()
+    pool = _runtime_pool_token()
+    unit = f"{token} {pool} "
+    blob = unit * ((1024 * 1024) // len(unit))
+    started = time.perf_counter()
+    shown = scan.redact_text(blob)
+    elapsed = time.perf_counter() - started
+    if elapsed >= 3.0:
+        raise AssertionError("token-plus-pool 1 MiB redact_text exceeded 3s")
+    _assert_no_jwt_grams("", shown, token)
+    if pool in shown:
+        raise AssertionError("pool token leaked from 1 MiB blob")
+
+
+def test_pool_spans_use_prepared_text():
+    token = _runtime_pool_token()
+    shown = scan.redact_text(f"tar: pre\\t{token}: Cannot open")
+    if token in shown:
+        raise AssertionError("pool window was not matched on prepared text")
+
+
+def test_secret_quote_needle_is_redacted():
+    secret = _runtime_env_secret("/")
+    encoded = quote(secret, safe="")
+    if encoded == secret:
+        raise AssertionError("quote needle fixture was not encoded")
+    shown = scan.redact_text(f"tar: {encoded}: Cannot open", (secret,))
+    if encoded in shown or secret in shown:
+        raise AssertionError("quoted secret needle leaked")
+
+
+def test_rejoin_lookaround_does_not_join_unrelated_lines():
+    if scan._join_tar_newlines("one \ntwo") != "one \ntwo":
+        raise AssertionError("F7 lookaround joined a spaced line")
+    if scan._join_tar_newlines("hdr.\npay") != "hdr.pay":
+        raise AssertionError("F7 lookaround did not join a token split")
+
+
+def test_still_decodes_four_layers_not_plain_backslashes():
+    token = _pyjwt_access_token()
+    layered = _jwt_quote_layers(token, 4)
+    if not scan._still_decodes(layered, unescape=False):
+        raise AssertionError("four percent layers did not fail closed")
+    if scan._still_decodes("notes " + ("\\" * 24) + " path", unescape=True):
+        raise AssertionError("plain backslashes failed closed")
+
+
+def test_mapping_keeps_prefix_suffix_for_octal_dot():
+    token = _pyjwt_access_token()
+    escaped = token.replace(".", r"\056")
+    shown = scan.redact_text("pre " + escaped + " post")
+    if not shown.startswith("pre ") or not shown.endswith(" post"):
+        raise AssertionError("R48-F6 mapping dropped prefix or suffix")
+    _assert_no_jwt_grams("", shown, token)
+
+
+def test_header_24kib_and_40kib_alone_and_behind_prefix(tmp_path, capsys):
+    real = _pyjwt_access_token()
+    header, payload, signature = real.split(".")
+    for length in (24 * 1024, 40 * 1024):
+        long_header = ("A" * (length - len(header))) + header
+        token = f"{long_header}.{payload}.{signature}"
+        planted = ("A" * (40 * 1024)) + token
+        evidence = tmp_path / f"ev-{length}"
+        evidence.mkdir()
+        (evidence / "alone.txt").write_text(token + "\n", encoding="utf-8")
+        (evidence / "behind.txt").write_text(planted + "\n", encoding="utf-8")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"],
+            capsys,
+            (token, planted),
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("24/40 KiB header JWT was not a hit")
+
+
+def test_glued_tokens_without_separator_are_redacted():
+    first = _pyjwt_access_token()
+    second = _pyjwt_access_token()
+    glued = first + second
+    shown = scan.redact_text(f"tar: {glued}: Cannot open")
+    _assert_no_jwt_grams("", shown, first)
+    _assert_no_jwt_grams("", shown, second)
+
+
+def test_two_adjacent_tokens_have_two_spans():
+    first = _pyjwt_access_token()
+    second = _pyjwt_access_token()
+    line = f"{first} {second}"
+    spans = list(scan._iter_jwts(line))
+    if len(spans) != 2:
+        raise AssertionError("two adjacent tokens did not yield two spans")
+    hits = scan.scan_text(("notes.txt",), line + "\n")
+    jwt_hits = [hit for hit in hits if hit.kind == scan.KIND_JWT]
+    if len(jwt_hits) != 1:
+        raise AssertionError("two adjacent tokens on one line were not one jwt hit")
+    shown = scan.redact_text(line)
+    _assert_no_jwt_grams("", shown, first)
+    _assert_no_jwt_grams("", shown, second)

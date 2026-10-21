@@ -30,9 +30,11 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - bytes after the IEND chunk of a PNG, a chunk outside the
   reviewed allowlist (``IHDR``, ``PLTE``, ``IDAT``, ``IEND``,
   ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``), a truncated or
-  length-overflowed chunk, or a bad CRC. The first chunk must
-  be ``IHDR`` before the file is walked as a chunk stream so
-  reviewed magic-plus-bytes PNGs stay refuse-binary
+  length-overflowed chunk, a bad CRC, an invalid ``PLTE``
+  size, or an unwalkable PNG that still has IEND plus tail.
+  The first chunk must be ``IHDR`` before the file is walked
+  as a chunk stream so reviewed magic-plus-bytes PNGs stay
+  refuse-binary
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
 - a duplicate identity
@@ -217,14 +219,29 @@ _JWT_OTHER_MAX = 8192
 _JWT_HEADER_MAX = 32 * 1024
 _JWT_EYJ_PER_RUN = 16
 _DECODE_LAYERS = 3
+_UNESCAPE_BOUND = 8
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
 _NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
-_TIMESTAMP_RE = re.compile(r"\d{8}T\d{4,6}Z?")
+_TIMESTAMP_RE = re.compile(
+    r"(?<![0-9A-Za-z])\d{8}T\d{4}(?:\d{2})?Z?(?![0-9A-Za-z])"
+)
+_NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
+_UPPER_RE = re.compile(r"[A-Z]")
+_LOWER_RE = re.compile(r"[a-z]")
+_DIGIT_RE = re.compile(r"[0-9]")
 _PNG_ALLOWED_CHUNKS = frozenset(
     {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"sRGB", b"pHYs", b"gAMA", b"cHRM"}
 )
+_PNG_CHUNK_SIZES = {
+    b"IHDR": 13,
+    b"sRGB": 1,
+    b"pHYs": 9,
+    b"gAMA": 4,
+    b"cHRM": 32,
+    b"IEND": 0,
+}
 _CTRL_SIMPLE = {
     7: r"\a",
     8: r"\b",
@@ -263,12 +280,8 @@ def _redact_tag(raw: str) -> str:
     return f"<redacted name hmac:{digest}>"
 
 
-def _unescape_tar(text: str) -> str:
-    """Strip GNU tar backslash and octal ``\\NNN`` escapes. Linear.
-
-    Consecutive octal runs are decoded as UTF-8 so a full-width dot
-    (``\\357\\274\\216``) is one character even under ``LC_ALL=C``.
-    """
+def _unescape_tar_once(text: str) -> str:
+    """One GNU tar backslash / octal ``\\NNN`` pass. Linear."""
     if "\\" not in text:
         return text
     out: list[str] = []
@@ -306,6 +319,44 @@ def _unescape_tar(text: str) -> str:
     return "".join(out)
 
 
+def _has_tar_escape(text: str) -> bool:
+    """True when a remaining ``\\`` is a simple or octal tar escape."""
+    index = 0
+    length = len(text)
+    while index < length:
+        pos = text.find("\\", index)
+        if pos < 0 or pos + 1 >= length:
+            return False
+        nxt = text[pos + 1]
+        if nxt in _TAR_SIMPLE_ESCAPES or nxt in "01234567":
+            return True
+        index = pos + 1
+    return False
+
+
+def _unescape_tar(text: str) -> str:
+    """Strip GNU tar backslash and octal ``\\NNN`` escapes. Linear.
+
+    Consecutive octal runs are decoded as UTF-8 so a full-width dot
+    (``\\357\\274\\216``) is one character even under ``LC_ALL=C``.
+    One pass always runs so an unknown ``\\X`` (JSON ``\\u``) peels
+    once. Further passes run only while a simple or octal escape
+    remains (max ``_UNESCAPE_BOUND``) so ``\\\\056`` becomes ``.``
+    without eating a leftover ``\\X``.
+    """
+    if "\\" not in text:
+        return text
+    current = _unescape_tar_once(text)
+    for _ in range(_UNESCAPE_BOUND - 1):
+        if not _has_tar_escape(current):
+            return current
+        nxt = _unescape_tar_once(current)
+        if nxt == current:
+            return nxt
+        current = nxt
+    return current
+
+
 def _decode_u_percent(text: str) -> str:
     """Decode ``%uXXXX`` / ``%UXXXX`` (JS-style) code points. Linear."""
     if "%u" not in text and "%U" not in text:
@@ -333,10 +384,7 @@ def _decode_layers(text: str, limit: int = _DECODE_LAYERS) -> tuple[str, ...]:
 
 def _needs_decode_variants(text: str) -> bool:
     """True when ``%``, ``\\``, or non-ASCII may change a decode variant."""
-    for char in text:
-        if char in "%\\" or ord(char) > 127:
-            return True
-    return False
+    return _NEEDS_DECODE_RE.search(text) is not None
 
 
 def _peel_once(text: str, *, unescape: bool) -> str:
@@ -581,8 +629,8 @@ def _identity_pieces(length: int) -> list[tuple[int, int, int, int]]:
     return [(0, length, 0, length)]
 
 
-def _map_unescape(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
-    """Unescape tar escapes. Pieces are only at escape boundaries."""
+def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
+    """One unescape pass. Pieces are only at escape boundaries."""
     if "\\" not in text:
         return text, _identity_pieces(len(text))
     chunks: list[str] = []
@@ -644,6 +692,69 @@ def _map_unescape(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
         index += 2
     flush_literal(length)
     return "".join(chunks), pieces
+
+
+def _compose_pieces(
+    outer: list[tuple[int, int, int, int]],
+    inner: list[tuple[int, int, int, int]],
+) -> list[tuple[int, int, int, int]]:
+    """Compose two piece maps: inner prep → outer orig."""
+    starts = [piece[0] for piece in outer]
+    composed: list[tuple[int, int, int, int]] = []
+    for prep_start, prep_end, mid_left, mid_right in inner:
+        orig = _orig_span(outer, mid_left, mid_right, starts)
+        if orig is None:
+            continue
+        composed.append((prep_start, prep_end, orig[0], orig[1]))
+    return composed
+
+
+def _unescape_layers(
+    text: str,
+) -> list[tuple[str, list[tuple[int, int, int, int]]]]:
+    """Each unescape pass as ``(prepared, pieces-to-original)``.
+
+    The first pass always runs. Later passes run only while a
+    simple or octal escape remains, matching ``_unescape_tar``.
+    """
+    current, pieces = _map_unescape_once(text)
+    layers = [(current, pieces)]
+    for _ in range(_UNESCAPE_BOUND - 1):
+        if not _has_tar_escape(current):
+            break
+        nxt, nxt_pieces = _map_unescape_once(current)
+        if nxt == current:
+            break
+        pieces = _compose_pieces(pieces, nxt_pieces)
+        current = nxt
+        layers.append((current, pieces))
+    return layers
+
+
+def _map_unescape(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
+    """Unescape tar escapes to a fixed point (max ``_UNESCAPE_BOUND``)."""
+    if "\\" not in text:
+        return text, _identity_pieces(len(text))
+    return _unescape_layers(text)[-1]
+
+
+def _secret_orig_spans(
+    text: str, secrets: tuple[str, ...]
+) -> list[tuple[int, int, str]]:
+    """Secret spans on the original and every unescape layer.
+
+    A raw backslash in a configured secret must match the original.
+    A tar-escaped ``\\\\`` plus hex that looks like octal must match
+    the first unescaped layer, before a later octal peel.
+    """
+    spans = list(_iter_secret_spans(text, secrets))
+    if "\\" not in text or not secrets:
+        return spans
+    for prepared, pieces in _unescape_layers(text):
+        spans.extend(
+            _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
+        )
+    return spans
 
 
 def _orig_span(
@@ -798,12 +909,15 @@ def _replace_mapped_spans(
     original: str,
     pieces: list[tuple[int, int, int, int]],
     *groups: list[tuple[int, int, str]],
+    orig_groups: tuple[list[tuple[int, int, str]], ...] = (),
 ) -> str:
     """Replace prepared spans in ``original`` with a single-pass join.
 
     Groups are JWT (and percent runs), then secrets, then pool. A
     leftover pool window cannot punch a hole in a JWT span. Merge
     is ``O(n log n)`` so a multi-MiB ``eyJ`` blob stays linear.
+    ``orig_groups`` are already in original coordinates (raw secrets
+    that contain a backslash must not be looked up through unescape).
     """
     kept: list[tuple[int, int, str]] = []
     for group in groups:
@@ -815,6 +929,20 @@ def _replace_mapped_spans(
         extra = [
             (start, stop, tag)
             for start, stop, tag in mapped
+            if not _span_overlaps(kept, start, stop, starts)
+        ]
+        if extra:
+            kept = _merge_sorted_spans(kept + extra)
+    for group in orig_groups:
+        if not group:
+            continue
+        if not kept:
+            kept = _merge_sorted_spans(group)
+            continue
+        starts = [item[0] for item in kept]
+        extra = [
+            (start, stop, tag)
+            for start, stop, tag in group
             if not _span_overlaps(kept, start, stop, starts)
         ]
         if extra:
@@ -838,9 +966,13 @@ def _iter_secret_spans(
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         tag = _redact_tag(secret)
         needles = [secret]
-        encoded = quote(secret, safe="")
-        if encoded and encoded != secret:
-            needles.append(encoded)
+        folded = unicodedata.normalize("NFKC", secret)
+        if folded and folded not in needles:
+            needles.append(folded)
+        for base in tuple(needles):
+            encoded = quote(base, safe="")
+            if encoded and encoded not in needles:
+                needles.append(encoded)
         for needle in needles:
             start = 0
             while True:
@@ -854,6 +986,7 @@ def _iter_secret_spans(
 
 def _iter_pool_spans(text: str) -> list[tuple[int, int, str]]:
     spans: list[tuple[int, int, str]] = []
+    stamps = _timestamp_spans(text)
     run_start = -1
     for index, char in enumerate(text):
         if char in _POOL:
@@ -861,23 +994,56 @@ def _iter_pool_spans(text: str) -> list[tuple[int, int, str]]:
                 run_start = index
             continue
         if run_start >= 0:
-            spans.extend(_pool_spans_in_run(text, run_start, index))
+            spans.extend(_pool_spans_in_run(text, run_start, index, stamps))
             run_start = -1
     if run_start >= 0:
-        spans.extend(_pool_spans_in_run(text, run_start, len(text)))
+        spans.extend(_pool_spans_in_run(text, run_start, len(text), stamps))
     return spans
 
 
-def _pool_spans_in_run(text: str, start: int, end: int) -> list[tuple[int, int, str]]:
+def _timestamp_spans(text: str) -> list[tuple[int, int]]:
+    return [(match.start(), match.end()) for match in _TIMESTAMP_RE.finditer(text)]
+
+
+def _overlaps_stamp(
+    stamps: list[tuple[int, int]], start: int, stop: int
+) -> bool:
+    for left, right in stamps:
+        if start < right and stop > left:
+            return True
+    return False
+
+
+def _pool_run_has_mix(run: str) -> bool:
+    return bool(
+        _UPPER_RE.search(run)
+        and _LOWER_RE.search(run)
+        and _DIGIT_RE.search(run)
+        and any(char in _SYMBOLS for char in run)
+    )
+
+
+def _pool_spans_in_run(
+    text: str,
+    start: int,
+    end: int,
+    stamps: list[tuple[int, int]] | None = None,
+) -> list[tuple[int, int, str]]:
     spans: list[tuple[int, int, str]] = []
+    run = text[start:end]
+    if not _pool_run_has_mix(run):
+        return spans
+    if stamps is None:
+        stamps = _timestamp_spans(text)
     index = start
     while index <= end - DEV_PASSWORD_LENGTH:
         window = text[index : index + DEV_PASSWORD_LENGTH]
-        if _is_strong_window(window):
-            spans.append((index, index + DEV_PASSWORD_LENGTH, _redact_tag(window)))
-            index += DEV_PASSWORD_LENGTH
-        else:
-            index += 1
+        if _is_strong_window(window) and not _overlaps_stamp(
+            stamps, index, index + DEV_PASSWORD_LENGTH
+        ):
+            spans.append((index, end, _redact_tag(text[index:end])))
+            break
+        index += 1
     return spans
 
 
@@ -921,6 +1087,7 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
         jwtish,
         _iter_secret_spans(prepared, secrets),
         _iter_pool_spans(prepared),
+        orig_groups=(_secret_orig_spans(text, secrets),),
     )
     return _reescape_controls(shown)
 
@@ -1001,8 +1168,12 @@ def pool_token_on_line(line: str) -> bool:
             return False
         text = "".join(run)
         last = len(text) - DEV_PASSWORD_LENGTH
+        stamps = _timestamp_spans(text)
         for offset in range(0, last + 1):
-            if _is_strong_window(text[offset : offset + DEV_PASSWORD_LENGTH]):
+            stop = offset + DEV_PASSWORD_LENGTH
+            if _is_strong_window(text[offset:stop]) and not _overlaps_stamp(
+                stamps, offset, stop
+            ):
                 return True
         return False
 
@@ -1018,11 +1189,18 @@ def pool_token_on_line(line: str) -> bool:
 
 def configured_secret_on_line(line: str, secrets: tuple[str, ...]) -> bool:
     for secret in secrets:
-        if secret and secret in line:
-            return True
-        encoded = quote(secret, safe="")
-        if encoded and encoded != secret and encoded in line:
-            return True
+        if not secret:
+            continue
+        needles = [secret]
+        folded = unicodedata.normalize("NFKC", secret)
+        if folded and folded not in needles:
+            needles.append(folded)
+        for base in needles:
+            if base in line:
+                return True
+            encoded = quote(base, safe="")
+            if encoded and encoded != base and encoded in line:
+                return True
     return False
 
 
@@ -1175,8 +1353,12 @@ def _iter_jwts(text: str) -> Iterator[tuple[int, int, str]]:
                 examined += 1
                 token = text[pos:token_end]
                 if _jwt_header_has_alg(token):
-                    yield pos, token_end, token
-                    cursor = token_end
+                    end = token_end
+                    last_dot = text.rfind(".", pos, token_end)
+                    if last_dot != -1 and _JWT_PREFIX in text[last_dot + 1 : token_end]:
+                        end = _extend_dot_joined_runs(text, token_end)
+                    yield pos, end, text[pos:end]
+                    cursor = end
                     pending = [item for item in pending if item[1] > cursor]
                     found = True
                     break
@@ -1582,19 +1764,44 @@ def archive_kind(data: bytes) -> str | None:
     return None
 
 
+def _png_walked_iend_end(data: bytes) -> int:
+    """End offset of the IEND chunk reached by walking lengths; -1 if not."""
+    if not data.startswith(PNG_MAGIC) or len(data) < 16:
+        return -1
+    if data[12:16] != b"IHDR":
+        return -1
+    pos = 8
+    length = len(data)
+    while pos + 12 <= length:
+        size = int.from_bytes(data[pos : pos + 4], "big")
+        if pos + 12 + size > length:
+            return -1
+        name = data[pos + 4 : pos + 8]
+        if name == b"IEND":
+            return pos + 12 + size
+        pos += 12 + size
+    return -1
+
+
 def _png_disallowed_chunk(data: bytes) -> bool:
     """True when a PNG chunk is disallowed, truncated, overflowed, or CRC-bad.
 
-    Magic-plus-bytes reviewed PNGs are not a chunk stream: the first
-    chunk must be ``IHDR`` before this walker treats the rest as
-    chunks. Those files stay refuse-binary.
+    A complete first chunk that is not ``IHDR`` is unsuppressible.
+    Magic-plus-bytes reviewed PNGs do not have a complete first chunk
+    and stay refuse-binary. Allowed ancillary chunks have fixed
+    lengths (``pHYs`` 9, ``gAMA`` 4, ``sRGB`` 1, ``cHRM`` 32).
+    ``PLTE`` must be 3–768 bytes and a multiple of 3.
     """
     if not data.startswith(PNG_MAGIC) or len(data) < 8:
         return False
     pos = 8
     length = len(data)
-    if pos + 8 > length or data[pos + 4 : pos + 8] != b"IHDR":
+    if pos + 8 > length:
         return False
+    first_name = data[pos + 4 : pos + 8]
+    first_size = int.from_bytes(data[pos : pos + 4], "big")
+    if first_name != b"IHDR":
+        return pos + 12 + first_size <= length
     while pos + 12 <= length:
         size = int.from_bytes(data[pos : pos + 4], "big")
         if pos + 12 + size > length:
@@ -1605,6 +1812,11 @@ def _png_disallowed_chunk(data: bytes) -> bool:
         if (zlib.crc32(name + payload) & 0xFFFFFFFF) != crc_got:
             return True
         if name not in _PNG_ALLOWED_CHUNKS:
+            return True
+        want = _PNG_CHUNK_SIZES.get(name)
+        if want is not None and size != want:
+            return True
+        if name == b"PLTE" and (size < 3 or size > 768 or size % 3):
             return True
         pos += 12 + size
         if name == b"IEND":
@@ -1617,6 +1829,12 @@ def _png_has_trailing(data: bytes) -> bool:
         return False
     if _png_disallowed_chunk(data):
         return True
+    walked = _png_walked_iend_end(data)
+    if walked >= 0:
+        return walked < len(data)
+    # Unwalkable streams: restore main's IEND search so magic +
+    # garbage + IEND + tail stays png-trailing. Reviewed r38
+    # magic-plus-bytes files have no IEND and stay refuse-binary.
     pos = data.find(PNG_IEND)
     if pos < 0:
         return False
