@@ -164,6 +164,18 @@ def _runtime_digit_first_pool_token() -> str:
     raise AssertionError("could not generate a digit-first pool token")
 
 
+def _runtime_pool_token_prefixed(prefix: str) -> str:
+    """Pool password with a fixed prefix. Do not print or log it."""
+    for _ in range(400):
+        token = generate_dev_password()
+        if len(token) <= len(prefix):
+            continue
+        candidate = prefix + token[len(prefix) :]
+        if pool_token_on_line(candidate):
+            return candidate
+    raise AssertionError("could not generate a prefixed pool token")
+
+
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
@@ -3820,6 +3832,8 @@ def test_plte_valid_and_invalid_sizes(tmp_path, capsys):
         (b"\x00", False),
         (b"\x00\x01\x02\x03", False),
         (b"\x00" * 769, False),
+        (b"\x00" * 771, False),
+        (b"\x00" * 3000, False),
     )
     for payload, ok in cases:
         data = _chunk_png(_png_chunk(b"PLTE", payload))
@@ -3965,28 +3979,46 @@ def test_redact_text_newline_split_token_1mib_is_linear_time():
     token = _pyjwt_access_token()
     header, rest = token.split(".", 1)
     for unit in (f"{header}.\n{rest} ", f"{header}.\\n{rest} "):
-        blob = unit * ((1024 * 1024) // len(unit))
+        small = unit * ((1024 * 1024) // len(unit))
         started = time.perf_counter()
-        shown = scan.redact_text(blob)
-        elapsed = time.perf_counter() - started
-        if elapsed >= 3.0:
+        shown = scan.redact_text(small)
+        small_elapsed = time.perf_counter() - started
+        if small_elapsed >= 3.0:
             raise AssertionError("newline-split 1 MiB redact_text exceeded 3s")
         _assert_no_jwt_grams("", shown, token)
+        if "\\n" not in unit:
+            continue
+        large = unit * ((8 * 1024 * 1024) // len(unit))
+        started = time.perf_counter()
+        large_shown = scan.redact_text(large)
+        large_elapsed = time.perf_counter() - started
+        if small_elapsed > 0 and large_elapsed / small_elapsed > 14.0:
+            raise AssertionError("8 MiB newline-split exceeded 14x the 1 MiB time")
+        _assert_no_jwt_grams("", large_shown, token)
 
 
 def test_redact_text_token_plus_pool_1mib_is_linear_time():
     token = _pyjwt_access_token()
     pool = _runtime_pool_token()
     unit = f"{token} {pool} "
-    blob = unit * ((1024 * 1024) // len(unit))
+    small = unit * ((1024 * 1024) // len(unit))
     started = time.perf_counter()
-    shown = scan.redact_text(blob)
-    elapsed = time.perf_counter() - started
-    if elapsed >= 3.0:
+    shown = scan.redact_text(small)
+    small_elapsed = time.perf_counter() - started
+    if small_elapsed >= 3.0:
         raise AssertionError("token-plus-pool 1 MiB redact_text exceeded 3s")
     _assert_no_jwt_grams("", shown, token)
     if pool in shown:
         raise AssertionError("pool token leaked from 1 MiB blob")
+    large = unit * ((8 * 1024 * 1024) // len(unit))
+    started = time.perf_counter()
+    large_shown = scan.redact_text(large)
+    large_elapsed = time.perf_counter() - started
+    if small_elapsed > 0 and large_elapsed / small_elapsed > 14.0:
+        raise AssertionError("8 MiB token-plus-pool exceeded 14x the 1 MiB time")
+    _assert_no_jwt_grams("", large_shown, token)
+    if pool in large_shown:
+        raise AssertionError("pool token leaked from 8 MiB blob")
 
 
 def test_pool_spans_use_prepared_text():
@@ -4074,3 +4106,179 @@ def test_two_adjacent_tokens_have_two_spans():
     shown = scan.redact_text(line)
     _assert_no_jwt_grams("", shown, first)
     _assert_no_jwt_grams("", shown, second)
+
+
+def test_glued_pool_after_timestamp_20k_and_fixed_prefixes():
+    stamps = (
+        "20261020T1200",
+        "20261020T120000",
+        "20261020T1200Z",
+        "20261020T120000Z",
+    )
+    misses = 0
+    leaks = 0
+    checked = 0
+    for index in range(20000):
+        token = generate_dev_password()
+        if not pool_token_on_line(token):
+            continue
+        checked += 1
+        line = stamps[index % 4] + token
+        if not pool_token_on_line(line):
+            misses += 1
+        shown = scan.redact_text(line)
+        if token in shown:
+            leaks += 1
+    if checked < 15000:
+        raise AssertionError("too few runtime pool tokens for glued regression")
+    if misses or leaks:
+        raise AssertionError("glued pool after timestamp missed or leaked")
+    for prefix in ("12!", "Z!"):
+        token = _runtime_pool_token_prefixed(prefix)
+        line = "20261020T1200" + token
+        if not pool_token_on_line(line):
+            raise AssertionError("fixed-prefix glued pool was not a hit")
+        shown = scan.redact_text(line)
+        if token in shown:
+            raise AssertionError("fixed-prefix glued pool leaked")
+
+
+def test_odd_backslash_056_layers_leave_no_8gram():
+    token = _pyjwt_access_token()
+    for depth in (3, 5):
+        escaped = token.replace(".", ("\\" * depth) + "056")
+        shown = scan.redact_text(f"tar: {escaped}: Cannot open")
+        _assert_no_jwt_grams("", shown, token)
+        if escaped in shown:
+            raise AssertionError("odd-depth octal JWT run was not redacted")
+
+
+def test_nine_escape_layers_fail_closed_secret():
+    secret = _runtime_env_secret("x")
+    layered = ("\\" * 18) + secret
+    shown = scan.redact_text(f"tar: {layered}: Cannot open", (secret,))
+    if secret in shown:
+        raise AssertionError("9-layer escaped secret leaked")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("9-layer escaped secret was not fail-closed")
+
+
+def test_literal_newline_secret_is_redacted():
+    secret = _runtime_env_secret("\n")
+    shown = scan.redact_text(f"pre {secret} post", (secret,))
+    if secret in shown:
+        raise AssertionError("literal-newline secret leaked")
+    tail = secret.split("\n", 1)[1]
+    if tail and tail in shown:
+        raise AssertionError("literal-newline secret tail leaked")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("literal-newline secret was not redacted")
+
+
+def test_redact_text_4mib_cap_still_redacts_secret():
+    secret = _runtime_env_secret("x")
+    blob = ("A" * (4 * 1024 * 1024)) + secret
+    shown = scan.redact_text(blob, (secret,))
+    if secret in shown:
+        raise AssertionError("secret leaked from 4 MiB redact_text")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("4 MiB redact_text did not redact the secret")
+
+
+def test_nfkc_needle_is_in_secret_needles():
+    secret = "seed" + uuid.uuid4().hex[:10] + "\u212a" + uuid.uuid4().hex[:10]
+    folded = unicodedata.normalize("NFKC", secret)
+    if folded == secret:
+        raise AssertionError("NFKC fixture did not change the secret")
+    needles = scan._secret_needles(secret)
+    if folded not in needles:
+        raise AssertionError("NFKC needle mutant dropped the folded form")
+    if not scan.configured_secret_on_line(folded, (secret,)):
+        raise AssertionError("NFKC folded secret was not a configured hit")
+
+
+def test_octal_needle_for_non_ascii_secret():
+    secret = "seed" + uuid.uuid4().hex[:10] + "\u00e9" + uuid.uuid4().hex[:10]
+    octal = scan._octal_utf8_needle(secret)
+    if not octal:
+        raise AssertionError("non-ASCII secret had no octal needle")
+    shown = scan.redact_text(f"tar: {octal}: Cannot open", (secret,))
+    if octal in shown or secret in shown:
+        raise AssertionError("octal non-ASCII secret leaked")
+
+
+def test_shlex_dropped_secrets_file_value_exits_2(tmp_path, capsys):
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text("DEV_SEED_ADMIN_PASSWORD=one two\n", encoding="utf-8")
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist", "--secrets-file", str(secrets)],
+        capsys,
+        (),
+    )
+    if code != 2:
+        raise AssertionError("shlex-dropped secrets value did not exit 2")
+    if "dropped by shlex" not in err:
+        raise AssertionError("shlex-dropped secrets value was not reported")
+
+
+def test_u002e_and_x2e_jwt_are_hits(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    for label, escaped in (
+        ("u002e", token.replace(".", r"\u002e")),
+        ("x2e", token.replace(".", r"\x2e")),
+    ):
+        evidence = tmp_path / f"ev-{label}"
+        evidence.mkdir()
+        (evidence / "notes.txt").write_text(escaped + "\n", encoding="utf-8")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, escaped)
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("\\u002e/\\x2e JWT was not a hit")
+        shown = scan.redact_text(f"tar: {escaped}: Cannot open")
+        _assert_no_jwt_grams("", shown, token)
+
+
+def test_wrap_60_72_pem_and_xxd_jwt_are_hits(tmp_path, capsys):
+    token = _pyjwt_access_token()
+
+    def wrapped(width: int) -> str:
+        return "\n".join(
+            token[index : index + width] for index in range(0, len(token), width)
+        )
+
+    raw = token.encode("ascii")
+    xxd_lines = []
+    for offset in range(0, len(raw), 16):
+        chunk = raw[offset : offset + 16]
+        hexpart = " ".join(f"{byte:02x}" for byte in chunk)
+        xxd_lines.append(f"{offset:08x}: {hexpart} ")
+    pem = "-----BEGIN TOKEN-----\n" + wrapped(64) + "\n-----END TOKEN-----\n"
+    cases = (
+        ("w60.txt", wrapped(60) + "\n"),
+        ("w72.txt", wrapped(72) + "\n"),
+        ("pem.txt", pem),
+        ("xxd.txt", "\n".join(xxd_lines) + "\n"),
+    )
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    planted = [token]
+    for name, body in cases:
+        (evidence / name).write_text(body, encoding="utf-8")
+        planted.append(body)
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, tuple(planted)
+    )
+    if code != 1 or "jwt" not in err:
+        raise AssertionError("60/72/PEM/xxd wrapped JWT was not a hit")
+
+
+def test_newline_display_is_escaped():
+    shown = scan.redact_text("pre\npost")
+    if "\n" in shown:
+        raise AssertionError("newline display left a raw line break")
+    if "\\n" not in shown:
+        raise AssertionError("newline display did not show a visible escape")
