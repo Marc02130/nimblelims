@@ -25,8 +25,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   are ``1f 8b 08``, the FLG reserved bits are zero, and a bounded
   inflate succeeds, or when gzip-after-junk scanning reaches the
   32-candidate cap (an unsuppressible archive hit, not
-  refuse-binary), except short or weak signatures in valid UTF-8
-  text
+  refuse-binary),   except short or weak signatures in valid UTF-8
+  text (including ``LZIP`` and ``Rar!`` in UTF-8 text)
 - bytes after the IEND chunk of a PNG
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
@@ -65,11 +65,18 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   Separators must be a single ``.``; ``..`` between segments
   is not a JWT. Detection percent-decodes until the text
   stops changing (max 3 passes), including ``%u002E``, and
-  applies NFKC. Tar unescaping (``\\NNN`` octal, backslash,
-  and a newline between segments) applies only to names
-  and tar output, never to file content, so JSON
-  ``\\uXXXX`` in a file cannot become a pool false
-  positive.
+  applies NFKC. Consecutive tar octal runs decode as UTF-8
+  even under ``LC_ALL=C``. Tar unescaping applies to names
+  and tar output. File content gets a JWT-only unescape
+  pass so ``\\056`` / newline-split tokens still hit, without
+  running pool rules on that copy (JSON ``\\uXXXX`` cannot
+  become a pool false positive). Alternate unescape and
+  percent-decode until unchanged (max 3); if the text still
+  changes, that is an unsuppressible encoded-run hit.
+  Lines with no ``%``, ``\\``, or non-ASCII skip decode
+  variants. Wrapped 64/76-column encodings are joined.
+  Redaction finds spans on a normalized copy and replaces
+  those spans in the original, then re-escapes controls.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -163,7 +170,7 @@ CPIO_BIN_LE = b"\x71\xc7"
 LZMA_MAGIC = b"\x5d\x00\x00"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 PNG_IEND = b"\x00\x00\x00\x00IEND"
-WEAK_ARCHIVE = frozenset({"zlib", "lzma", "cpio", "bz2"})
+WEAK_ARCHIVE = frozenset({"zlib", "lzma", "cpio", "bz2", "lzip", "rar"})
 _POOL = set(DEV_PASSWORD_POOL)
 _SYMBOLS = set("!@#$%^&*-_")
 _SEPARATORS = set("_-")
@@ -198,7 +205,20 @@ _DECODE_LAYERS = 3
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
-_NL_RUN_RE = re.compile(r"\.*[\r\n]+\.*")
+_NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
+_TIMESTAMP_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?"
+)
+_PNG_ALLOWED_CHUNKS = frozenset({b"IHDR", b"PLTE", b"IDAT", b"IEND"})
+_CTRL_SIMPLE = {
+    7: r"\a",
+    8: r"\b",
+    9: r"\t",
+    10: r"\n",
+    11: r"\v",
+    12: r"\f",
+    13: r"\r",
+}
 _TAR_SIMPLE_ESCAPES = {
     "a": "\a",
     "b": "\b",
@@ -229,7 +249,11 @@ def _redact_tag(raw: str) -> str:
 
 
 def _unescape_tar(text: str) -> str:
-    """Strip GNU tar backslash and octal ``\\NNN`` escapes. Linear."""
+    """Strip GNU tar backslash and octal ``\\NNN`` escapes. Linear.
+
+    Consecutive octal runs are decoded as UTF-8 so a full-width dot
+    (``\\357\\274\\216``) is one character even under ``LC_ALL=C``.
+    """
     if "\\" not in text:
         return text
     out: list[str] = []
@@ -248,12 +272,19 @@ def _unescape_tar(text: str) -> str:
             index += 2
             continue
         if nxt in "01234567":
-            end = index + 1
-            last = min(length, index + 4)
-            while end < last and text[end] in "01234567":
-                end += 1
-            out.append(chr(int(text[index + 1 : end], 8) & 0xFF))
-            index = end
+            raw = bytearray()
+            while (
+                index + 1 < length
+                and text[index] == "\\"
+                and text[index + 1] in "01234567"
+            ):
+                end = index + 1
+                last = min(length, index + 4)
+                while end < last and text[end] in "01234567":
+                    end += 1
+                raw.append(int(text[index + 1 : end], 8) & 0xFF)
+                index = end
+            out.append(raw.decode("utf-8", errors="replace"))
             continue
         out.append(nxt)
         index += 2
@@ -285,15 +316,76 @@ def _decode_layers(text: str, limit: int = _DECODE_LAYERS) -> tuple[str, ...]:
     return tuple(layers)
 
 
+def _needs_decode_variants(text: str) -> bool:
+    """True when ``%``, ``\\``, or non-ASCII may change a decode variant."""
+    for char in text:
+        if char in "%\\" or ord(char) > 127:
+            return True
+    return False
+
+
+def _peel_once(text: str, *, unescape: bool) -> str:
+    """One alternate unescape/join then percent-decode pass."""
+    current = text
+    if unescape:
+        current = _join_tar_newlines(_unescape_tar(current))
+    return _percent_once(current)
+
+
+def _still_decodes(text: str, *, unescape: bool = False) -> bool:
+    """True when another peel would change the text after ``_DECODE_LAYERS``."""
+    current = text
+    for _ in range(_DECODE_LAYERS):
+        nxt = _peel_once(current, unescape=unescape)
+        if nxt == current:
+            return False
+        current = nxt
+    return _peel_once(current, unescape=unescape) != current
+
+
 def _join_tar_newlines(text: str) -> str:
     """Collapse a newline and any adjacent dots into one ``.``.
 
-    ``header.\\n payload`` and ``header\\r\\npayload`` must become
-    ``header.payload``, not ``header..payload``.
+    Only joins a newline that sits between base64url characters so
+    unrelated real lines stay apart (F7) while ``header.\\npayload``
+    and CRLF still become ``header.payload``, not ``header..payload``.
     """
     if "\n" not in text and "\r" not in text:
         return text
     return _NL_RUN_RE.sub(".", text)
+
+
+def _unwrap_wrapped_encodings(text: str) -> str:
+    """Join MIME-style wrapped base64/base64url lines (64/76-col wraps)."""
+    if "\n" not in text and "\r" not in text:
+        return text
+    lines = text.splitlines()
+    if len(lines) < 2:
+        return text
+    out: list[str] = []
+    buf: list[str] = []
+
+    def flush() -> None:
+        if buf:
+            out.append("".join(buf))
+            buf.clear()
+
+    wrap = frozenset({64, 76})
+    token_chars = re.compile(r"[A-Za-z0-9+/_=.-]+")
+    for line in lines:
+        if len(line) in wrap and token_chars.fullmatch(line):
+            buf.append(line)
+            continue
+        if buf and token_chars.fullmatch(line):
+            buf.append(line)
+            flush()
+            continue
+        flush()
+        out.append(line)
+    flush()
+    if out == lines:
+        return text
+    return "\n".join(out)
 
 
 def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
@@ -303,9 +395,15 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
     ``_DECODE_LAYERS``), including ``%u002E``. NFKC is an extra
     variant. Tar unescaping (and a newline between segments) is
     only for names and tar output (``unescape=True``), never file
-    content. When nothing changes, scanners including the JWT
-    walk run once per line.
+    content, except a JWT-only unescape pass in ``scan_text``.
+    Lines with no ``%``, ``\\``, or non-ASCII skip decode variants.
+    When nothing changes, scanners including the JWT walk run once
+    per line.
     """
+    if not _needs_decode_variants(text) and not (
+        unescape and ("\n" in text or "\r" in text)
+    ):
+        return (text,)
     seen: list[str] = []
     bases = [text]
     if unescape:
@@ -315,6 +413,16 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
         joined = _join_tar_newlines(unescaped)
         if joined != unescaped:
             bases.append(joined)
+    current = text
+    if unescape:
+        current = _join_tar_newlines(_unescape_tar(current))
+    for _ in range(_DECODE_LAYERS):
+        nxt = _peel_once(current, unescape=unescape)
+        if nxt == current:
+            break
+        if nxt not in bases:
+            bases.append(nxt)
+        current = nxt
     for base in bases:
         for layer in _decode_layers(base):
             for form in (layer, unicodedata.normalize("NFKC", layer)):
@@ -424,27 +532,160 @@ def _redact_percent_jwts(text: str) -> str:
     return "".join(out)
 
 
+def _reescape_controls(text: str) -> str:
+    """Re-escape non-printable and control characters before printing."""
+    out: list[str] = []
+    for char in text:
+        code = ord(char)
+        if code < 32 or code == 127:
+            simple = _CTRL_SIMPLE.get(code)
+            out.append(simple if simple is not None else f"\\{code:03o}")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def _map_unescape(text: str) -> tuple[str, list[tuple[int, int]]]:
+    """Unescape tar escapes and record each output char's input span."""
+    if "\\" not in text:
+        return text, [(index, index + 1) for index in range(len(text))]
+    out: list[str] = []
+    spans: list[tuple[int, int]] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char != "\\" or index + 1 >= length:
+            out.append(char)
+            spans.append((index, index + 1))
+            index += 1
+            continue
+        start = index
+        nxt = text[index + 1]
+        simple = _TAR_SIMPLE_ESCAPES.get(nxt)
+        if simple is not None:
+            out.append(simple)
+            spans.append((start, index + 2))
+            index += 2
+            continue
+        if nxt in "01234567":
+            raw = bytearray()
+            while (
+                index + 1 < length
+                and text[index] == "\\"
+                and text[index + 1] in "01234567"
+            ):
+                end = index + 1
+                last = min(length, index + 4)
+                while end < last and text[end] in "01234567":
+                    end += 1
+                raw.append(int(text[index + 1 : end], 8) & 0xFF)
+                index = end
+            decoded = raw.decode("utf-8", errors="replace")
+            for _char in decoded:
+                out.append(_char)
+                spans.append((start, index))
+            continue
+        out.append(nxt)
+        spans.append((start, index + 2))
+        index += 2
+    return "".join(out), spans
+
+
+def _map_join_newlines(text: str, spans: list[tuple[int, int]]) -> tuple[str, list[tuple[int, int]]]:
+    if "\n" not in text and "\r" not in text:
+        return text, spans
+    out: list[str] = []
+    mapped: list[tuple[int, int]] = []
+    index = 0
+    for match in _NL_RUN_RE.finditer(text):
+        out.append(text[index : match.start()])
+        mapped.extend(spans[index : match.start()])
+        out.append(".")
+        mapped.append((spans[match.start()][0], spans[match.end() - 1][1]))
+        index = match.end()
+    out.append(text[index:])
+    mapped.extend(spans[index:])
+    return "".join(out), mapped
+
+
+def _map_nfkc(text: str, spans: list[tuple[int, int]]) -> tuple[str, list[tuple[int, int]]]:
+    out: list[str] = []
+    mapped: list[tuple[int, int]] = []
+    for index, char in enumerate(text):
+        normalized = unicodedata.normalize("NFKC", char)
+        if not normalized:
+            continue
+        for piece in normalized:
+            out.append(piece)
+            mapped.append(spans[index])
+    return "".join(out), mapped
+
+
+def _prepare_mapped(text: str) -> tuple[str, list[tuple[int, int]]]:
+    unescaped, spans = _map_unescape(text)
+    joined, spans = _map_join_newlines(unescaped, spans)
+    return _map_nfkc(joined, spans)
+
+
+def _orig_span(
+    spans: list[tuple[int, int]], begin: int, end: int
+) -> tuple[int, int] | None:
+    if begin >= end or begin < 0 or end > len(spans):
+        return None
+    return spans[begin][0], spans[end - 1][1]
+
+
+def _replace_mapped_spans(
+    original: str,
+    spans: list[tuple[int, int]],
+    replacements: list[tuple[int, int, str]],
+) -> str:
+    """Replace prepared spans in ``original`` from right to left."""
+    mapped: list[tuple[int, int, str]] = []
+    for begin, end, tag in replacements:
+        orig = _orig_span(spans, begin, end)
+        if orig is None:
+            continue
+        mapped.append((orig[0], orig[1], tag))
+    mapped.sort(key=lambda item: item[0], reverse=True)
+    shown = original
+    last = len(shown) + 1
+    for start, stop, tag in mapped:
+        if stop > last:
+            continue
+        shown = shown[:start] + tag + shown[stop:]
+        last = start
+    return shown
+
+
 def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     """Redact JWTs, then configured secrets, then pool windows.
 
-    Tar-unescape and NFKC first, then percent-encoded runs
-    (decode until unchanged, max 3, including ``%u002E``), then
-    raw JWTs. Encoded-before-raw closes the signature ``%2D``/
-    ``%5F`` hole: a leftover 24-character tail cannot print.
-    A pool window, a ``%2E``/``%252E`` encoding, a ``%u002E``
-    or full-width dot, or a tar ``\\056`` / newline split
-    cannot leave the payload in the clear. Tar unescaping here
-    is for tar stderr and names only; file content is not
-    unescaped. Name hits use the same JWT-then-secret-then-pool
-    check order.
+    Spans are found on a normalized copy (tar-unescape, newline
+    join, NFKC, percent-encoded runs then raw JWTs) and mapped
+    back so the returned text keeps the original escapes. Encoded
+    before raw closes the signature ``%2D``/``%5F`` hole. A pool
+    window, a ``%2E``/``%252E`` encoding, a ``%u002E`` or
+    full-width dot, or a tar ``\\056`` / newline split cannot
+    leave the payload in the clear. Control characters are
+    re-escaped before printing.
     """
     if not text:
         return text
-    prepared = unicodedata.normalize(
-        "NFKC",
-        _join_tar_newlines(_unescape_tar(text)),
-    )
-    shown = _redact_jwts(_redact_percent_jwts(prepared))
+    prepared, spans = _prepare_mapped(text)
+    replacements: list[tuple[int, int, str]] = []
+    for match in _PERCENT_JWT_RUN_RE.finditer(prepared):
+        raw = match.group(0)
+        if "%" not in raw:
+            continue
+        decoded = _decode_layers(raw)[-1]
+        if decoded == raw or not jwt_on_line(decoded):
+            continue
+        replacements.append((match.start(), match.end(), _redact_tag(raw)))
+    for begin, end, token in _iter_jwts(prepared):
+        replacements.append((begin, end, _redact_tag(token)))
+    shown = _replace_mapped_spans(text, spans, replacements)
     needles: list[tuple[str, str]] = []
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         needles.append((secret, _redact_tag(secret)))
@@ -454,7 +695,7 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     for needle, tag in needles:
         if needle in shown:
             shown = shown.replace(needle, tag)
-    return _redact_pool_windows(shown)
+    return _reescape_controls(_redact_pool_windows(shown))
 
 
 class Hit:
@@ -519,6 +760,8 @@ def _is_strong_window(window: str) -> bool:
     separators = sum(char in _SEPARATORS for char in window)
     if separators >= 3 and not any(char in _OTHER_SYMBOLS for char in window):
         return False
+    if _TIMESTAMP_RE.match(window):
+        return False
     return True
 
 
@@ -562,9 +805,17 @@ def scan_text(
     secrets: tuple[str, ...] = (),
 ) -> list[Hit]:
     hits: list[Hit] = []
-    for number, line in enumerate(text.splitlines(), start=1):
+
+    def _scan_line(number: int, line: str, *, jwt_unescape: bool) -> None:
+        if _still_decodes(line, unescape=False) or (
+            jwt_unescape and _still_decodes(line, unescape=True)
+        ):
+            hits.append(Hit(KIND_ENCODED, identity, number, secrets))
         variants = _text_variants(line)
-        is_jwt = any(jwt_on_line(variant) for variant in variants)
+        jwt_forms = variants
+        if jwt_unescape and ("\\" in line or "\n" in line or "\r" in line):
+            jwt_forms = variants + _text_variants(line, unescape=True)
+        is_jwt = any(jwt_on_line(variant) for variant in jwt_forms)
         if any(PRINTED_ONCE_RE.search(variant) for variant in variants):
             hits.append(Hit(KIND_PRINTED_ONCE, identity, number, secrets))
         if any(BCRYPT_RE.search(variant) for variant in variants):
@@ -577,6 +828,14 @@ def scan_text(
             hits.append(Hit(KIND_ENCODED, identity, number, secrets))
         if is_jwt:
             hits.append(Hit(KIND_JWT, identity, number, secrets))
+
+    for number, line in enumerate(text.splitlines(), start=1):
+        _scan_line(number, line, jwt_unescape=True)
+    unwrapped = _unwrap_wrapped_encodings(text)
+    if unwrapped != text:
+        for number, line in enumerate(unwrapped.splitlines(), start=1):
+            if any(jwt_on_line(variant) for variant in _text_variants(line)):
+                hits.append(Hit(KIND_JWT, identity, number, secrets))
     return hits
 
 
@@ -1096,9 +1355,30 @@ def archive_kind(data: bytes) -> str | None:
     return None
 
 
+def _png_disallowed_chunk(data: bytes) -> bool:
+    """True when a PNG has a chunk outside the reviewed allowlist."""
+    if not data.startswith(PNG_MAGIC) or len(data) < 8:
+        return False
+    pos = 8
+    length = len(data)
+    while pos + 12 <= length:
+        size = int.from_bytes(data[pos : pos + 4], "big")
+        if size < 0 or pos + 12 + size > length:
+            return False
+        name = data[pos + 4 : pos + 8]
+        if name not in _PNG_ALLOWED_CHUNKS:
+            return True
+        pos += 12 + size
+        if name == b"IEND":
+            return False
+    return False
+
+
 def _png_has_trailing(data: bytes) -> bool:
     if not data.startswith(PNG_MAGIC):
         return False
+    if _png_disallowed_chunk(data):
+        return True
     pos = data.find(PNG_IEND)
     if pos < 0:
         return False
