@@ -34,7 +34,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   size, or an unwalkable PNG that still has IEND plus tail.
   The first chunk must be ``IHDR`` before the file is walked
   as a chunk stream so reviewed magic-plus-bytes PNGs stay
-  refuse-binary
+  refuse-binary. A backslash-dot is a tar escape. Compact
+  timestamp overlap uses only the ``YYYYMMDDThhmm`` core.
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
 - a duplicate identity
