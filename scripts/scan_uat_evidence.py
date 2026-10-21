@@ -30,9 +30,11 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
 - bytes after the IEND chunk of a PNG, a chunk outside the
   reviewed allowlist (``IHDR``, ``PLTE``, ``IDAT``, ``IEND``,
   ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``), a truncated or
-  length-overflowed chunk, or a bad CRC. The first chunk must
-  be ``IHDR`` before the file is walked as a chunk stream so
-  reviewed magic-plus-bytes PNGs stay refuse-binary
+  length-overflowed chunk, a bad CRC, an invalid ``PLTE``
+  size, or an unwalkable PNG that still has IEND plus tail.
+  The first chunk must be ``IHDR`` before the file is walked
+  as a chunk stream so reviewed magic-plus-bytes PNGs stay
+  refuse-binary
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
 - a duplicate identity
@@ -222,7 +224,9 @@ _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
 _NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
-_TIMESTAMP_RE = re.compile(r"\d{8}T\d{4,6}Z?")
+_TIMESTAMP_RE = re.compile(
+    r"(?<![0-9A-Za-z])\d{8}T\d{4}(?:\d{2})?Z?(?![0-9A-Za-z])"
+)
 _NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
 _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
@@ -1786,6 +1790,7 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     Magic-plus-bytes reviewed PNGs do not have a complete first chunk
     and stay refuse-binary. Allowed ancillary chunks have fixed
     lengths (``pHYs`` 9, ``gAMA`` 4, ``sRGB`` 1, ``cHRM`` 32).
+    ``PLTE`` must be 3–768 bytes and a multiple of 3.
     """
     if not data.startswith(PNG_MAGIC) or len(data) < 8:
         return False
@@ -1811,6 +1816,8 @@ def _png_disallowed_chunk(data: bytes) -> bool:
         want = _PNG_CHUNK_SIZES.get(name)
         if want is not None and size != want:
             return True
+        if name == b"PLTE" and (size < 3 or size > 768 or size % 3):
+            return True
         pos += 12 + size
         if name == b"IEND":
             return False
@@ -1825,7 +1832,14 @@ def _png_has_trailing(data: bytes) -> bool:
     walked = _png_walked_iend_end(data)
     if walked >= 0:
         return walked < len(data)
-    return False
+    # Unwalkable streams: restore main's IEND search so magic +
+    # garbage + IEND + tail stays png-trailing. Reviewed r38
+    # magic-plus-bytes files have no IEND and stay refuse-binary.
+    pos = data.find(PNG_IEND)
+    if pos < 0:
+        return False
+    end = pos + len(PNG_IEND) + 4
+    return end < len(data)
 
 
 def _looks_text(data: bytes) -> bool:
