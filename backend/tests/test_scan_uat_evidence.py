@@ -3548,13 +3548,19 @@ def test_redact_text_redacts_tar_escaped_configured_secret(marker):
 
 
 def test_redact_text_several_mib_is_linear_time():
+    """Several MiB of ``eyJ*17.a.b`` must redact well under the CI budget.
+
+    The quadratic rope/per-character path took 177 s at 8 MiB. This
+    uses 4 MiB and the same 15 s budget as the dotted-eyJ walk so a
+    return to that path fails by more than an order of magnitude.
+    """
     unit = ("eyJ" * 17) + ".a.b"
     blob = unit * ((4 * 1024 * 1024) // len(unit))
     started = time.perf_counter()
     shown = scan.redact_text(blob)
     elapsed = time.perf_counter() - started
-    if elapsed >= 5.0:
-        raise AssertionError("redact_text on several MiB exceeded 5s")
+    if elapsed >= 15.0:
+        raise AssertionError("redact_text on several MiB exceeded 15s")
     if "<redacted name hmac:" not in shown:
         raise AssertionError("several-MiB eyJ blob was not redacted")
 

@@ -130,6 +130,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import bisect
 import errno
 import hashlib
 import hmac
@@ -730,29 +731,72 @@ def _prepare_mapped(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
     return _map_nfkc(joined, pieces)
 
 
-def _replace_mapped_spans(
-    original: str,
+def _map_orig_spans(
     pieces: list[tuple[int, int, int, int]],
     replacements: list[tuple[int, int, str]],
-) -> str:
-    """Replace prepared spans in ``original`` with a single-pass join.
-
-    ``replacements`` are accepted in caller order (JWT, secrets, pool)
-    so a leftover pool window cannot punch a hole in a JWT span.
-    """
-    accepted: list[tuple[int, int, str]] = []
+) -> list[tuple[int, int, str]]:
+    mapped: list[tuple[int, int, str]] = []
     for begin, end, tag in replacements:
         orig = _orig_span(pieces, begin, end)
         if orig is None:
             continue
-        start, stop = orig
-        if any(start < kept_stop and stop > kept_start for kept_start, kept_stop, _ in accepted):
+        mapped.append((orig[0], orig[1], tag))
+    return mapped
+
+
+def _merge_sorted_spans(
+    spans: list[tuple[int, int, str]],
+) -> list[tuple[int, int, str]]:
+    ordered = sorted(spans, key=lambda item: (item[0], -(item[1] - item[0])))
+    kept: list[tuple[int, int, str]] = []
+    for start, stop, tag in ordered:
+        if kept and start < kept[-1][1]:
             continue
-        accepted.append((start, stop, tag))
-    accepted.sort(key=lambda item: item[0])
+        kept.append((start, stop, tag))
+    return kept
+
+
+def _span_overlaps(
+    kept: list[tuple[int, int, str]], start: int, stop: int
+) -> bool:
+    if not kept:
+        return False
+    idx = bisect.bisect_right([item[0] for item in kept], start) - 1
+    if idx >= 0 and start < kept[idx][1]:
+        return True
+    nxt = idx + 1
+    if nxt < len(kept) and kept[nxt][0] < stop:
+        return True
+    return False
+
+
+def _replace_mapped_spans(
+    original: str,
+    pieces: list[tuple[int, int, int, int]],
+    *groups: list[tuple[int, int, str]],
+) -> str:
+    """Replace prepared spans in ``original`` with a single-pass join.
+
+    Groups are JWT (and percent runs), then secrets, then pool. A
+    leftover pool window cannot punch a hole in a JWT span. Merge
+    is ``O(n log n)`` so a multi-MiB ``eyJ`` blob stays linear.
+    """
+    kept: list[tuple[int, int, str]] = []
+    for group in groups:
+        mapped = _map_orig_spans(pieces, group)
+        if not kept:
+            kept = _merge_sorted_spans(mapped)
+            continue
+        extra = [
+            (start, stop, tag)
+            for start, stop, tag in mapped
+            if not _span_overlaps(kept, start, stop)
+        ]
+        if extra:
+            kept = _merge_sorted_spans(kept + extra)
     parts: list[str] = []
     cursor = 0
-    for start, stop, tag in accepted:
+    for start, stop, tag in kept:
         if start < cursor:
             continue
         parts.append(original[cursor:start])
@@ -839,16 +883,20 @@ def redact_text(text: str, secrets: tuple[str, ...] = ()) -> str:
     if not text:
         return text
     prepared, pieces = _prepare_mapped(text)
-    replacements: list[tuple[int, int, str]] = []
+    jwtish: list[tuple[int, int, str]] = []
     for match in _PERCENT_JWT_RUN_RE.finditer(prepared):
         raw = match.group(0)
         if _percent_run_should_redact(raw):
-            replacements.append((match.start(), match.end(), _redact_tag(raw)))
+            jwtish.append((match.start(), match.end(), _redact_tag(raw)))
     for begin, end, token in _iter_jwts(prepared):
-        replacements.append((begin, end, _redact_tag(token)))
-    replacements.extend(_iter_secret_spans(prepared, secrets))
-    replacements.extend(_iter_pool_spans(prepared))
-    shown = _replace_mapped_spans(text, pieces, replacements)
+        jwtish.append((begin, end, _redact_tag(token)))
+    shown = _replace_mapped_spans(
+        text,
+        pieces,
+        jwtish,
+        _iter_secret_spans(prepared, secrets),
+        _iter_pool_spans(prepared),
+    )
     return _reescape_controls(shown)
 
 
