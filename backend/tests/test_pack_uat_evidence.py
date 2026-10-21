@@ -1222,3 +1222,55 @@ def test_pack_missing_secrets_file_exits_2(tmp_path):
         raise AssertionError("pack missing --secrets-file did not exit 2")
     if "secrets file not found" not in packed.stderr:
         raise AssertionError("pack missing --secrets-file was not reported")
+
+
+def _runtime_env_secret(marker: str) -> str:
+    return "seed" + uuid.uuid4().hex[:12] + marker + uuid.uuid4().hex[:12]
+
+
+def _tar_escape_name(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("\t", "\\t").replace("'", "\\'")
+
+
+def _assert_secret_and_tail_absent(stdout: str, stderr: str, secret: str) -> None:
+    escaped = _tar_escape_name(secret)
+    tail = ""
+    for sep in ("\\", "\t", "'"):
+        if sep in secret:
+            tail = secret.split(sep, 1)[1]
+            break
+    for blob in (stdout, stderr):
+        if secret in blob or (escaped != secret and escaped in blob) or (
+            tail and tail in blob
+        ):
+            raise AssertionError("configured secret leaked into stdout or stderr")
+
+
+@pytest.mark.parametrize(
+    ("marker", "locale"),
+    [("\\", None), ("\t", None), ("'", "C")],
+    ids=["backslash", "tab", "quote"],
+)
+def test_verify_hardlink_redacts_escaped_configured_secret(tmp_path, marker, locale):
+    secret = _runtime_env_secret(marker)
+    archive = tmp_path / "crafted.tgz"
+    _crafted_hardlink_tgz(archive, f"round/{secret}", "round/missing-target")
+    env = os.environ.copy()
+    env["DEV_SEED_ADMIN_PASSWORD"] = secret
+    if locale:
+        env["LC_ALL"] = locale
+        env["LANG"] = locale
+    verified = subprocess.run(
+        ["python3", str(PACK), "--verify", str(archive), "--no-allowlist"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    _assert_secret_and_tail_absent(verified.stdout, verified.stderr, secret)
+    if verified.returncode != 2:
+        raise AssertionError("crafted escaped-secret pack did not fail verify")
+    if "tar extract failed" not in verified.stderr:
+        raise AssertionError("verify did not report tar extract failed")
+    if "<redacted name hmac:" not in verified.stderr:
+        raise AssertionError("tar stderr was not redacted")

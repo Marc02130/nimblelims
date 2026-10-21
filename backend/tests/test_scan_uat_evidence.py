@@ -3454,6 +3454,19 @@ def test_pool_token_excludes_iso_timestamps():
         raise AssertionError("runtime pool token was not a hit")
 
 
+def test_pool_token_excludes_compact_iso_timestamps():
+    compact = "Aa1!20261020T231931xxxxx"
+    if len(compact) != DEV_PASSWORD_LENGTH:
+        raise AssertionError("compact timestamp fixture is not 24 characters")
+    if scan._TIMESTAMP_RE.search("20261020T231931") is None:
+        raise AssertionError("compact timestamp regex did not match")
+    if scan.pool_token_on_line(compact):
+        raise AssertionError("compact ISO timestamp was a pool-token hit")
+    token = _runtime_pool_token()
+    if not scan.pool_token_on_line(token):
+        raise AssertionError("runtime pool token was not a hit")
+
+
 def test_lzip_and_rar_text_are_not_archive(tmp_path, capsys):
     evidence = tmp_path / "evidence"
     evidence.mkdir()
@@ -3481,3 +3494,221 @@ def test_missing_secrets_file_without_env_exits_2(tmp_path, capsys, monkeypatch)
         raise AssertionError("missing --secrets-file did not exit 2")
     if "secrets file not found" not in err:
         raise AssertionError("missing --secrets-file was not reported")
+
+
+def _png_chunk(name: bytes, data: bytes) -> bytes:
+    crc = zlib.crc32(name + data) & 0xFFFFFFFF
+    return len(data).to_bytes(4, "big") + name + data + crc.to_bytes(4, "big")
+
+
+def _chunk_png(*chunks: bytes) -> bytes:
+    ihdr = _png_chunk(
+        b"IHDR",
+        (1).to_bytes(4, "big") + (1).to_bytes(4, "big") + bytes((8, 2, 0, 0, 0)),
+    )
+    iend = _png_chunk(b"IEND", b"")
+    return b"\x89PNG\r\n\x1a\n" + ihdr + b"".join(chunks) + iend
+
+
+def _runtime_env_secret(marker: str) -> str:
+    return "seed" + uuid.uuid4().hex[:12] + marker + uuid.uuid4().hex[:12]
+
+
+def _tar_escape_name(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("\t", "\\t").replace("'", "\\'")
+
+
+def _assert_secret_and_tail_absent(shown: str, secret: str) -> None:
+    escaped = _tar_escape_name(secret)
+    tail = ""
+    for sep in ("\\", "\t", "'"):
+        if sep in secret:
+            tail = secret.split(sep, 1)[1]
+            break
+    if secret in shown:
+        raise AssertionError("configured secret leaked")
+    if escaped != secret and escaped in shown:
+        raise AssertionError("tar-escaped configured secret leaked")
+    if tail and tail in shown:
+        raise AssertionError("configured secret tail leaked")
+
+
+@pytest.mark.parametrize(
+    "marker",
+    ["\\", "\t", "'"],
+    ids=["backslash", "tab", "quote"],
+)
+def test_redact_text_redacts_tar_escaped_configured_secret(marker):
+    secret = _runtime_env_secret(marker)
+    escaped = _tar_escape_name(secret)
+    shown = scan.redact_text(f"tar: round/{escaped}: Cannot hard link", (secret,))
+    _assert_secret_and_tail_absent(shown, secret)
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("tar-escaped configured secret was not redacted")
+
+
+def test_redact_text_several_mib_is_linear_time():
+    unit = ("eyJ" * 17) + ".a.b"
+    blob = unit * ((4 * 1024 * 1024) // len(unit))
+    started = time.perf_counter()
+    shown = scan.redact_text(blob)
+    elapsed = time.perf_counter() - started
+    if elapsed >= 5.0:
+        raise AssertionError("redact_text on several MiB exceeded 5s")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("several-MiB eyJ blob was not redacted")
+
+
+def test_plain_many_backslash_text_is_not_encoded_run(tmp_path, capsys):
+    line = "notes " + ("\\" * 24) + " path only"
+    if scan._still_decodes(line, unescape=True):
+        raise AssertionError("plain backslash text failed closed")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(line + "\n", encoding="utf-8")
+    code, out, err = _run([str(evidence), "--no-allowlist"], capsys, ())
+    if "encoded run" in err:
+        raise AssertionError("plain backslash text was an encoded-run hit")
+    if code != 0:
+        raise AssertionError("plain backslash evidence did not scan clean")
+
+
+def test_fail_closed_layers_and_octal_dot_leave_no_8gram():
+    token = _pyjwt_access_token()
+    for layers in (4, 5):
+        layered = _jwt_quote_layers(token, layers)
+        if not scan._still_decodes(layered, unescape=False):
+            raise AssertionError("layered JWT did not fail closed")
+        shown = scan.redact_text(f"tar: {layered}: Cannot open")
+        _assert_no_jwt_grams("", shown, token)
+        if layered in shown:
+            raise AssertionError("layered JWT run was not redacted whole")
+    escaped = token.replace(".", r"\056")
+    shown = scan.redact_text(f"tar: {escaped}: Cannot open")
+    _assert_no_jwt_grams("", shown, token)
+    if escaped in shown:
+        raise AssertionError("octal-dot JWT was not redacted")
+
+
+def test_png_srgb_phys_is_suppressible(tmp_path, capsys):
+    extra = (
+        _png_chunk(b"sRGB", b"\x00"),
+        _png_chunk(
+            b"pHYs",
+            (2835).to_bytes(4, "big") + (2835).to_bytes(4, "big") + b"\x01",
+        ),
+        _png_chunk(b"gAMA", (45455).to_bytes(4, "big")),
+        _png_chunk(b"cHRM", b"\x00" * 32),
+    )
+    payload = _chunk_png(*extra)
+    if scan._png_disallowed_chunk(payload):
+        raise AssertionError("sRGB/pHYs PNG was treated as disallowed")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 0:
+        raise AssertionError("sRGB/pHYs PNG did not stay suppressible")
+    if "png-trailing" in err:
+        raise AssertionError("sRGB/pHYs PNG was png-trailing")
+    if "clean" not in out:
+        raise AssertionError("sRGB/pHYs PNG evidence did not scan clean")
+
+
+def test_png_truncated_chunk_is_unsuppressible(tmp_path, capsys):
+    payload = _chunk_png()[:-8]
+    if scan._png_disallowed_chunk(payload) is not True:
+        raise AssertionError("truncated PNG was not suspicious")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 1:
+        raise AssertionError("truncated PNG was not a hit")
+    if _hit("png-trailing", "photo.png") not in err:
+        raise AssertionError("truncated PNG was not png-trailing")
+
+
+def test_png_length_overflow_is_unsuppressible(tmp_path, capsys):
+    ihdr = _png_chunk(
+        b"IHDR",
+        (1).to_bytes(4, "big") + (1).to_bytes(4, "big") + bytes((8, 2, 0, 0, 0)),
+    )
+    overflow = (2**24).to_bytes(4, "big") + b"IDAT" + b"\x00" * 8
+    payload = b"\x89PNG\r\n\x1a\n" + ihdr + overflow
+    if scan._png_disallowed_chunk(payload) is not True:
+        raise AssertionError("length-overflow PNG was not suspicious")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 1:
+        raise AssertionError("length-overflow PNG was not a hit")
+    if _hit("png-trailing", "photo.png") not in err:
+        raise AssertionError("length-overflow PNG was not png-trailing")
+
+
+def test_png_bad_crc_is_unsuppressible(tmp_path, capsys):
+    good = _chunk_png()
+    payload = bytearray(good)
+    payload[8 + 4 + 4 + 13] ^= 0xFF
+    payload = bytes(payload)
+    if scan._png_disallowed_chunk(payload) is not True:
+        raise AssertionError("bad-CRC PNG was not suspicious")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, _out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 1:
+        raise AssertionError("bad-CRC PNG was not a hit")
+    if _hit("png-trailing", "photo.png") not in err:
+        raise AssertionError("bad-CRC PNG was not png-trailing")
+
+
+def test_r38_magic_bytes_png_is_not_a_chunk_stream(tmp_path, capsys):
+    if scan._png_disallowed_chunk(UTC_PNG):
+        raise AssertionError("r38 magic-plus-bytes PNG was walked as chunks")
+    evidence = tmp_path / "evidence"
+    (evidence / "ui").mkdir(parents=True)
+    (evidence / "ui" / UTC_NAME).write_bytes(UTC_PNG)
+    allow = _write_allowlist(
+        tmp_path / "allow.json",
+        [{"path": UTC_REL, "sha256": UTC_SHA}],
+    )
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if code != 0:
+        raise AssertionError("r38 magic-plus-bytes PNG did not stay suppressible")
+    if "png-trailing" in err:
+        raise AssertionError("r38 PNG became png-trailing")
+    if "clean" not in out:
+        raise AssertionError("r38 PNG evidence did not scan clean")
