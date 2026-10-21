@@ -647,14 +647,32 @@ def _map_unescape(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
 
 
 def _orig_span(
-    pieces: list[tuple[int, int, int, int]], begin: int, end: int
+    pieces: list[tuple[int, int, int, int]],
+    begin: int,
+    end: int,
+    starts: list[int] | None = None,
 ) -> tuple[int, int] | None:
+    """Map a prepared ``[begin, end)`` through escape-boundary pieces.
+
+    ``starts`` is the piece ``prep_start`` list, built once per call.
+    Lookup is a bisect plus a walk of the overlapping pieces only.
+    """
     if begin >= end or not pieces:
         return None
+    if starts is None:
+        starts = [piece[0] for piece in pieces]
+    index = bisect.bisect_right(starts, begin) - 1
+    if index < 0:
+        index = 0
     orig_start: int | None = None
     orig_end: int | None = None
-    for prep_start, prep_end, orig_left, orig_right in pieces:
-        if prep_end <= begin or prep_start >= end:
+    length = len(pieces)
+    while index < length:
+        prep_start, prep_end, orig_left, orig_right = pieces[index]
+        if prep_start >= end:
+            break
+        if prep_end <= begin:
+            index += 1
             continue
         left = max(begin, prep_start)
         right = min(end, prep_end)
@@ -670,6 +688,7 @@ def _orig_span(
         if orig_start is None:
             orig_start = mapped_left
         orig_end = mapped_right
+        index += 1
     if orig_start is None or orig_end is None or orig_end < orig_start:
         return None
     return orig_start, orig_end
@@ -684,15 +703,16 @@ def _map_join_newlines(
     mapped: list[tuple[int, int, int, int]] = []
     index = 0
     prep = 0
+    starts = [piece[0] for piece in pieces]
     for match in _NL_RUN_RE.finditer(text):
         if match.start() > index:
             chunk = text[index : match.start()]
-            orig = _orig_span(pieces, index, match.start())
+            orig = _orig_span(pieces, index, match.start(), starts)
             if orig is not None:
                 chunks.append(chunk)
                 mapped.append((prep, prep + len(chunk), orig[0], orig[1]))
                 prep += len(chunk)
-        orig = _orig_span(pieces, match.start(), match.end())
+        orig = _orig_span(pieces, match.start(), match.end(), starts)
         if orig is not None:
             chunks.append(".")
             mapped.append((prep, prep + 1, orig[0], orig[1]))
@@ -700,7 +720,7 @@ def _map_join_newlines(
         index = match.end()
     if index < len(text):
         chunk = text[index:]
-        orig = _orig_span(pieces, index, len(text))
+        orig = _orig_span(pieces, index, len(text), starts)
         if orig is not None:
             chunks.append(chunk)
             mapped.append((prep, prep + len(chunk), orig[0], orig[1]))
@@ -735,9 +755,10 @@ def _map_orig_spans(
     pieces: list[tuple[int, int, int, int]],
     replacements: list[tuple[int, int, str]],
 ) -> list[tuple[int, int, str]]:
+    starts = [piece[0] for piece in pieces]
     mapped: list[tuple[int, int, str]] = []
     for begin, end, tag in replacements:
-        orig = _orig_span(pieces, begin, end)
+        orig = _orig_span(pieces, begin, end, starts)
         if orig is None:
             continue
         mapped.append((orig[0], orig[1], tag))
@@ -757,11 +778,14 @@ def _merge_sorted_spans(
 
 
 def _span_overlaps(
-    kept: list[tuple[int, int, str]], start: int, stop: int
+    kept: list[tuple[int, int, str]],
+    start: int,
+    stop: int,
+    starts: list[int],
 ) -> bool:
     if not kept:
         return False
-    idx = bisect.bisect_right([item[0] for item in kept], start) - 1
+    idx = bisect.bisect_right(starts, start) - 1
     if idx >= 0 and start < kept[idx][1]:
         return True
     nxt = idx + 1
@@ -787,10 +811,11 @@ def _replace_mapped_spans(
         if not kept:
             kept = _merge_sorted_spans(mapped)
             continue
+        starts = [item[0] for item in kept]
         extra = [
             (start, stop, tag)
             for start, stop, tag in mapped
-            if not _span_overlaps(kept, start, stop)
+            if not _span_overlaps(kept, start, stop, starts)
         ]
         if extra:
             kept = _merge_sorted_spans(kept + extra)
