@@ -1287,3 +1287,17 @@ def test_verify_double_escaped_056_jwt_does_not_leak(tmp_path):
         raise AssertionError("double-escaped JWT pack did not fail verify")
     if "<redacted name hmac:" not in verified.stderr:
         raise AssertionError("double-escaped JWT tar stderr was not redacted")
+
+
+def test_verify_odd_backslash_056_jwt_does_not_leak(tmp_path):
+    token = _pyjwt_access_token()
+    for depth in (3, 5):
+        escaped = token.replace(".", ("\\" * depth) + "056")
+        archive = tmp_path / f"odd-{depth}.tgz"
+        _crafted_hardlink_tgz(archive, f"round/{escaped}", "round/missing-target")
+        verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+        _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+        if verified.returncode != 2:
+            raise AssertionError("odd-depth JWT pack did not fail verify")
+        if "<redacted name hmac:" not in verified.stderr:
+            raise AssertionError("odd-depth JWT tar stderr was not redacted")

@@ -34,7 +34,8 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   size, or an unwalkable PNG that still has IEND plus tail.
   The first chunk must be ``IHDR`` before the file is walked
   as a chunk stream so reviewed magic-plus-bytes PNGs stay
-  refuse-binary
+  refuse-binary. A backslash-dot is a tar escape. Compact
+  timestamp overlap uses only the ``YYYYMMDDThhmm`` core.
 - a binary file that is not PGDMP or UTF-8 text
 - an unsafe name in any directory or file
 - a duplicate identity
@@ -87,9 +88,13 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   Redaction finds spans on a prepared copy (unescape, newline
   join, NFKC), including configured secrets and pool windows,
   maps them through escape-boundary pieces, and applies them
-  with a single-pass join, then re-escapes controls. A
-  compact ``YYYYMMDDThhmm[ss][Z]`` substring is not a
-  password-pool hit.
+  with a single-pass join, then re-escapes controls. Secret
+  matching walks every unescape layer (no size-based skip) so
+  a several-MiB stderr still redacts a depth-2–7 escaped
+  configured secret; leftover escapes after 8 peels
+  fail-closed. ``\\u002e`` / ``\\x2e`` map in one linear
+  ``re.finditer`` pass. A compact ``YYYYMMDDThhmm[ss][Z]``
+  substring is not a password-pool hit.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -225,8 +230,15 @@ _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
 _NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
 _TIMESTAMP_RE = re.compile(
-    r"(?<![0-9A-Za-z])\d{8}T\d{4}(?:\d{2})?Z?(?![0-9A-Za-z])"
+    r"(?<![0-9A-Za-z])(\d{8}T\d{4})(?:\d{2})?Z?(?![0-9A-Za-z])"
 )
+_JWT_DOT_ESCAPES = (
+    ("\\u002e", "."),
+    ("\\u002E", "."),
+    ("\\x2e", "."),
+    ("\\x2E", "."),
+)
+_JWT_DOT_ESCAPE_RE = re.compile(r"\\(?:u002[eE]|x2[eE])")
 _NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
 _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
@@ -263,6 +275,7 @@ _TAR_SIMPLE_ESCAPES = {
     '"': '"',
     "'": "'",
     " ": " ",
+    ".": ".",
 }
 Identity = tuple[str, ...]
 _REDACT_KEY = _secretsmod.token_bytes(32)
@@ -320,7 +333,7 @@ def _unescape_tar_once(text: str) -> str:
 
 
 def _has_tar_escape(text: str) -> bool:
-    """True when a remaining ``\\`` is a simple or octal tar escape."""
+    """True when a remaining ``\\`` is a simple, octal, or backslash-dot escape."""
     index = 0
     length = len(text)
     while index < length:
@@ -432,7 +445,7 @@ def _join_tar_newlines(text: str) -> str:
 
 
 def _unwrap_wrapped_encodings(text: str) -> str:
-    """Join MIME-style wrapped base64/base64url lines (64/76-col wraps)."""
+    """Join wrapped base64/base64url (60/64/72/76), PEM bodies, and xxd hex."""
     if "\n" not in text and "\r" not in text:
         return text
     lines = text.splitlines()
@@ -446,18 +459,45 @@ def _unwrap_wrapped_encodings(text: str) -> str:
             out.append("".join(buf))
             buf.clear()
 
-    wrap = frozenset({64, 76})
+    wrap = frozenset({60, 64, 72, 76})
     token_chars = re.compile(r"[A-Za-z0-9+/_=.-]+")
+    pem_fence = re.compile(r"^-----BEGIN |^-----END ")
+    xxd_re = re.compile(
+        r"^[0-9a-fA-F]{4,}:\s+((?:[0-9a-fA-F]{2} ){1,16})"
+    )
+    xxd_bytes = bytearray()
     for line in lines:
-        if len(line) in wrap and token_chars.fullmatch(line):
-            buf.append(line)
+        stripped = line.strip()
+        if pem_fence.match(stripped):
+            flush()
             continue
-        if buf and token_chars.fullmatch(line):
-            buf.append(line)
+        xxd = xxd_re.match(stripped)
+        if xxd is not None:
+            flush()
+            xxd_bytes.extend(bytes.fromhex(xxd.group(1)))
+            continue
+        if xxd_bytes:
+            try:
+                out.append(xxd_bytes.decode("ascii"))
+            except UnicodeDecodeError:
+                out.append(line)
+            xxd_bytes.clear()
+        body = stripped if len(stripped) in wrap and token_chars.fullmatch(stripped) else line
+        if len(body) in wrap and token_chars.fullmatch(body):
+            buf.append(body)
+            continue
+        if buf and token_chars.fullmatch(body):
+            buf.append(body)
             flush()
             continue
         flush()
         out.append(line)
+    if xxd_bytes:
+        try:
+            out.append(xxd_bytes.decode("ascii"))
+        except UnicodeDecodeError:
+            pass
+        xxd_bytes.clear()
     flush()
     if out == lines:
         return text
@@ -504,7 +544,18 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
             for form in (layer, unicodedata.normalize("NFKC", layer)):
                 if form not in seen:
                     seen.append(form)
+                dotted = _jwt_dot_decoded(form)
+                if dotted not in seen:
+                    seen.append(dotted)
     return tuple(seen)
+
+
+def _jwt_dot_decoded(text: str) -> str:
+    current = text
+    for raw, repl in _JWT_DOT_ESCAPES:
+        if raw in current:
+            current = current.replace(raw, repl)
+    return current
 
 
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
@@ -745,15 +796,22 @@ def _secret_orig_spans(
 
     A raw backslash in a configured secret must match the original.
     A tar-escaped ``\\\\`` plus hex that looks like octal must match
-    the first unescaped layer, before a later octal peel.
+    the first unescaped layer, before a later octal peel. Every
+    layer is searched; leftover escapes after ``_UNESCAPE_BOUND``
+    peels fail-closed on the original backslash run.
     """
     spans = list(_iter_secret_spans(text, secrets))
     if "\\" not in text or not secrets:
         return spans
-    for prepared, pieces in _unescape_layers(text):
+    layers = _unescape_layers(text)
+    for prepared, pieces in layers:
         spans.extend(
             _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
         )
+    if len(layers) >= _UNESCAPE_BOUND and _has_tar_escape(layers[-1][0]):
+        tag = _redact_tag(text)
+        for match in re.finditer(r"\S*\\\S*", text):
+            spans.append((match.start(), match.end(), tag))
     return spans
 
 
@@ -856,8 +914,47 @@ def _map_nfkc(
     return "".join(chunks), mapped
 
 
+def _map_jwt_dot_escapes(
+    text: str, pieces: list[tuple[int, int, int, int]]
+) -> tuple[str, list[tuple[int, int, int, int]]]:
+    """Map ``\\u002e`` / ``\\x2e`` to ``.`` for JWT detection and redaction."""
+    if "\\u002" not in text and "\\x2" not in text:
+        return text, pieces
+    starts = [piece[0] for piece in pieces]
+    chunks: list[str] = []
+    mapped: list[tuple[int, int, int, int]] = []
+    prep = 0
+    cursor = 0
+    for match in _JWT_DOT_ESCAPE_RE.finditer(text):
+        if match.start() > cursor:
+            chunk = text[cursor : match.start()]
+            orig = _orig_span(pieces, cursor, match.start(), starts)
+            if orig is not None and chunk:
+                chunks.append(chunk)
+                mapped.append((prep, prep + len(chunk), orig[0], orig[1]))
+                prep += len(chunk)
+        orig = _orig_span(pieces, match.start(), match.end(), starts)
+        if orig is not None:
+            chunks.append(".")
+            mapped.append((prep, prep + 1, orig[0], orig[1]))
+            prep += 1
+        cursor = match.end()
+    if cursor < len(text):
+        chunk = text[cursor:]
+        orig = _orig_span(pieces, cursor, len(text), starts)
+        if orig is not None and chunk:
+            chunks.append(chunk)
+            mapped.append((prep, prep + len(chunk), orig[0], orig[1]))
+            prep += len(chunk)
+    if not chunks:
+        return text, pieces
+    return "".join(chunks), mapped
+
+
 def _prepare_mapped(text: str) -> tuple[str, list[tuple[int, int, int, int]]]:
-    unescaped, pieces = _map_unescape(text)
+    dotted, pieces = _map_jwt_dot_escapes(text, _identity_pieces(len(text)))
+    unescaped, nxt = _map_unescape(dotted)
+    pieces = _compose_pieces(pieces, nxt) if pieces else nxt
     joined, pieces = _map_join_newlines(unescaped, pieces)
     return _map_nfkc(joined, pieces)
 
@@ -959,20 +1056,38 @@ def _replace_mapped_spans(
     return "".join(parts)
 
 
+def _octal_utf8_needle(secret: str) -> str:
+    raw = secret.encode("utf-8", errors="surrogateescape")
+    if not raw or all(byte < 128 for byte in raw):
+        return ""
+    return "".join(f"\\{byte:03o}" for byte in raw)
+
+
+def _secret_needles(secret: str) -> list[str]:
+    needles = [secret]
+    folded = unicodedata.normalize("NFKC", secret)
+    if folded and folded not in needles:
+        needles.append(folded)
+    octal = _octal_utf8_needle(secret)
+    if octal and octal not in needles:
+        needles.append(octal)
+    folded_octal = _octal_utf8_needle(folded) if folded != secret else ""
+    if folded_octal and folded_octal not in needles:
+        needles.append(folded_octal)
+    for base in tuple(needles):
+        encoded = quote(base, safe="")
+        if encoded and encoded not in needles:
+            needles.append(encoded)
+    return needles
+
+
 def _iter_secret_spans(
     text: str, secrets: tuple[str, ...]
 ) -> list[tuple[int, int, str]]:
     spans: list[tuple[int, int, str]] = []
     for secret in sorted((item for item in secrets if item), key=len, reverse=True):
         tag = _redact_tag(secret)
-        needles = [secret]
-        folded = unicodedata.normalize("NFKC", secret)
-        if folded and folded not in needles:
-            needles.append(folded)
-        for base in tuple(needles):
-            encoded = quote(base, safe="")
-            if encoded and encoded not in needles:
-                needles.append(encoded)
+        needles = _secret_needles(secret)
         for needle in needles:
             start = 0
             while True:
@@ -1002,7 +1117,12 @@ def _iter_pool_spans(text: str) -> list[tuple[int, int, str]]:
 
 
 def _timestamp_spans(text: str) -> list[tuple[int, int]]:
-    return [(match.start(), match.end()) for match in _TIMESTAMP_RE.finditer(text)]
+    """Core ``YYYYMMDDThhmm`` span of each bounded stamp.
+
+    Optional seconds or ``Z`` may be the first characters of a glued
+    password, so they never cancel a window on their own.
+    """
+    return [match.span(1) for match in _TIMESTAMP_RE.finditer(text)]
 
 
 def _overlaps_stamp(
@@ -1191,16 +1311,8 @@ def configured_secret_on_line(line: str, secrets: tuple[str, ...]) -> bool:
     for secret in secrets:
         if not secret:
             continue
-        needles = [secret]
-        folded = unicodedata.normalize("NFKC", secret)
-        if folded and folded not in needles:
-            needles.append(folded)
-        for base in needles:
-            if base in line:
-                return True
-            encoded = quote(base, safe="")
-            if encoded and encoded != base and encoded in line:
-                return True
+        if any(needle in line for needle in _secret_needles(secret)):
+            return True
     return False
 
 
@@ -1475,7 +1587,10 @@ def _read_secrets_file(path: Path) -> list[tuple[str, str]]:
         key, raw = text.split("=", 1)
         parsed = shlex.split(raw)
         if len(parsed) != 1:
-            continue
+            shown = redact_name_path(str(path), ())
+            raise SystemExit(
+                f"ERROR: secrets file value dropped by shlex: {shown}"
+            )
         pairs.append((key, parsed[0]))
     return pairs
 
