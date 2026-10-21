@@ -4206,7 +4206,7 @@ def test_literal_newline_secret_is_redacted():
 
 def test_redact_text_several_mib_raw_secret_is_redacted():
     secret = _runtime_env_secret("x")
-    blob = ("~" * int(4.1 * 1024 * 1024)) + secret
+    blob = (" " * int(4.1 * 1024 * 1024)) + secret
     shown = scan.redact_text(blob, (secret,))
     _assert_no_secret_grams(shown, secret)
     if "<redacted name hmac:" not in shown:
@@ -4216,7 +4216,7 @@ def test_redact_text_several_mib_raw_secret_is_redacted():
 def test_padded_stderr_depth3_newline_secret_leaves_no_8gram():
     secret = _runtime_env_secret("\n")
     escaped = _tar_escape_depth(secret, 3)
-    blob = ("~" * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
+    blob = (" " * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
     shown = scan.redact_text(blob, (secret,))
     _assert_no_secret_grams(shown, secret)
     if secret in shown or escaped in shown:
@@ -4228,7 +4228,7 @@ def test_padded_stderr_depth3_newline_secret_leaves_no_8gram():
 def test_padded_stderr_depth9_tab_fail_closed_leaves_no_8gram():
     secret = _runtime_env_secret("\t")
     escaped = _tar_escape_depth(secret, 9)
-    blob = ("~" * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
+    blob = (" " * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
     shown = scan.redact_text(blob, (secret,))
     _assert_no_secret_grams(shown, secret)
     if secret in shown or escaped in shown:
