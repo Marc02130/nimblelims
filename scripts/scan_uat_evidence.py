@@ -88,9 +88,13 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   Redaction finds spans on a prepared copy (unescape, newline
   join, NFKC), including configured secrets and pool windows,
   maps them through escape-boundary pieces, and applies them
-  with a single-pass join, then re-escapes controls. A
-  compact ``YYYYMMDDThhmm[ss][Z]`` substring is not a
-  password-pool hit.
+  with a single-pass join, then re-escapes controls. Secret
+  matching walks every unescape layer (no size-based skip) so
+  a several-MiB stderr still redacts a depth-2–7 escaped
+  configured secret; leftover escapes after 8 peels
+  fail-closed. ``\\u002e`` / ``\\x2e`` map in one linear
+  ``re.finditer`` pass. A compact ``YYYYMMDDThhmm[ss][Z]``
+  substring is not a password-pool hit.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -228,13 +232,13 @@ _NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
 _TIMESTAMP_RE = re.compile(
     r"(?<![0-9A-Za-z])(\d{8}T\d{4})(?:\d{2})?Z?(?![0-9A-Za-z])"
 )
-_REDACT_LAYER_BYTES = 4 * 1024 * 1024
 _JWT_DOT_ESCAPES = (
     ("\\u002e", "."),
     ("\\u002E", "."),
     ("\\x2e", "."),
     ("\\x2E", "."),
 )
+_JWT_DOT_ESCAPE_RE = re.compile(r"\\(?:u002[eE]|x2[eE])")
 _NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
 _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
@@ -792,14 +796,14 @@ def _secret_orig_spans(
 
     A raw backslash in a configured secret must match the original.
     A tar-escaped ``\\\\`` plus hex that looks like octal must match
-    the first unescaped layer, before a later octal peel.
+    the first unescaped layer, before a later octal peel. Every
+    layer is searched; leftover escapes after ``_UNESCAPE_BOUND``
+    peels fail-closed on the original backslash run.
     """
     spans = list(_iter_secret_spans(text, secrets))
     if "\\" not in text or not secrets:
         return spans
     layers = _unescape_layers(text)
-    if len(text) > _REDACT_LAYER_BYTES and len(layers) > 2:
-        layers = [layers[0], layers[-1]]
     for prepared, pieces in layers:
         spans.extend(
             _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
@@ -921,34 +925,27 @@ def _map_jwt_dot_escapes(
     mapped: list[tuple[int, int, int, int]] = []
     prep = 0
     cursor = 0
-    length = len(text)
-    while cursor < length:
-        hit: tuple[str, str] | None = None
-        for raw, repl in _JWT_DOT_ESCAPES:
-            if text.startswith(raw, cursor):
-                hit = (raw, repl)
-                break
-        if hit is None:
-            nxt = length
-            for raw, _repl in _JWT_DOT_ESCAPES:
-                pos = text.find(raw, cursor)
-                if 0 <= pos < nxt:
-                    nxt = pos
-            chunk = text[cursor:nxt]
-            orig = _orig_span(pieces, cursor, nxt, starts)
+    for match in _JWT_DOT_ESCAPE_RE.finditer(text):
+        if match.start() > cursor:
+            chunk = text[cursor : match.start()]
+            orig = _orig_span(pieces, cursor, match.start(), starts)
             if orig is not None and chunk:
                 chunks.append(chunk)
                 mapped.append((prep, prep + len(chunk), orig[0], orig[1]))
                 prep += len(chunk)
-            cursor = nxt
-            continue
-        raw, repl = hit
-        orig = _orig_span(pieces, cursor, cursor + len(raw), starts)
+        orig = _orig_span(pieces, match.start(), match.end(), starts)
         if orig is not None:
-            chunks.append(repl)
-            mapped.append((prep, prep + len(repl), orig[0], orig[1]))
-            prep += len(repl)
-        cursor += len(raw)
+            chunks.append(".")
+            mapped.append((prep, prep + 1, orig[0], orig[1]))
+            prep += 1
+        cursor = match.end()
+    if cursor < len(text):
+        chunk = text[cursor:]
+        orig = _orig_span(pieces, cursor, len(text), starts)
+        if orig is not None and chunk:
+            chunks.append(chunk)
+            mapped.append((prep, prep + len(chunk), orig[0], orig[1]))
+            prep += len(chunk)
     if not chunks:
         return text, pieces
     return "".join(chunks), mapped
