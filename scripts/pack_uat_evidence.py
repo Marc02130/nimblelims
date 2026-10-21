@@ -29,9 +29,11 @@ SHA-256. Only then is the archive renamed into place and recorded in
 implementation. A dirty folder or a dirty packed result produces no
 ``.tgz``. Failed tar stderr is redacted JWTs first (tar-unescape
 and NFKC, then encoded runs after percent-decoding until
-unchanged (max 3, including ``%u002E``), then raw tokens), then
-configured secrets, then pool windows, before
-it is printed. Every printed path goes through
+unchanged (max 3, including ``%u002E``), or that still peel
+toward ``eyJ``, then raw tokens), then configured secrets and
+pool windows matched on that prepared copy (so a backslash,
+tab, or quote in a configured secret cannot leave a tail),
+before it is printed. Every printed path goes through
 ``redact_name_path``. An archive or output name that matches a
 secret rule is refused. Sidecar names are redacted the same way.
 
@@ -277,7 +279,13 @@ def _secrets_from_extra(extra: list[str]) -> tuple[str, ...]:
             index += 2
             continue
         index += 1
-    return _SCAN.load_scan_secrets(secrets_file=secrets_file)
+    try:
+        return _SCAN.load_scan_secrets(secrets_file=secrets_file)
+    except SystemExit as exc:
+        message = str(exc)
+        if message:
+            print(message, file=sys.stderr)
+        raise SystemExit(2) from exc
 
 
 def _print_tar_stderr(text: str, secrets: tuple[str, ...]) -> None:
@@ -565,17 +573,22 @@ def main(argv: list[str] | None = None) -> int:
         extra.extend(["--allowlist", args.allowlist])
     if args.no_allowlist:
         extra.append("--no-allowlist")
-    if args.verify:
-        return verify_pack(Path(args.verify), extra)
-    if not args.evidence:
-        print("ERROR: evidence directory is required", file=sys.stderr)
+    try:
+        if args.verify:
+            return verify_pack(Path(args.verify), extra)
+        if not args.evidence:
+            print("ERROR: evidence directory is required", file=sys.stderr)
+            return 2
+        folder = Path(args.evidence)
+        if args.output:
+            output = Path(args.output)
+        else:
+            output = folder.resolve().parent / f"{folder.resolve().name}.tgz"
+        return pack_folder(folder, output, extra)
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            return exc.code
         return 2
-    folder = Path(args.evidence)
-    if args.output:
-        output = Path(args.output)
-    else:
-        output = folder.resolve().parent / f"{folder.resolve().name}.tgz"
-    return pack_folder(folder, output, extra)
 
 
 if __name__ == "__main__":
