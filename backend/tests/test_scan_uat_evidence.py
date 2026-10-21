@@ -3556,6 +3556,35 @@ def _assert_secret_and_tail_absent(shown: str, secret: str) -> None:
         raise AssertionError("configured secret tail leaked")
 
 
+def _assert_no_secret_grams(shown: str, secret: str) -> None:
+    sources = [secret]
+    for sep in ("\n", "\t", "\\"):
+        if sep in secret:
+            left, right = secret.split(sep, 1)
+            sources.extend([left, right])
+            break
+    for source in sources:
+        if not source:
+            continue
+        if len(source) < 8:
+            if source in shown:
+                raise AssertionError("configured secret fragment leaked")
+            continue
+        for index in range(len(source) - 7):
+            if source[index : index + 8] in shown:
+                raise AssertionError("configured secret 8-gram leaked")
+
+
+def _tar_escape_depth(text: str, depth: int) -> str:
+    """Encode ``text`` so ``depth`` tar peels reveal it."""
+    current = (
+        text.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t")
+    )
+    for _ in range(max(0, depth - 1)):
+        current = current.replace("\\", "\\\\")
+    return current
+
+
 @pytest.mark.parametrize(
     "marker",
     ["\\", "\t", "'"],
@@ -4175,14 +4204,60 @@ def test_literal_newline_secret_is_redacted():
         raise AssertionError("literal-newline secret was not redacted")
 
 
-def test_redact_text_4mib_cap_still_redacts_secret():
+def test_redact_text_several_mib_raw_secret_is_redacted():
     secret = _runtime_env_secret("x")
-    blob = ("A" * (4 * 1024 * 1024)) + secret
+    blob = ("A" * int(4.1 * 1024 * 1024)) + secret
     shown = scan.redact_text(blob, (secret,))
-    if secret in shown:
-        raise AssertionError("secret leaked from 4 MiB redact_text")
+    _assert_no_secret_grams(shown, secret)
     if "<redacted name hmac:" not in shown:
-        raise AssertionError("4 MiB redact_text did not redact the secret")
+        raise AssertionError("several-MiB redact_text did not redact the secret")
+
+
+def test_padded_stderr_depth3_newline_secret_leaves_no_8gram():
+    secret = _runtime_env_secret("\n")
+    escaped = _tar_escape_depth(secret, 3)
+    blob = ("A" * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
+    shown = scan.redact_text(blob, (secret,))
+    _assert_no_secret_grams(shown, secret)
+    if secret in shown or escaped in shown:
+        raise AssertionError("depth-3 newline secret leaked from padded stderr")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("depth-3 newline secret was not redacted")
+
+
+def test_padded_stderr_depth9_tab_fail_closed_leaves_no_8gram():
+    secret = _runtime_env_secret("\t")
+    escaped = _tar_escape_depth(secret, 9)
+    blob = ("A" * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
+    shown = scan.redact_text(blob, (secret,))
+    _assert_no_secret_grams(shown, secret)
+    if secret in shown or escaped in shown:
+        raise AssertionError("depth-9 tab secret leaked from padded stderr")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("depth-9 tab secret was not fail-closed")
+
+
+def test_map_jwt_dot_escapes_1mib_is_linear_time():
+    unit = "ab\\u002e"
+    small = unit * ((1024 * 1024) // len(unit))
+    pieces = scan._identity_pieces(len(small))
+    started = time.perf_counter()
+    mapped, _mapped_pieces = scan._map_jwt_dot_escapes(small, pieces)
+    small_elapsed = time.perf_counter() - started
+    if small_elapsed >= 3.0:
+        raise AssertionError("1 MiB \\\\u002e map exceeded 3s")
+    expected = "ab." * (len(small) // len(unit))
+    if mapped != expected:
+        raise AssertionError("1 MiB \\\\u002e map missed an escape")
+    large = unit * ((8 * 1024 * 1024) // len(unit))
+    large_pieces = scan._identity_pieces(len(large))
+    started = time.perf_counter()
+    large_mapped, _ = scan._map_jwt_dot_escapes(large, large_pieces)
+    large_elapsed = time.perf_counter() - started
+    if small_elapsed > 0 and large_elapsed / small_elapsed > 14.0:
+        raise AssertionError("8 MiB \\\\u002e map exceeded 14x the 1 MiB time")
+    if large_mapped != "ab." * (len(large) // len(unit)):
+        raise AssertionError("8 MiB \\\\u002e map missed an escape")
 
 
 def test_nfkc_needle_is_in_secret_needles():
