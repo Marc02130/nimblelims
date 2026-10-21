@@ -1274,3 +1274,16 @@ def test_verify_hardlink_redacts_escaped_configured_secret(tmp_path, marker, loc
         raise AssertionError("verify did not report tar extract failed")
     if "<redacted name hmac:" not in verified.stderr:
         raise AssertionError("tar stderr was not redacted")
+
+
+def test_verify_double_escaped_056_jwt_does_not_leak(tmp_path):
+    token = _pyjwt_access_token()
+    escaped = token.replace(".", r"\\056")
+    archive = tmp_path / "double-octal.tgz"
+    _crafted_hardlink_tgz(archive, f"round/{escaped}", "round/missing-target")
+    verified = _run_pack_unchecked(["--verify", str(archive), "--no-allowlist"])
+    _assert_no_jwt_grams(verified.stdout, verified.stderr, token)
+    if verified.returncode != 2:
+        raise AssertionError("double-escaped JWT pack did not fail verify")
+    if "<redacted name hmac:" not in verified.stderr:
+        raise AssertionError("double-escaped JWT tar stderr was not redacted")
