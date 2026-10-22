@@ -92,9 +92,17 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   matching walks every unescape layer (no size-based skip) so
   a several-MiB stderr still redacts a depth-2–7 escaped
   configured secret; leftover escapes after 8 peels
-  fail-closed. ``\\u002e`` / ``\\x2e`` map in one linear
+  fail-closed on each ``\\S+`` token that contains a
+  backslash (linear). ``\\u002e`` / ``\\x2e`` / ``\\X2E`` /
+  ``\\u{2e}`` / ``\\U0000002e`` / ``&#46;`` map in one linear
   ``re.finditer`` pass. A compact ``YYYYMMDDThhmm[ss][Z]``
-  substring is not a password-pool hit.
+  substring is not a password-pool hit. Wrapped 76-column
+  standard base64, PEM, and MIME bodies decode to a JWT.
+  xxd default, ``-p``, and ``-g1`` hex dumps join. Octal
+  needles escape only bytes ``>= 0x80``. Unbalanced quotes
+  in ``--secrets-file`` exit 2. A peel that would emit more
+  than 65536 escape pieces fail-closed instead of
+  materializing a multi-gigabyte pair-run.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -137,6 +145,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import bisect
 import errno
 import hashlib
@@ -225,7 +234,9 @@ _JWT_HEADER_MAX = 32 * 1024
 _JWT_EYJ_PER_RUN = 16
 _DECODE_LAYERS = 3
 _UNESCAPE_BOUND = 8
+_UNESCAPE_PIECE_BOUND = 65536
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
+_WORD_RE = re.compile(r"\S+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
 _NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
@@ -237,8 +248,24 @@ _JWT_DOT_ESCAPES = (
     ("\\u002E", "."),
     ("\\x2e", "."),
     ("\\x2E", "."),
+    ("\\X2e", "."),
+    ("\\X2E", "."),
+    ("\\u{2e}", "."),
+    ("\\u{2E}", "."),
+    ("\\U0000002e", "."),
+    ("\\U0000002E", "."),
+    ("&#46;", "."),
+    ("&#x2e;", "."),
+    ("&#x2E;", "."),
 )
-_JWT_DOT_ESCAPE_RE = re.compile(r"\\(?:u002[eE]|x2[eE])")
+_JWT_DOT_ESCAPE_RE = re.compile(
+    r"\\u002[eE]|\\[xX]2[eE]|\\u\{2[eE]\}|\\U0000002[eE]|&#(?:46|x2[eE]);"
+)
+_XXD_OFFSET_RE = re.compile(r"^[ \t]*[0-9a-fA-F]{4,}:[ \t]+(.*)$")
+_XXD_PLAIN_RE = re.compile(r"^[0-9a-fA-F]{16,}$")
+_PEM_FENCE_RE = re.compile(r"^-----BEGIN |^-----END ")
+_WRAP_TOKEN_RE = re.compile(r"[A-Za-z0-9+/_=.-]+")
+_WRAP_WIDTHS = frozenset({60, 64, 72, 76})
 _NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
 _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
@@ -453,55 +480,98 @@ def _unwrap_wrapped_encodings(text: str) -> str:
         return text
     out: list[str] = []
     buf: list[str] = []
+    xxd_bytes = bytearray()
+    xxd_plain: list[str] = []
 
     def flush() -> None:
         if buf:
             out.append("".join(buf))
             buf.clear()
 
-    wrap = frozenset({60, 64, 72, 76})
-    token_chars = re.compile(r"[A-Za-z0-9+/_=.-]+")
-    pem_fence = re.compile(r"^-----BEGIN |^-----END ")
-    xxd_re = re.compile(
-        r"^[0-9a-fA-F]{4,}:\s+((?:[0-9a-fA-F]{2} ){1,16})"
-    )
-    xxd_bytes = bytearray()
+    def flush_xxd() -> None:
+        nonlocal xxd_bytes
+        if xxd_bytes:
+            try:
+                out.append(xxd_bytes.decode("ascii"))
+            except UnicodeDecodeError:
+                pass
+            xxd_bytes = bytearray()
+        if xxd_plain:
+            hexpart = "".join(xxd_plain)
+            xxd_plain.clear()
+            if len(hexpart) % 2 == 0:
+                try:
+                    out.append(bytes.fromhex(hexpart).decode("ascii"))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+
     for line in lines:
         stripped = line.strip()
-        if pem_fence.match(stripped):
+        if _PEM_FENCE_RE.match(stripped):
             flush()
+            flush_xxd()
             continue
-        xxd = xxd_re.match(stripped)
+        xxd = _XXD_OFFSET_RE.match(line)
         if xxd is not None:
             flush()
-            xxd_bytes.extend(bytes.fromhex(xxd.group(1)))
+            if xxd_plain:
+                flush_xxd()
+            hex_part = xxd.group(1).split("  ", 1)[0]
+            digits = "".join(
+                char for char in hex_part if char in "0123456789abcdefABCDEF"
+            )
+            if len(digits) >= 2 and len(digits) % 2 == 0:
+                xxd_bytes.extend(bytes.fromhex(digits))
             continue
         if xxd_bytes:
             try:
                 out.append(xxd_bytes.decode("ascii"))
             except UnicodeDecodeError:
                 out.append(line)
-            xxd_bytes.clear()
-        body = stripped if len(stripped) in wrap and token_chars.fullmatch(stripped) else line
-        if len(body) in wrap and token_chars.fullmatch(body):
+            xxd_bytes = bytearray()
+        if _XXD_PLAIN_RE.fullmatch(stripped) and len(stripped) % 2 == 0:
+            flush()
+            xxd_plain.append(stripped)
+            continue
+        if xxd_plain:
+            flush_xxd()
+        body = (
+            stripped
+            if len(stripped) in _WRAP_WIDTHS and _WRAP_TOKEN_RE.fullmatch(stripped)
+            else line
+        )
+        if len(body) in _WRAP_WIDTHS and _WRAP_TOKEN_RE.fullmatch(body):
             buf.append(body)
             continue
-        if buf and token_chars.fullmatch(body):
+        if buf and _WRAP_TOKEN_RE.fullmatch(body):
             buf.append(body)
             flush()
             continue
         flush()
         out.append(line)
-    if xxd_bytes:
-        try:
-            out.append(xxd_bytes.decode("ascii"))
-        except UnicodeDecodeError:
-            pass
-        xxd_bytes.clear()
+    if xxd_bytes or xxd_plain:
+        flush_xxd()
     flush()
     if out == lines:
         return text
     return "\n".join(out)
+
+
+def _try_ascii_b64(text: str) -> str:
+    """Decode standard base64 to ASCII, or ``\"\"`` if it is not a payload."""
+    compact = "".join(text.split())
+    if len(compact) < 8 or len(compact) % 4 != 0:
+        return ""
+    if not re.fullmatch(r"[A-Za-z0-9+/]+=*", compact):
+        return ""
+    try:
+        raw = base64.b64decode(compact, validate=True)
+    except (ValueError, binascii.Error):
+        return ""
+    try:
+        return raw.decode("ascii")
+    except UnicodeDecodeError:
+        return ""
 
 
 def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
@@ -519,6 +589,9 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
     if not _needs_decode_variants(text) and not (
         unescape and ("\n" in text or "\r" in text)
     ):
+        dotted = _jwt_dot_decoded(text)
+        if dotted != text:
+            return (text, dotted)
         return (text,)
     seen: list[str] = []
     bases = [text]
@@ -550,12 +623,20 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def _has_jwt_dot_escape(text: str) -> bool:
+    return (
+        "&#" in text
+        or "\\u" in text
+        or "\\x" in text
+        or "\\X" in text
+        or "\\U" in text
+    )
+
+
 def _jwt_dot_decoded(text: str) -> str:
-    current = text
-    for raw, repl in _JWT_DOT_ESCAPES:
-        if raw in current:
-            current = current.replace(raw, repl)
-    return current
+    if not _has_jwt_dot_escape(text):
+        return text
+    return _JWT_DOT_ESCAPE_RE.sub(".", text)
 
 
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
@@ -702,6 +783,17 @@ def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]
         prep += len(chunk)
         lit = None
 
+    def stop_after_bound() -> bool:
+        nonlocal prep
+        if len(pieces) < _UNESCAPE_PIECE_BOUND:
+            return False
+        if index < length:
+            rest = text[index:]
+            chunks.append(rest)
+            pieces.append((prep, prep + len(rest), index, length))
+            prep += len(rest)
+        return True
+
     while index < length:
         char = text[index]
         if char != "\\" or index + 1 >= length:
@@ -718,6 +810,8 @@ def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]
             pieces.append((prep, prep + len(simple), start, index + 2))
             prep += len(simple)
             index += 2
+            if stop_after_bound():
+                break
             continue
         if nxt in "01234567":
             raw = bytearray()
@@ -736,12 +830,17 @@ def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]
             chunks.append(decoded)
             pieces.append((prep, prep + len(decoded), start, index))
             prep += len(decoded)
+            if stop_after_bound():
+                break
             continue
         chunks.append(nxt)
         pieces.append((prep, prep + len(nxt), start, index + 2))
         prep += len(nxt)
         index += 2
-    flush_literal(length)
+        if stop_after_bound():
+            break
+    else:
+        flush_literal(length)
     return "".join(chunks), pieces
 
 
@@ -770,6 +869,8 @@ def _unescape_layers(
     """
     current, pieces = _map_unescape_once(text)
     layers = [(current, pieces)]
+    if len(pieces) >= _UNESCAPE_PIECE_BOUND:
+        return layers
     for _ in range(_UNESCAPE_BOUND - 1):
         if not _has_tar_escape(current):
             break
@@ -779,6 +880,8 @@ def _unescape_layers(
         pieces = _compose_pieces(pieces, nxt_pieces)
         current = nxt
         layers.append((current, pieces))
+        if len(pieces) >= _UNESCAPE_PIECE_BOUND:
+            break
     return layers
 
 
@@ -808,10 +911,16 @@ def _secret_orig_spans(
         spans.extend(
             _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
         )
-    if len(layers) >= _UNESCAPE_BOUND and _has_tar_escape(layers[-1][0]):
+    over_pieces = any(
+        len(pieces) >= _UNESCAPE_PIECE_BOUND for _prepared, pieces in layers
+    )
+    if (
+        len(layers) >= _UNESCAPE_BOUND or over_pieces
+    ) and _has_tar_escape(layers[-1][0]):
         tag = _redact_tag(text)
-        for match in re.finditer(r"\S*\\\S*", text):
-            spans.append((match.start(), match.end(), tag))
+        for match in _WORD_RE.finditer(text):
+            if "\\" in match.group():
+                spans.append((match.start(), match.end(), tag))
     return spans
 
 
@@ -917,8 +1026,8 @@ def _map_nfkc(
 def _map_jwt_dot_escapes(
     text: str, pieces: list[tuple[int, int, int, int]]
 ) -> tuple[str, list[tuple[int, int, int, int]]]:
-    """Map ``\\u002e`` / ``\\x2e`` to ``.`` for JWT detection and redaction."""
-    if "\\u002" not in text and "\\x2" not in text:
+    """Map ``\\u002e`` / ``\\x2e`` / HTML and JS dots to ``.``."""
+    if not _has_jwt_dot_escape(text):
         return text, pieces
     starts = [piece[0] for piece in pieces]
     chunks: list[str] = []
@@ -1060,7 +1169,9 @@ def _octal_utf8_needle(secret: str) -> str:
     raw = secret.encode("utf-8", errors="surrogateescape")
     if not raw or all(byte < 128 for byte in raw):
         return ""
-    return "".join(f"\\{byte:03o}" for byte in raw)
+    return "".join(
+        f"\\{byte:03o}" if byte >= 0x80 else chr(byte) for byte in raw
+    )
 
 
 def _secret_needles(secret: str) -> list[str]:
@@ -1351,7 +1462,11 @@ def scan_text(
     unwrapped = _unwrap_wrapped_encodings(text)
     if unwrapped != text:
         for number, line in enumerate(unwrapped.splitlines(), start=1):
-            if any(jwt_on_line(variant) for variant in _text_variants(line)):
+            forms = list(_text_variants(line))
+            decoded = _try_ascii_b64(line)
+            if decoded:
+                forms.extend(_text_variants(decoded))
+            if any(jwt_on_line(variant) for variant in forms):
                 hits.append(Hit(KIND_JWT, identity, number, secrets))
     return hits
 
@@ -1585,7 +1700,13 @@ def _read_secrets_file(path: Path) -> list[tuple[str, str]]:
         if not text or text.startswith("#") or "=" not in text:
             continue
         key, raw = text.split("=", 1)
-        parsed = shlex.split(raw)
+        try:
+            parsed = shlex.split(raw)
+        except ValueError:
+            shown = redact_name_path(str(path), ())
+            raise SystemExit(
+                f"ERROR: secrets file value dropped by shlex: {shown}"
+            ) from None
         if len(parsed) != 1:
             shown = redact_name_path(str(path), ())
             raise SystemExit(
