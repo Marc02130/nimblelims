@@ -76,3 +76,11 @@ logs/
 *.log
 tmp/
 temp/
+
+# --- Local UAT evidence (never commit or publish) ---
+# Screenshots, captured logs, tarballs, and run outputs stay on the test machine.
+/evidence/
+/uat-evidence/
+evidence.tgz
+*.tgz.sha256
+
