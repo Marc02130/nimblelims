@@ -37,11 +37,6 @@ def instrument_block_reason(
     if row is None:
         return {"code": "instrument_not_found", "message": "Instrument not found."}
     label = row.name or "This instrument"
-    if row.active is not True:
-        return {
-            "code": INSTRUMENT_INACTIVE,
-            "message": f"{label} is inactive and cannot be used.",
-        }
     if row.status == "retired":
         return {
             "code": INSTRUMENT_RETIRED,
@@ -51,6 +46,11 @@ def instrument_block_reason(
         return {
             "code": INSTRUMENT_OUT_OF_SERVICE,
             "message": f"{label} is out of service and cannot be used.",
+        }
+    if row.active is not True:
+        return {
+            "code": INSTRUMENT_INACTIVE,
+            "message": f"{label} is inactive and cannot be used.",
         }
     open_down = (
         db.query(InstrumentDowntime)

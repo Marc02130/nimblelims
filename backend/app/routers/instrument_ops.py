@@ -324,6 +324,7 @@ def update_event(
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
+    db.flush()
     if row.schedule_id:
         schedule = (
             db.query(InstrumentMaintenanceSchedule)

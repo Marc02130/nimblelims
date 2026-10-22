@@ -132,22 +132,16 @@ def _secure(table: str, policy: str) -> None:
 
 
 def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None:
+    # list_entries.name is unique on create_all (BaseModel) but only
+    # (list_id, name) is unique after Alembic. Never ON CONFLICT (name).
     conn.execute(
         sa.text(
             """
             INSERT INTO lists (id, name, description, active, created_at, modified_at)
-            VALUES (:id, :name, :description, true, NOW(), NOW())
-            ON CONFLICT (id) DO NOTHING
-            """
-        ),
-        {"id": list_id, "name": name, "description": description},
-    )
-    conn.execute(
-        sa.text(
-            """
-            INSERT INTO lists (id, name, description, active, created_at, modified_at)
-            VALUES (:id, :name, :description, true, NOW(), NOW())
-            ON CONFLICT (name) DO NOTHING
+            SELECT :id, :name, :description, true, NOW(), NOW()
+            WHERE NOT EXISTS (
+                SELECT 1 FROM lists WHERE id = :id OR name = :name
+            )
             """
         ),
         {"id": list_id, "name": name, "description": description},
@@ -167,10 +161,10 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
                 INSERT INTO list_entries (
                     id, name, description, code, active, created_at, modified_at, list_id
                 )
-                VALUES (
-                    :id, :name, :name, NULL, true, NOW(), NOW(), :list_id
+                SELECT :id, :name, :name, NULL, true, NOW(), NOW(), :list_id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM list_entries WHERE id = :id OR name = :name
                 )
-                ON CONFLICT (id) DO NOTHING
                 """
             ),
             {
@@ -178,20 +172,6 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
                 "name": entry_name,
                 "list_id": resolved,
             },
-        )
-        conn.execute(
-            sa.text(
-                """
-                INSERT INTO list_entries (
-                    id, name, description, code, active, created_at, modified_at, list_id
-                )
-                VALUES (
-                    gen_random_uuid(), :name, :name, NULL, true, NOW(), NOW(), :list_id
-                )
-                ON CONFLICT (name) DO NOTHING
-                """
-            ),
-            {"name": entry_name, "list_id": resolved},
         )
 
 
