@@ -183,6 +183,13 @@ def test_rls_instrument_uses_are_tenant_scoped(migrated_engine):
             ),
             {"id": inst, "n": _name("RLS"), "t": type_id},
         )
+        assert (
+            conn.execute(
+                text("SELECT maintenance_tracked FROM instruments WHERE id = :id"),
+                {"id": inst},
+            ).scalar()
+            is False
+        )
         conn.execute(
             text("INSERT INTO lims_runs (id,name,status,created_by) VALUES (:id,:n,'draft',:u)"),
             {"id": run, "n": _name("RLS run"), "u": ua},

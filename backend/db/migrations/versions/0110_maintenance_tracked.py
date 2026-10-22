@@ -72,7 +72,6 @@ def upgrade() -> None:
             server_default="false",
         ),
     )
-    op.alter_column("instruments", "maintenance_tracked", server_default=None)
 
     op.create_table(
         "instrument_type_defaults",
