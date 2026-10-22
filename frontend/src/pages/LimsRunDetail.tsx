@@ -38,6 +38,7 @@ import PublishPromotionDialog from '../components/runs/PublishPromotionDialog';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 import StartCohortPanel from '../components/experiments/StartCohortPanel';
 import ReagentUsePanel from '../components/reagents/ReagentUsePanel';
+import InstrumentUsePanel from '../components/instruments/InstrumentUsePanel';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -623,6 +624,7 @@ const LimsRunDetail: React.FC = () => {
       )}
 
       {runId && <ReagentUsePanel limsRunId={runId} analysisId={run.analysis_id} />}
+      {runId && <InstrumentUsePanel limsRunId={runId} />}
 
       <PublishPromotionDialog
         open={publishDialogOpen}

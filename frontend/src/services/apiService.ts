@@ -922,8 +922,6 @@ export class ApiService {
   async createInstrumentType(data: {
     name: string;
     description?: string;
-    vendor?: string;
-    model?: string;
     active?: boolean;
   }) {
     const response: AxiosResponse = await this.api.post('/v1/instrument-types', data);
@@ -935,8 +933,6 @@ export class ApiService {
     data: Partial<{
       name: string;
       description?: string;
-      vendor?: string;
-      model?: string;
       active?: boolean;
     }>
   ) {
@@ -944,47 +940,28 @@ export class ApiService {
     return response.data;
   }
 
-  async deleteInstrumentType(id: string) {
-    const response: AxiosResponse = await this.api.delete(`/v1/instrument-types/${id}`);
-    return response.data;
-  }
-
   async getInstruments(params?: {
     search?: string;
     instrument_type_id?: string;
+    status?: string;
     active?: boolean;
   }) {
     const response: AxiosResponse = await this.api.get('/v1/instruments', { params });
     return response.data;
   }
 
-  async createInstrument(data: {
-    name: string;
-    description?: string;
-    instrument_type_id: string;
-    serial_number?: string;
-    active?: boolean;
-  }) {
+  async getInstrumentEligibility(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/instruments/${id}/eligibility`);
+    return response.data;
+  }
+
+  async createInstrument(data: Record<string, unknown>) {
     const response: AxiosResponse = await this.api.post('/v1/instruments', data);
     return response.data;
   }
 
-  async updateInstrument(
-    id: string,
-    data: Partial<{
-      name: string;
-      description?: string;
-      instrument_type_id: string;
-      serial_number?: string;
-      active?: boolean;
-    }>
-  ) {
+  async updateInstrument(id: string, data: Record<string, unknown>) {
     const response: AxiosResponse = await this.api.patch(`/v1/instruments/${id}`, data);
-    return response.data;
-  }
-
-  async deleteInstrument(id: string) {
-    const response: AxiosResponse = await this.api.delete(`/v1/instruments/${id}`);
     return response.data;
   }
 
@@ -1016,8 +993,87 @@ export class ApiService {
     return response.data;
   }
 
-  async deleteCroSource(id: string) {
-    const response: AxiosResponse = await this.api.delete(`/v1/cro-sources/${id}`);
+  async getInstrumentMaintenanceSchedules(params?: { instrument_id?: string; include_inactive?: boolean }) {
+    const response: AxiosResponse = await this.api.get('/v1/instrument-maintenance-schedules', { params });
+    return response.data;
+  }
+
+  async createInstrumentMaintenanceSchedule(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/instrument-maintenance-schedules', data);
+    return response.data;
+  }
+
+  async updateInstrumentMaintenanceSchedule(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instrument-maintenance-schedules/${id}`, data);
+    return response.data;
+  }
+
+  async getInstrumentMaintenanceEvents(params?: {
+    instrument_id?: string;
+    schedule_id?: string;
+    include_voided?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/instrument-maintenance-events', { params });
+    return response.data;
+  }
+
+  async createInstrumentMaintenanceEvent(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/instrument-maintenance-events', data);
+    return response.data;
+  }
+
+  async updateInstrumentMaintenanceEvent(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instrument-maintenance-events/${id}`, data);
+    return response.data;
+  }
+
+  async getInstrumentDowntime(params?: {
+    instrument_id?: string;
+    open_only?: boolean;
+    include_inactive?: boolean;
+  }) {
+    const response: AxiosResponse = await this.api.get('/v1/instrument-downtime', { params });
+    return response.data;
+  }
+
+  async createInstrumentDowntime(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/instrument-downtime', data);
+    return response.data;
+  }
+
+  async updateInstrumentDowntime(id: string, data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instrument-downtime/${id}`, data);
+    return response.data;
+  }
+
+  async addExperimentInstrument(experimentId: string, instrumentId: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/experiments/${experimentId}/instruments`,
+      { instrument_id: instrumentId },
+    );
+    return response.data;
+  }
+
+  async setExperimentInstrumentActive(experimentId: string, instrumentId: string, active: boolean) {
+    const response: AxiosResponse = await this.api.patch(
+      `/v1/experiments/${experimentId}/instruments`,
+      { instrument_id: instrumentId, active },
+    );
+    return response.data;
+  }
+
+  async getInstrumentUses(params?: { lims_run_id?: string; experiment_id?: string; instrument_id?: string }) {
+    const response: AxiosResponse = await this.api.get('/v1/instrument-uses', { params });
+    return response.data;
+  }
+
+  async recordInstrumentUse(data: Record<string, unknown>) {
+    const response: AxiosResponse = await this.api.post('/v1/instrument-uses', data);
+    return response.data;
+  }
+
+  async voidInstrumentUse(id: string) {
+    const response: AxiosResponse = await this.api.patch(`/v1/instrument-uses/${id}`, { active: false });
     return response.data;
   }
 

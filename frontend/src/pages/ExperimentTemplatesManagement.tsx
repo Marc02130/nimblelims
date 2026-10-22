@@ -146,6 +146,12 @@ const ENTRY_TYPE_OPTIONS: {
     helper:
       'Default catalog reagents for this experiment. The lab tech can add any active reagent, then picks the lot.',
   },
+  {
+    value: 'instrument',
+    label: 'Instruments',
+    helper:
+      'Default catalog instruments for this experiment. The lab tech can add any eligible instrument, then record its use.',
+  },
 ];
 
 /** FieldDefinitions used as entry columns (not Custom Fields for Sample/Test tables). */
@@ -301,6 +307,18 @@ const PREDEFINED_PRESETS: {
       fields: [],
     },
   },
+  {
+    key: 'instruments',
+    label: 'Instruments',
+    entry: {
+      entry_type: 'instrument',
+      name: 'Instruments',
+      description: 'Default catalog instruments; the lab tech can add any eligible instrument and record its use',
+      predefined_entry_key: 'instruments',
+      config: { allowed_instrument_ids: [] },
+      fields: [],
+    },
+  },
 ];
 
 /** New templates start with Header + Samples so create always yields a reusable entry spine. */
@@ -353,6 +371,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
     Array<{ id: string; name: string; operation: string }>
   >([]);
   const [reagentOptions, setReagentOptions] = useState<{ id: string; name: string }[]>([]);
+  const [instrumentOptions, setInstrumentOptions] = useState<{ id: string; name: string }[]>([]);
 
   // Create FieldDefinition (entry columns — not Custom Fields for Sample/Test)
   const [createFieldOpen, setCreateFieldOpen] = useState(false);
@@ -424,6 +443,21 @@ const ExperimentTemplatesManagement: React.FC = () => {
         );
       })
       .catch(() => setReagentOptions([]));
+    apiService
+      .getInstruments({ active: true })
+      .then((raw) => {
+        const list = (Array.isArray(raw) ? raw : []) as Array<{
+          id?: string;
+          name?: string;
+          active?: boolean;
+        }>;
+        setInstrumentOptions(
+          list
+            .filter((row) => row?.id && row?.name && row.active !== false)
+            .map((row) => ({ id: String(row.id), name: String(row.name) })),
+        );
+      })
+      .catch(() => setInstrumentOptions([]));
   }, []);
 
   useEffect(() => {
@@ -560,6 +594,13 @@ const ExperimentTemplatesManagement: React.FC = () => {
           break;
         }
       }
+      if (e.entry_type === 'instrument') {
+        const ids = e.config?.allowed_instrument_ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+          errors[1] = true;
+          break;
+        }
+      }
     }
     return { valid: !errors.some(Boolean), tabErrors: errors };
   };
@@ -591,7 +632,18 @@ const ExperimentTemplatesManagement: React.FC = () => {
           ...(next.config || {}),
           allowed_reagent_ids: Array.isArray(prior) ? prior : [],
         };
-      } else if (patch.entry_type !== undefined && e.predefined_entry_key === 'reagents') {
+      } else if (patch.entry_type === 'instrument') {
+        const prior = next.config?.allowed_instrument_ids;
+        next.predefined_entry_key = 'instruments';
+        next.fields = [];
+        next.config = {
+          ...(next.config || {}),
+          allowed_instrument_ids: Array.isArray(prior) ? prior : [],
+        };
+      } else if (
+        patch.entry_type !== undefined &&
+        (e.predefined_entry_key === 'reagents' || e.predefined_entry_key === 'instruments')
+      ) {
         next.predefined_entry_key = undefined;
       }
       return next;
@@ -1117,11 +1169,17 @@ const ExperimentTemplatesManagement: React.FC = () => {
                 <div>
                   Tables &amp; forms: each entry needs a name and a type.
                   {(formDef.entries ?? []).some((entry) => {
-                    if (entry.entry_type !== 'reagent') return false;
-                    const ids = entry.config?.allowed_reagent_ids;
-                    return !Array.isArray(ids) || ids.length === 0;
+                    if (entry.entry_type === 'reagent') {
+                      const ids = entry.config?.allowed_reagent_ids;
+                      return !Array.isArray(ids) || ids.length === 0;
+                    }
+                    if (entry.entry_type === 'instrument') {
+                      const ids = entry.config?.allowed_instrument_ids;
+                      return !Array.isArray(ids) || ids.length === 0;
+                    }
+                    return false;
                   })
-                    ? ' A Reagent entry needs at least one default reagent from the catalog.'
+                    ? ' A Reagent or Instruments entry needs at least one default from the catalog.'
                     : ' These are the reusable capture places instantiated when an experiment is created from this template.'}
                 </div>
               )}
@@ -1330,6 +1388,61 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       {ENTRY_TYPE_OPTIONS.find((o) => o.value === entry.entry_type)?.helper ||
                         entry.entry_type}
                     </Typography>
+
+                    {entry.entry_type === 'instrument' && (
+                      <FormControl
+                        size="small"
+                        fullWidth
+                        sx={{ mb: 1.5 }}
+                        error={
+                          tabErrors[1] &&
+                          (!Array.isArray(entry.config?.allowed_instrument_ids) ||
+                            entry.config.allowed_instrument_ids.length === 0)
+                        }
+                      >
+                        <InputLabel id={`allowed-instruments-${ei}`}>Default instruments</InputLabel>
+                        <Select
+                          multiple
+                          labelId={`allowed-instruments-${ei}`}
+                          label="Default instruments"
+                          value={
+                            Array.isArray(entry.config?.allowed_instrument_ids)
+                              ? entry.config.allowed_instrument_ids
+                              : []
+                          }
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            const ids = typeof value === 'string' ? value.split(',') : value;
+                            updateEntry(ei, {
+                              config: {
+                                ...(entry.config || {}),
+                                allowed_instrument_ids: ids,
+                              },
+                            });
+                          }}
+                          renderValue={(selected) =>
+                            (selected as string[])
+                              .map((id) => instrumentOptions.find((row) => row.id === id)?.name || id)
+                              .join(', ')
+                          }
+                        >
+                          {instrumentOptions.length === 0 ? (
+                            <MenuItem value="" disabled>
+                              No active instruments in the catalog
+                            </MenuItem>
+                          ) : (
+                            instrumentOptions.map((row) => (
+                              <MenuItem key={row.id} value={row.id}>
+                                {row.name}
+                              </MenuItem>
+                            ))
+                          )}
+                        </Select>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                          These instruments are prefilled on the experiment. The lab tech can add any other eligible instrument, then record its use.
+                        </Typography>
+                      </FormControl>
+                    )}
 
                     {entry.entry_type === 'reagent' && (
                       <FormControl
@@ -1666,6 +1779,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
                     {!isDataTable && entry.entry_type === 'reagent' && (
                       <Typography variant="body2" color="text.secondary">
                         Lots are recorded on the experiment. This entry stores the default reagents.
+                      </Typography>
+                    )}
+                    {!isDataTable && entry.entry_type === 'instrument' && (
+                      <Typography variant="body2" color="text.secondary">
+                        Instrument use is recorded on the experiment. This entry stores the default instruments.
                       </Typography>
                     )}
                   </Box>
