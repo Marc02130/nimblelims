@@ -230,11 +230,15 @@ const InstrumentCatalogManagement: React.FC = () => {
     loadAll();
   }, [loadAll]);
 
-  const filterBySearch = <T extends { name?: string }>(rows: T[], extra?: (row: T) => string) => {
+  const filterBySearch = <T,>(rows: T[], extra?: (row: T) => string) => {
     if (!searchTerm) return rows;
     const term = searchTerm.toLowerCase();
     return rows.filter((row) => {
-      const blob = [row.name || '', extra ? extra(row) : ''].join(' ').toLowerCase();
+      const named =
+        row && typeof row === 'object' && 'name' in row && typeof (row as { name?: unknown }).name === 'string'
+          ? (row as { name: string }).name
+          : '';
+      const blob = [named, extra ? extra(row) : ''].join(' ').toLowerCase();
       return blob.includes(term);
     });
   };
@@ -632,8 +636,9 @@ const InstrumentCatalogManagement: React.FC = () => {
                 onChange={(e) => setInstrumentForm({ ...instrumentForm, name: e.target.value })}
               />
               <FormControl fullWidth margin="normal">
-                <InputLabel>Type</InputLabel>
+                <InputLabel id="instrument-type-label">Type</InputLabel>
                 <Select
+                  labelId="instrument-type-label"
                   label="Type"
                   value={instrumentForm.instrument_type_id}
                   onChange={(e) =>
@@ -676,8 +681,9 @@ const InstrumentCatalogManagement: React.FC = () => {
                 onChange={(e) => setInstrumentForm({ ...instrumentForm, asset_tag: e.target.value })}
               />
               <FormControl fullWidth margin="normal">
-                <InputLabel>Status</InputLabel>
+                <InputLabel id="instrument-status-label">Status</InputLabel>
                 <Select
+                  labelId="instrument-status-label"
                   label="Status"
                   value={instrumentForm.status}
                   onChange={(e) => setInstrumentForm({ ...instrumentForm, status: String(e.target.value) })}

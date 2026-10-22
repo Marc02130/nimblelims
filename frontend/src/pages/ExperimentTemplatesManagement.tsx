@@ -93,6 +93,7 @@ interface TemplateEntryDeclaration {
     | 'experiment_data'
     | 'predefined_action'
     | 'reagent'
+    | 'instrument'
     | 'display_table'
     | 'sample_data'
     | 'experiment_detail';
@@ -107,6 +108,7 @@ interface TemplateEntryDeclaration {
     status?: string;
     depends_on?: string[];
     allowed_reagent_ids?: string[];
+    allowed_instrument_ids?: string[];
     [key: string]: unknown;
   };
   fields?: TemplateEntryField[];
@@ -1168,19 +1170,29 @@ const ExperimentTemplatesManagement: React.FC = () => {
               {tabErrors[1] && (
                 <div>
                   Tables &amp; forms: each entry needs a name and a type.
-                  {(formDef.entries ?? []).some((entry) => {
-                    if (entry.entry_type === 'reagent') {
+                  {(() => {
+                    const entries = formDef.entries ?? [];
+                    const reagentEmpty = entries.some((entry) => {
+                      if (entry.entry_type !== 'reagent') return false;
                       const ids = entry.config?.allowed_reagent_ids;
                       return !Array.isArray(ids) || ids.length === 0;
-                    }
-                    if (entry.entry_type === 'instrument') {
+                    });
+                    const instrumentEmpty = entries.some((entry) => {
+                      if (entry.entry_type !== 'instrument') return false;
                       const ids = entry.config?.allowed_instrument_ids;
                       return !Array.isArray(ids) || ids.length === 0;
+                    });
+                    if (reagentEmpty && instrumentEmpty) {
+                      return ' A Reagent or Instruments entry needs at least one default from the catalog.';
                     }
-                    return false;
-                  })
-                    ? ' A Reagent or Instruments entry needs at least one default from the catalog.'
-                    : ' These are the reusable capture places instantiated when an experiment is created from this template.'}
+                    if (reagentEmpty) {
+                      return ' A Reagent entry needs at least one default reagent from the catalog.';
+                    }
+                    if (instrumentEmpty) {
+                      return ' An Instruments entry needs at least one default instrument from the catalog.';
+                    }
+                    return ' These are the reusable capture places instantiated when an experiment is created from this template.';
+                  })()}
                 </div>
               )}
             </Alert>

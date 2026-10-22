@@ -103,6 +103,8 @@ interface Entry {
     sample_columns?: string[];
     allowed_reagent_ids?: string[];
     removed_reagent_ids?: string[];
+    allowed_instrument_ids?: string[];
+    removed_instrument_ids?: string[];
   } | null;
   field_definition_links: FieldLink[];
   values: EntryValue[];
@@ -164,6 +166,7 @@ const TYPE_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'info' |
   experiment_detail: 'info',
   predefined_action: 'warning',
   reagent: 'secondary',
+  instrument: 'info',
   display_table: 'default',
 };
 

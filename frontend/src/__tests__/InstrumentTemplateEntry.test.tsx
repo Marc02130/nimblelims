@@ -91,7 +91,7 @@ describe('Experiment instrument capture', () => {
       ],
     });
     wrap(<EntryCapturePanel experimentId="exp1" />);
-    expect(await screen.findByText('Instruments')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Record use/i })).toBeInTheDocument();
     await waitFor(() => expect(api.getInstruments).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: /Record use/i }));
     await waitFor(() => expect(api.recordInstrumentUse).toHaveBeenCalled());

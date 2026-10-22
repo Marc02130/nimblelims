@@ -21,7 +21,7 @@ jest.mock('@mui/x-data-grid', () => ({
 }));
 
 import InstrumentCatalogManagement from '../pages/admin/InstrumentCatalogManagement';
-import { apiService } from '../../services/apiService';
+import { apiService } from '../services/apiService';
 
 jest.mock('../services/apiService', () => ({
   ...jest.requireActual('../services/apiService'),
