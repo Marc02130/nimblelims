@@ -38,7 +38,7 @@ The filter replaces the entire next line with `[redacted]`. It exits non-zero wh
 
 UAT evidence — screenshots, captured logs, tarballs, and run outputs — stays on the test machine. Do not commit it. Do not publish it. Do not open a pull request that adds it.
 
-There is no repository scanner, packer, allowlist, or PNG chunk policy for UAT evidence. Do not add those tools back. Local folders such as `/evidence/`, `/uat-evidence/`, `evidence.tgz`, and `*.tgz.sha256` are gitignored.
+There is no repository scanner, packer, allowlist, or PNG chunk policy for UAT evidence. Do not add those tools back. Local folders such as `/evidence/`, `/uat-evidence/`, `/uat-*/`, `*.har`, `*.tgz`, `evidence.tgz`, and `*.tgz.sha256` are gitignored.
 
 Record the UAT verdict (pass / fail / waiver) in the script or results table. Leave the screenshots, logs, and packs on the machine that ran the cases.
 

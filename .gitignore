@@ -81,6 +81,9 @@ temp/
 # Screenshots, captured logs, tarballs, and run outputs stay on the test machine.
 /evidence/
 /uat-evidence/
+/uat-*/
+*.har
+*.tgz
 evidence.tgz
 *.tgz.sha256
 
