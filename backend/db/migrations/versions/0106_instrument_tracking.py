@@ -125,6 +125,7 @@ def _secure(table: str, policy: str) -> None:
         f"USING ({policy}) WITH CHECK ({policy})"
     )
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    op.execute(f"DROP TRIGGER IF EXISTS {table}_update_modified_at ON {table}")
     op.execute(
         f"CREATE TRIGGER {table}_update_modified_at BEFORE UPDATE ON {table} "
         "FOR EACH ROW EXECUTE FUNCTION update_modified_at_column()"
