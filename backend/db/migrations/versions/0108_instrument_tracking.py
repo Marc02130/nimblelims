@@ -118,7 +118,9 @@ def _audit_cols():
 
 
 def _secure(table: str, policy: str) -> None:
-    op.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO lims_app")
+    op.execute(f"GRANT SELECT, INSERT, UPDATE ON {table} TO lims_app")
+    # 0103 default privileges also grant DELETE. Nothing is deleted.
+    op.execute(f"REVOKE DELETE ON {table} FROM lims_app")
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"DROP POLICY IF EXISTS {table}_access ON {table}")
     op.execute(

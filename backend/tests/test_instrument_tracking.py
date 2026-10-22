@@ -114,6 +114,24 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
         assert dropped is None
 
 
+def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
+    tables = (
+        "instruments",
+        "cro_sources",
+        "instrument_maintenance_schedules",
+        "instrument_maintenance_events",
+        "instrument_downtime",
+        "instrument_uses",
+    )
+    with migrated_engine.connect() as conn:
+        for table in tables:
+            can_delete = conn.execute(
+                text("SELECT has_table_privilege('lims_app', :t, 'DELETE')"),
+                {"t": table},
+            ).scalar()
+            assert can_delete is False, f"lims_app must not DELETE {table}"
+
+
 def test_rls_instrument_uses_are_tenant_scoped(migrated_engine):
     from app.core.security import get_password_hash
 
