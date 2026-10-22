@@ -36,6 +36,7 @@ jest.mock('../services/apiService', () => ({
 }));
 
 jest.mock('../components/reagents/ReagentUsePanel', () => () => null);
+jest.mock('../components/instruments/InstrumentUsePanel', () => () => null);
 jest.mock('../pages/DoseResponse/DoseResponseTab', () => () => null);
 jest.mock('../components/experiments/StartCohortPanel', () => () => null);
 jest.mock('../components/runs/PublishPromotionDialog', () => () => null);
