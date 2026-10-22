@@ -3421,6 +3421,105 @@ def test_wrapped_base64_jwt_is_a_hit(tmp_path, capsys):
         raise AssertionError("wrapped JWT was not a jwt hit")
 
 
+def test_png_trns_valid_and_invalid_per_color_type(tmp_path, capsys):
+    cases = (
+        (0, (_png_chunk(b"tRNS", b"\x00\xff"),), True),
+        (0, (_png_chunk(b"tRNS", b"\x00"),), False),
+        (0, (_png_chunk(b"tRNS", b"\x00\xff\x00"),), False),
+        (2, (_png_chunk(b"tRNS", b"\x00" * 6),), True),
+        (2, (_png_chunk(b"tRNS", b"\x00" * 5),), False),
+        (2, (_png_chunk(b"tRNS", b"\x00" * 7),), False),
+        (
+            3,
+            (
+                _png_chunk(b"PLTE", b"\x00\x01\x02\x03\x04\x05"),
+                _png_chunk(b"tRNS", b"\xaa\xbb"),
+            ),
+            True,
+        ),
+        (
+            3,
+            (
+                _png_chunk(b"tRNS", b"\xaa"),
+                _png_chunk(b"PLTE", b"\x00\x01\x02"),
+            ),
+            False,
+        ),
+        (4, (_png_chunk(b"tRNS", b"\x00\xff"),), False),
+        (6, (_png_chunk(b"tRNS", b"\x00" * 6),), False),
+        (
+            2,
+            (
+                _png_chunk(b"IDAT", b"\x00"),
+                _png_chunk(b"tRNS", b"\x00" * 6),
+            ),
+            False,
+        ),
+    )
+    for color_type, chunks, ok in cases:
+        _assert_png_scan(tmp_path, capsys, _png_file(color_type, *chunks), ok=ok)
+
+
+def test_png_trns_longer_than_palette(tmp_path, capsys):
+    payload = _png_file(
+        3,
+        _png_chunk(b"PLTE", b"\x00\x01\x02"),
+        _png_chunk(b"tRNS", b"\xaa\xbb"),
+    )
+    _assert_png_scan(tmp_path, capsys, payload, ok=False)
+
+
+def test_png_iccp_valid_and_invalid(tmp_path, capsys):
+    valid = _png_file(2, _png_chunk(b"iCCP", _iccp_payload()))
+    _assert_png_scan(tmp_path, capsys, valid, ok=True)
+    bad_name = _png_file(
+        2, _png_chunk(b"iCCP", _iccp_payload(name=b" leading"))
+    )
+    _assert_png_scan(tmp_path, capsys, bad_name, ok=False)
+    bad_method = _png_file(
+        2, _png_chunk(b"iCCP", _iccp_payload(method=1))
+    )
+    _assert_png_scan(tmp_path, capsys, bad_method, ok=False)
+    bomb_raw = b"\x00" * (scan._PNG_ICCP_INFLATE_MAX + 1)
+    bomb = _png_file(
+        2,
+        _png_chunk(b"iCCP", _iccp_payload(raw=bomb_raw)),
+    )
+    _assert_png_scan(tmp_path, capsys, bomb, ok=False)
+    truncated = _png_file(
+        2,
+        _png_chunk(
+            b"iCCP",
+            b"ICC Profile\x00\x00" + zlib.compress(b"hello")[:-4],
+        ),
+    )
+    _assert_png_scan(tmp_path, capsys, truncated, ok=False)
+    duplicate = _png_file(
+        2,
+        _png_chunk(b"iCCP", _iccp_payload()),
+        _png_chunk(b"iCCP", _iccp_payload(name=b"Other")),
+    )
+    _assert_png_scan(tmp_path, capsys, duplicate, ok=False)
+    with_srgb = _png_file(
+        2,
+        _png_chunk(b"iCCP", _iccp_payload()),
+        _png_chunk(b"sRGB", b"\x00"),
+    )
+    _assert_png_scan(tmp_path, capsys, with_srgb, ok=False)
+
+
+def test_png_text_and_exif_chunks_are_blocked(tmp_path, capsys):
+    for name, data in (
+        (b"tEXt", b"Comment\x00hidden"),
+        (b"zTXt", b"Comment\x00\x00" + zlib.compress(b"hidden")),
+        (b"iTXt", b"Comment\x00\x00\x00\x00\x00hidden"),
+        (b"eXIf", b"Exif\x00\x00"),
+    ):
+        _assert_png_scan(
+            tmp_path, capsys, _png_file(2, _png_chunk(name, data)), ok=False
+        )
+
+
 def test_png_text_chunk_is_unsuppressible(tmp_path, capsys):
     def _chunk(name: bytes, data: bytes) -> bytes:
         crc = zlib.crc32(name + data) & 0xFFFFFFFF
@@ -3533,6 +3632,51 @@ def _chunk_png(*chunks: bytes) -> bytes:
     )
     iend = _png_chunk(b"IEND", b"")
     return b"\x89PNG\r\n\x1a\n" + ihdr + b"".join(chunks) + iend
+
+
+def _ihdr_data(color_type: int, bit_depth: int = 8) -> bytes:
+    return (1).to_bytes(4, "big") + (1).to_bytes(4, "big") + bytes(
+        (bit_depth, color_type, 0, 0, 0)
+    )
+
+
+def _png_file(color_type: int, *chunks: bytes) -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", _ihdr_data(color_type))
+        + b"".join(chunks)
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def _iccp_payload(
+    name: bytes = b"ICC Profile", method: int = 0, raw: bytes = b"icc"
+) -> bytes:
+    return name + b"\x00" + bytes((method,)) + zlib.compress(raw)
+
+
+def _assert_png_scan(tmp_path, capsys, payload: bytes, *, ok: bool) -> None:
+    if ok:
+        if scan._png_disallowed_chunk(payload):
+            raise AssertionError("valid PNG was treated as disallowed")
+    elif scan._png_disallowed_chunk(payload) is not True:
+        raise AssertionError("invalid PNG was not suspicious")
+    evidence = tmp_path / f"ev-{uuid.uuid4().hex[:10]}"
+    evidence.mkdir()
+    (evidence / "photo.png").write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    allow = _write_allowlist(
+        tmp_path / f"allow-{evidence.name}.json",
+        [{"path": "photo.png", "sha256": digest}],
+    )
+    code, out, err = _run(
+        [str(evidence), "--allowlist", str(allow)], capsys, ()
+    )
+    if ok:
+        if code != 0 or "png-trailing" in err or "clean" not in out:
+            raise AssertionError("valid PNG did not stay suppressible")
+    elif code != 1 or _hit("png-trailing", "photo.png") not in err:
+        raise AssertionError("invalid PNG was not png-trailing")
 
 
 def _runtime_env_secret(marker: str) -> str:
