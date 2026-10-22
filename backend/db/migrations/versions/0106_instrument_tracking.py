@@ -159,7 +159,8 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
     if resolved is None:
         raise RuntimeError(f"could not seed list {name}")
     resolved = str(resolved)
-    for entry_id, entry_name, code in entries:
+    for entry_id, entry_name, _code in entries:
+        # list_entries.code is only positive/negative (0097). Slugs stay unused.
         conn.execute(
             sa.text(
                 """
@@ -167,7 +168,7 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
                     id, name, description, code, active, created_at, modified_at, list_id
                 )
                 VALUES (
-                    :id, :name, :name, :code, true, NOW(), NOW(), :list_id
+                    :id, :name, :name, NULL, true, NOW(), NOW(), :list_id
                 )
                 ON CONFLICT (id) DO NOTHING
                 """
@@ -175,7 +176,6 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
             {
                 "id": entry_id,
                 "name": entry_name,
-                "code": code,
                 "list_id": resolved,
             },
         )
@@ -186,12 +186,12 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
                     id, name, description, code, active, created_at, modified_at, list_id
                 )
                 VALUES (
-                    gen_random_uuid(), :name, :name, :code, true, NOW(), NOW(), :list_id
+                    gen_random_uuid(), :name, :name, NULL, true, NOW(), NOW(), :list_id
                 )
-                ON CONFLICT (list_id, name) DO NOTHING
+                ON CONFLICT (name) DO NOTHING
                 """
             ),
-            {"name": entry_name, "code": code, "list_id": resolved},
+            {"name": entry_name, "list_id": resolved},
         )
 
 

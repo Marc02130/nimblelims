@@ -158,23 +158,23 @@ def _seed_instrument_tracking_lists(engine) -> None:
         for list_id, name, description, entries in types:
             conn.execute(
                 text(
-                    "INSERT INTO lists (id, name, description, active) "
-                    "VALUES (:id, :name, :description, true) "
+                    "INSERT INTO lists (id, name, description, active, created_at, modified_at) "
+                    "VALUES (:id, :name, :description, true, NOW(), NOW()) "
                     "ON CONFLICT (id) DO NOTHING"
                 ),
                 {"id": list_id, "name": name, "description": description},
             )
-            for entry_id, entry_name, code in entries:
+            for entry_id, entry_name, _code in entries:
                 conn.execute(
                     text(
-                        "INSERT INTO list_entries (id, name, description, code, active, list_id) "
-                        "VALUES (:id, :name, :name, :code, true, :list_id) "
+                        "INSERT INTO list_entries "
+                        "(id, name, description, code, active, created_at, modified_at, list_id) "
+                        "VALUES (:id, :name, :name, NULL, true, NOW(), NOW(), :list_id) "
                         "ON CONFLICT (id) DO NOTHING"
                     ),
                     {
                         "id": entry_id,
                         "name": entry_name,
-                        "code": code,
                         "list_id": list_id,
                     },
                 )
