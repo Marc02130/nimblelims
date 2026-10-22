@@ -12,6 +12,7 @@ import shlex
 import shutil
 import subprocess
 import tarfile
+import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -1232,6 +1233,15 @@ def _tar_escape_name(text: str) -> str:
     return text.replace("\\", "\\\\").replace("\t", "\\t").replace("'", "\\'")
 
 
+def _tar_escape_depth(text: str, depth: int) -> str:
+    current = (
+        text.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t")
+    )
+    for _ in range(max(0, depth - 1)):
+        current = current.replace("\\", "\\\\")
+    return current
+
+
 def _assert_secret_and_tail_absent(stdout: str, stderr: str, secret: str) -> None:
     escaped = _tar_escape_name(secret)
     tail = ""
@@ -1301,3 +1311,24 @@ def test_verify_odd_backslash_056_jwt_does_not_leak(tmp_path):
             raise AssertionError("odd-depth JWT pack did not fail verify")
         if "<redacted name hmac:" not in verified.stderr:
             raise AssertionError("odd-depth JWT tar stderr was not redacted")
+
+
+def test_verify_nons_pace_backslash_name_is_fast(tmp_path):
+    secret = _runtime_env_secret("\t")
+    escaped = _tar_escape_depth(secret, 9)
+    name = ("A" * 180) + escaped
+    archive = tmp_path / "crafted.tgz"
+    _crafted_hardlink_tgz(archive, f"round/{name}", "round/missing-target")
+    started = time.perf_counter()
+    verified = _run_pack(
+        ["--verify", str(archive), "--no-allowlist"],
+        (secret, escaped),
+        extra_env={"POSTGRES_PASSWORD": secret},
+    )
+    elapsed = time.perf_counter() - started
+    if elapsed >= 2.0:
+        raise AssertionError("small no-space-backslash tgz verify exceeded 2s")
+    if secret in verified.stdout or secret in verified.stderr:
+        raise AssertionError("configured secret leaked from small tgz verify")
+    if verified.returncode != 2:
+        raise AssertionError("small no-space-backslash tgz did not fail verify")

@@ -29,9 +29,14 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   text (including ``LZIP`` and ``Rar!`` in UTF-8 text)
 - bytes after the IEND chunk of a PNG, a chunk outside the
   reviewed allowlist (``IHDR``, ``PLTE``, ``IDAT``, ``IEND``,
-  ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``), a truncated or
-  length-overflowed chunk, a bad CRC, an invalid ``PLTE``
-  size, or an unwalkable PNG that still has IEND plus tail.
+  ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``, ``tRNS``, ``iCCP``),
+  a truncated or length-overflowed chunk, a bad CRC, an
+  invalid ``PLTE`` size, a ``tRNS`` that does not fit the
+  color type or arrives after ``IDAT``, an ``iCCP`` that
+  fails name / method / bounded-zlib / placement checks, or
+  an unwalkable PNG that still has IEND plus tail. ``tEXt``,
+  ``zTXt``, ``iTXt``, ``eXIf``, and unknown chunks stay
+  blocked.
   The first chunk must be ``IHDR`` before the file is walked
   as a chunk stream so reviewed magic-plus-bytes PNGs stay
   refuse-binary. A backslash-dot is a tar escape. Compact
@@ -92,9 +97,17 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   matching walks every unescape layer (no size-based skip) so
   a several-MiB stderr still redacts a depth-2–7 escaped
   configured secret; leftover escapes after 8 peels
-  fail-closed. ``\\u002e`` / ``\\x2e`` map in one linear
+  fail-closed on each ``\\S+`` token that contains a
+  backslash (linear). ``\\u002e`` / ``\\x2e`` / ``\\X2E`` /
+  ``\\u{2e}`` / ``\\U0000002e`` / ``&#46;`` map in one linear
   ``re.finditer`` pass. A compact ``YYYYMMDDThhmm[ss][Z]``
-  substring is not a password-pool hit.
+  substring is not a password-pool hit. Wrapped 76-column
+  standard base64, PEM, and MIME bodies decode to a JWT.
+  xxd default, ``-p``, and ``-g1`` hex dumps join. Octal
+  needles escape only bytes ``>= 0x80``. Unbalanced quotes
+  in ``--secrets-file`` exit 2. A peel that would emit more
+  than 65536 escape pieces fail-closed instead of
+  materializing a multi-gigabyte pair-run.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -137,6 +150,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import bisect
 import errno
 import hashlib
@@ -225,7 +239,9 @@ _JWT_HEADER_MAX = 32 * 1024
 _JWT_EYJ_PER_RUN = 16
 _DECODE_LAYERS = 3
 _UNESCAPE_BOUND = 8
+_UNESCAPE_PIECE_BOUND = 65536
 _JWT_RUN_RE = re.compile(r"[A-Za-z0-9_-]+")
+_WORD_RE = re.compile(r"\S+")
 _PERCENT_JWT_RUN_RE = re.compile(r"[A-Za-z0-9_.%-]+")
 _U_PERCENT_RE = re.compile(r"%[uU]([0-9a-fA-F]{4})")
 _NL_RUN_RE = re.compile(r"(?<=[A-Za-z0-9_-])\.*[\r\n]+\.*(?=[A-Za-z0-9_-])")
@@ -237,15 +253,43 @@ _JWT_DOT_ESCAPES = (
     ("\\u002E", "."),
     ("\\x2e", "."),
     ("\\x2E", "."),
+    ("\\X2e", "."),
+    ("\\X2E", "."),
+    ("\\u{2e}", "."),
+    ("\\u{2E}", "."),
+    ("\\U0000002e", "."),
+    ("\\U0000002E", "."),
+    ("&#46;", "."),
+    ("&#x2e;", "."),
+    ("&#x2E;", "."),
 )
-_JWT_DOT_ESCAPE_RE = re.compile(r"\\(?:u002[eE]|x2[eE])")
+_JWT_DOT_ESCAPE_RE = re.compile(
+    r"\\u002[eE]|\\[xX]2[eE]|\\u\{2[eE]\}|\\U0000002[eE]|&#(?:46|x2[eE]);"
+)
+_XXD_OFFSET_RE = re.compile(r"^[ \t]*[0-9a-fA-F]{4,}:[ \t]+(.*)$")
+_XXD_PLAIN_RE = re.compile(r"^[0-9a-fA-F]{16,}$")
+_PEM_FENCE_RE = re.compile(r"^-----BEGIN |^-----END ")
+_WRAP_TOKEN_RE = re.compile(r"[A-Za-z0-9+/_=.-]+")
+_WRAP_WIDTHS = frozenset({60, 64, 72, 76})
 _NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
 _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
 _DIGIT_RE = re.compile(r"[0-9]")
 _PNG_ALLOWED_CHUNKS = frozenset(
-    {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"sRGB", b"pHYs", b"gAMA", b"cHRM"}
+    {
+        b"IHDR",
+        b"PLTE",
+        b"IDAT",
+        b"IEND",
+        b"sRGB",
+        b"pHYs",
+        b"gAMA",
+        b"cHRM",
+        b"tRNS",
+        b"iCCP",
+    }
 )
+_PNG_ICCP_INFLATE_MAX = 1024 * 1024
 _PNG_CHUNK_SIZES = {
     b"IHDR": 13,
     b"sRGB": 1,
@@ -453,55 +497,98 @@ def _unwrap_wrapped_encodings(text: str) -> str:
         return text
     out: list[str] = []
     buf: list[str] = []
+    xxd_bytes = bytearray()
+    xxd_plain: list[str] = []
 
     def flush() -> None:
         if buf:
             out.append("".join(buf))
             buf.clear()
 
-    wrap = frozenset({60, 64, 72, 76})
-    token_chars = re.compile(r"[A-Za-z0-9+/_=.-]+")
-    pem_fence = re.compile(r"^-----BEGIN |^-----END ")
-    xxd_re = re.compile(
-        r"^[0-9a-fA-F]{4,}:\s+((?:[0-9a-fA-F]{2} ){1,16})"
-    )
-    xxd_bytes = bytearray()
+    def flush_xxd() -> None:
+        nonlocal xxd_bytes
+        if xxd_bytes:
+            try:
+                out.append(xxd_bytes.decode("ascii"))
+            except UnicodeDecodeError:
+                pass
+            xxd_bytes = bytearray()
+        if xxd_plain:
+            hexpart = "".join(xxd_plain)
+            xxd_plain.clear()
+            if len(hexpart) % 2 == 0:
+                try:
+                    out.append(bytes.fromhex(hexpart).decode("ascii"))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+
     for line in lines:
         stripped = line.strip()
-        if pem_fence.match(stripped):
+        if _PEM_FENCE_RE.match(stripped):
             flush()
+            flush_xxd()
             continue
-        xxd = xxd_re.match(stripped)
+        xxd = _XXD_OFFSET_RE.match(line)
         if xxd is not None:
             flush()
-            xxd_bytes.extend(bytes.fromhex(xxd.group(1)))
+            if xxd_plain:
+                flush_xxd()
+            hex_part = xxd.group(1).split("  ", 1)[0]
+            digits = "".join(
+                char for char in hex_part if char in "0123456789abcdefABCDEF"
+            )
+            if len(digits) >= 2 and len(digits) % 2 == 0:
+                xxd_bytes.extend(bytes.fromhex(digits))
             continue
         if xxd_bytes:
             try:
                 out.append(xxd_bytes.decode("ascii"))
             except UnicodeDecodeError:
                 out.append(line)
-            xxd_bytes.clear()
-        body = stripped if len(stripped) in wrap and token_chars.fullmatch(stripped) else line
-        if len(body) in wrap and token_chars.fullmatch(body):
+            xxd_bytes = bytearray()
+        if _XXD_PLAIN_RE.fullmatch(stripped) and len(stripped) % 2 == 0:
+            flush()
+            xxd_plain.append(stripped)
+            continue
+        if xxd_plain:
+            flush_xxd()
+        body = (
+            stripped
+            if len(stripped) in _WRAP_WIDTHS and _WRAP_TOKEN_RE.fullmatch(stripped)
+            else line
+        )
+        if len(body) in _WRAP_WIDTHS and _WRAP_TOKEN_RE.fullmatch(body):
             buf.append(body)
             continue
-        if buf and token_chars.fullmatch(body):
+        if buf and _WRAP_TOKEN_RE.fullmatch(body):
             buf.append(body)
             flush()
             continue
         flush()
         out.append(line)
-    if xxd_bytes:
-        try:
-            out.append(xxd_bytes.decode("ascii"))
-        except UnicodeDecodeError:
-            pass
-        xxd_bytes.clear()
+    if xxd_bytes or xxd_plain:
+        flush_xxd()
     flush()
     if out == lines:
         return text
     return "\n".join(out)
+
+
+def _try_ascii_b64(text: str) -> str:
+    """Decode standard base64 to ASCII, or ``\"\"`` if it is not a payload."""
+    compact = "".join(text.split())
+    if len(compact) < 8 or len(compact) % 4 != 0:
+        return ""
+    if not re.fullmatch(r"[A-Za-z0-9+/]+=*", compact):
+        return ""
+    try:
+        raw = base64.b64decode(compact, validate=True)
+    except (ValueError, binascii.Error):
+        return ""
+    try:
+        return raw.decode("ascii")
+    except UnicodeDecodeError:
+        return ""
 
 
 def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
@@ -519,6 +606,9 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
     if not _needs_decode_variants(text) and not (
         unescape and ("\n" in text or "\r" in text)
     ):
+        dotted = _jwt_dot_decoded(text)
+        if dotted != text:
+            return (text, dotted)
         return (text,)
     seen: list[str] = []
     bases = [text]
@@ -550,12 +640,20 @@ def _text_variants(text: str, *, unescape: bool = False) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def _has_jwt_dot_escape(text: str) -> bool:
+    return (
+        "&#" in text
+        or "\\u" in text
+        or "\\x" in text
+        or "\\X" in text
+        or "\\U" in text
+    )
+
+
 def _jwt_dot_decoded(text: str) -> str:
-    current = text
-    for raw, repl in _JWT_DOT_ESCAPES:
-        if raw in current:
-            current = current.replace(raw, repl)
-    return current
+    if not _has_jwt_dot_escape(text):
+        return text
+    return _JWT_DOT_ESCAPE_RE.sub(".", text)
 
 
 def _segment_is_secret(segment: str, secrets: tuple[str, ...]) -> bool:
@@ -702,6 +800,17 @@ def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]
         prep += len(chunk)
         lit = None
 
+    def stop_after_bound() -> bool:
+        nonlocal prep
+        if len(pieces) < _UNESCAPE_PIECE_BOUND:
+            return False
+        if index < length:
+            rest = text[index:]
+            chunks.append(rest)
+            pieces.append((prep, prep + len(rest), index, length))
+            prep += len(rest)
+        return True
+
     while index < length:
         char = text[index]
         if char != "\\" or index + 1 >= length:
@@ -718,6 +827,8 @@ def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]
             pieces.append((prep, prep + len(simple), start, index + 2))
             prep += len(simple)
             index += 2
+            if stop_after_bound():
+                break
             continue
         if nxt in "01234567":
             raw = bytearray()
@@ -736,12 +847,17 @@ def _map_unescape_once(text: str) -> tuple[str, list[tuple[int, int, int, int]]]
             chunks.append(decoded)
             pieces.append((prep, prep + len(decoded), start, index))
             prep += len(decoded)
+            if stop_after_bound():
+                break
             continue
         chunks.append(nxt)
         pieces.append((prep, prep + len(nxt), start, index + 2))
         prep += len(nxt)
         index += 2
-    flush_literal(length)
+        if stop_after_bound():
+            break
+    else:
+        flush_literal(length)
     return "".join(chunks), pieces
 
 
@@ -770,6 +886,8 @@ def _unescape_layers(
     """
     current, pieces = _map_unescape_once(text)
     layers = [(current, pieces)]
+    if len(pieces) >= _UNESCAPE_PIECE_BOUND:
+        return layers
     for _ in range(_UNESCAPE_BOUND - 1):
         if not _has_tar_escape(current):
             break
@@ -779,6 +897,8 @@ def _unescape_layers(
         pieces = _compose_pieces(pieces, nxt_pieces)
         current = nxt
         layers.append((current, pieces))
+        if len(pieces) >= _UNESCAPE_PIECE_BOUND:
+            break
     return layers
 
 
@@ -808,10 +928,16 @@ def _secret_orig_spans(
         spans.extend(
             _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
         )
-    if len(layers) >= _UNESCAPE_BOUND and _has_tar_escape(layers[-1][0]):
+    over_pieces = any(
+        len(pieces) >= _UNESCAPE_PIECE_BOUND for _prepared, pieces in layers
+    )
+    if (
+        len(layers) >= _UNESCAPE_BOUND or over_pieces
+    ) and _has_tar_escape(layers[-1][0]):
         tag = _redact_tag(text)
-        for match in re.finditer(r"\S*\\\S*", text):
-            spans.append((match.start(), match.end(), tag))
+        for match in _WORD_RE.finditer(text):
+            if "\\" in match.group():
+                spans.append((match.start(), match.end(), tag))
     return spans
 
 
@@ -917,8 +1043,8 @@ def _map_nfkc(
 def _map_jwt_dot_escapes(
     text: str, pieces: list[tuple[int, int, int, int]]
 ) -> tuple[str, list[tuple[int, int, int, int]]]:
-    """Map ``\\u002e`` / ``\\x2e`` to ``.`` for JWT detection and redaction."""
-    if "\\u002" not in text and "\\x2" not in text:
+    """Map ``\\u002e`` / ``\\x2e`` / HTML and JS dots to ``.``."""
+    if not _has_jwt_dot_escape(text):
         return text, pieces
     starts = [piece[0] for piece in pieces]
     chunks: list[str] = []
@@ -1060,7 +1186,9 @@ def _octal_utf8_needle(secret: str) -> str:
     raw = secret.encode("utf-8", errors="surrogateescape")
     if not raw or all(byte < 128 for byte in raw):
         return ""
-    return "".join(f"\\{byte:03o}" for byte in raw)
+    return "".join(
+        f"\\{byte:03o}" if byte >= 0x80 else chr(byte) for byte in raw
+    )
 
 
 def _secret_needles(secret: str) -> list[str]:
@@ -1351,7 +1479,11 @@ def scan_text(
     unwrapped = _unwrap_wrapped_encodings(text)
     if unwrapped != text:
         for number, line in enumerate(unwrapped.splitlines(), start=1):
-            if any(jwt_on_line(variant) for variant in _text_variants(line)):
+            forms = list(_text_variants(line))
+            decoded = _try_ascii_b64(line)
+            if decoded:
+                forms.extend(_text_variants(decoded))
+            if any(jwt_on_line(variant) for variant in forms):
                 hits.append(Hit(KIND_JWT, identity, number, secrets))
     return hits
 
@@ -1585,7 +1717,13 @@ def _read_secrets_file(path: Path) -> list[tuple[str, str]]:
         if not text or text.startswith("#") or "=" not in text:
             continue
         key, raw = text.split("=", 1)
-        parsed = shlex.split(raw)
+        try:
+            parsed = shlex.split(raw)
+        except ValueError:
+            shown = redact_name_path(str(path), ())
+            raise SystemExit(
+                f"ERROR: secrets file value dropped by shlex: {shown}"
+            ) from None
         if len(parsed) != 1:
             shown = redact_name_path(str(path), ())
             raise SystemExit(
@@ -1879,6 +2017,79 @@ def archive_kind(data: bytes) -> str | None:
     return None
 
 
+def _png_iccp_name_ok(name: bytes) -> bool:
+    """PNG iCCP profile name: 1–79 Latin-1 printable, no odd spaces."""
+    if not (1 <= len(name) <= 79):
+        return False
+    if any(not (32 <= byte <= 126 or 161 <= byte <= 255) for byte in name):
+        return False
+    return name[0] != 32 and name[-1] != 32 and b"  " not in name
+
+
+def _png_zlib_bounded(stream: bytes) -> bool:
+    """True when ``stream`` is a complete zlib payload under the inflate cap."""
+    if not stream:
+        return False
+    decoder = zlib.decompressobj()
+    produced = 0
+    offset = 0
+    try:
+        while offset < len(stream) and not decoder.eof:
+            room = _PNG_ICCP_INFLATE_MAX - produced
+            if room <= 0:
+                return False
+            chunk = stream[offset : offset + 4096]
+            offset += len(chunk)
+            out = decoder.decompress(chunk, max_length=room)
+            produced += len(out)
+            if produced > _PNG_ICCP_INFLATE_MAX:
+                return False
+            while decoder.unconsumed_tail and not decoder.eof:
+                room = _PNG_ICCP_INFLATE_MAX - produced
+                if room <= 0:
+                    return False
+                more = decoder.decompress(decoder.unconsumed_tail, max_length=room)
+                if not more:
+                    return False
+                produced += len(more)
+                if produced > _PNG_ICCP_INFLATE_MAX:
+                    return False
+        if not decoder.eof:
+            room = _PNG_ICCP_INFLATE_MAX - produced
+            if room <= 0:
+                return False
+            produced += len(decoder.decompress(b"", max_length=room))
+        return bool(
+            decoder.eof
+            and produced <= _PNG_ICCP_INFLATE_MAX
+            and not decoder.unused_data
+        )
+    except zlib.error:
+        return False
+
+
+def _png_iccp_ok(payload: bytes) -> bool:
+    nul = payload.find(b"\x00")
+    if nul < 0 or not _png_iccp_name_ok(payload[:nul]):
+        return False
+    rest = payload[nul + 1 :]
+    if not rest or rest[0] != 0:
+        return False
+    return _png_zlib_bounded(rest[1:])
+
+
+def _png_trns_ok(
+    color_type: int, size: int, seen_plte: bool, palette_entries: int
+) -> bool:
+    if color_type == 0:
+        return size == 2
+    if color_type == 2:
+        return size == 6
+    if color_type == 3:
+        return seen_plte and 1 <= size <= palette_entries
+    return False
+
+
 def _png_walked_iend_end(data: bytes) -> int:
     """End offset of the IEND chunk reached by walking lengths; -1 if not."""
     if not data.startswith(PNG_MAGIC) or len(data) < 16:
@@ -1905,7 +2116,10 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     Magic-plus-bytes reviewed PNGs do not have a complete first chunk
     and stay refuse-binary. Allowed ancillary chunks have fixed
     lengths (``pHYs`` 9, ``gAMA`` 4, ``sRGB`` 1, ``cHRM`` 32).
-    ``PLTE`` must be 3–768 bytes and a multiple of 3.
+    ``PLTE`` must be 3–768 bytes and a multiple of 3. ``tRNS`` must
+    fit the color type and come before ``IDAT``. ``iCCP`` needs a
+    valid name, method 0, a bounded zlib profile, and must appear
+    before ``PLTE``/``IDAT``, at most once, and not with ``sRGB``.
     """
     if not data.startswith(PNG_MAGIC) or len(data) < 8:
         return False
@@ -1917,6 +2131,12 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     first_size = int.from_bytes(data[pos : pos + 4], "big")
     if first_name != b"IHDR":
         return pos + 12 + first_size <= length
+    color_type: int | None = None
+    palette_entries = 0
+    seen_plte = False
+    seen_idat = False
+    seen_iccp = False
+    seen_srgb = False
     while pos + 12 <= length:
         size = int.from_bytes(data[pos : pos + 4], "big")
         if pos + 12 + size > length:
@@ -1931,8 +2151,30 @@ def _png_disallowed_chunk(data: bytes) -> bool:
         want = _PNG_CHUNK_SIZES.get(name)
         if want is not None and size != want:
             return True
-        if name == b"PLTE" and (size < 3 or size > 768 or size % 3):
-            return True
+        if name == b"IHDR":
+            color_type = payload[9] if size == 13 else None
+        elif name == b"PLTE":
+            if size < 3 or size > 768 or size % 3:
+                return True
+            seen_plte = True
+            palette_entries = size // 3
+        elif name == b"IDAT":
+            seen_idat = True
+        elif name == b"tRNS":
+            if seen_idat or color_type is None:
+                return True
+            if not _png_trns_ok(color_type, size, seen_plte, palette_entries):
+                return True
+        elif name == b"iCCP":
+            if seen_iccp or seen_srgb or seen_plte or seen_idat:
+                return True
+            if not _png_iccp_ok(payload):
+                return True
+            seen_iccp = True
+        elif name == b"sRGB":
+            if seen_iccp:
+                return True
+            seen_srgb = True
         pos += 12 + size
         if name == b"IEND":
             return False
