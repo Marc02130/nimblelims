@@ -89,6 +89,8 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/reagent-vendors$"), "other", "config:edit", "reagent_vendor"),
     ("POST", re.compile(r"^/v1/instruments$"), "other", "config:edit", "instrument"),
     ("PATCH", re.compile(r"^/v1/instruments/[^/]+$"), "other", "config:edit", "instrument"),
+    ("POST", re.compile(r"^/v1/instrument-types$"), "other", "config:edit", "instrument_type"),
+    ("PATCH", re.compile(r"^/v1/instrument-types/[^/]+$"), "other", "config:edit", "instrument_type"),
     ("POST", re.compile(r"^/v1/instrument-maintenance-schedules$"), "other", "config:edit", "instrument_schedule"),
     ("PATCH", re.compile(r"^/v1/instrument-maintenance-schedules/[^/]+$"), "other", "config:edit", "instrument_schedule"),
 )
@@ -206,6 +208,18 @@ def _body_gap(method: str, path: str, body: Any) -> Optional[str]:
                 "A maintenance schedule's last_done and next_due come from events, "
                 "and active is not set by this configuration run. "
                 "Send interval, kind, and instrument only."
+            )
+        if method == "PATCH" and "interval_days" in body:
+            return (
+                "A new interval applies from the next passing event. "
+                "Changing interval_days does not clear an overdue schedule."
+            )
+    if path == "/v1/instruments" or re.match(r"^/v1/instruments/[^/]+$", path):
+        blocked = {"status", "active"} & set(body)
+        if blocked:
+            return (
+                "Instrument status and active are not set by this configuration run. "
+                "Send name, type, and vendor only."
             )
     return None
 

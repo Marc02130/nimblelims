@@ -66,6 +66,27 @@ def _refuse(code: str, message: str) -> None:
     raise HTTPException(status_code=422, detail={"code": code, "message": message})
 
 
+def _require_http_certificate(url: Optional[str]) -> None:
+    if not url:
+        return
+    if not (url.startswith("http://") or url.startswith("https://")):
+        _refuse(
+            "certificate_url_invalid",
+            "certificate_url must be an http or https URL.",
+        )
+
+
+def _refuse_future_ended_at(ended_at) -> None:
+    if ended_at is None:
+        return
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    ended = ended_at if getattr(ended_at, "tzinfo", None) else ended_at.replace(tzinfo=timezone.utc)
+    if ended > now:
+        _refuse("ended_at_in_future", "ended_at cannot be in the future.")
+
+
 def _commit(db: Session, row, fail: str):
     try:
         db.add(row)
@@ -80,7 +101,7 @@ def _commit(db: Session, row, fail: str):
 def _list_entry(db: Session, list_name: str, entry_id: UUID, label: str) -> ListEntry:
     lst = db.query(ListModel).filter(ListModel.name == list_name).first()
     if lst is None:
-        raise HTTPException(status_code=500, detail=f"{list_name} list is not seeded")
+        raise HTTPException(status_code=500, detail="A required list is not seeded")
     row = (
         db.query(ListEntry)
         .filter(ListEntry.id == entry_id, ListEntry.list_id == lst.id)
@@ -190,6 +211,7 @@ def create_schedule(
         raise HTTPException(status_code=400, detail="Invalid service vendor")
     row = InstrumentMaintenanceSchedule(
         **body.model_dump(),
+        next_due=current_lab_day() + timedelta(days=body.interval_days),
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -217,8 +239,8 @@ def update_schedule(
             raise HTTPException(status_code=400, detail="Invalid service vendor")
     for k, v in data.items():
         setattr(row, k, v)
-    if "interval_days" in data:
-        recompute_schedule(db, row)
+    # A new interval applies from the next passing event. Recomputing now
+    # from last_done would clear an overdue block without that event.
     row.modified_by = current_user.id
     _commit(db, row, "Could not update maintenance schedule")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
@@ -263,6 +285,12 @@ def create_event(
     db: Session = Depends(get_db),
 ):
     _require_instrument(db, body.instrument_id)
+    if body.performed_on > current_lab_day():
+        _refuse(
+            "performed_on_in_future",
+            f"performed_on {body.performed_on.isoformat()} is after today in the lab timezone.",
+        )
+    _require_http_certificate(body.certificate_url)
     if body.performed_by_user_id is None and body.performed_by_vendor_id is None:
         raise HTTPException(
             status_code=422,
@@ -317,6 +345,8 @@ def update_event(
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance event not found")
     data = explicit_updates(body, row, refuse_null={"active"})
+    if "certificate_url" in data:
+        _require_http_certificate(data["certificate_url"])
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
     for k, v in data.items():
@@ -396,6 +426,7 @@ def create_downtime(
 ):
     _require_instrument(db, body.instrument_id)
     _list_entry(db, "downtime_reasons", body.reason_id, "downtime reason")
+    _refuse_future_ended_at(body.ended_at)
     if body.maintenance_event_id:
         ev = (
             db.query(InstrumentMaintenanceEvent)
@@ -436,6 +467,7 @@ def update_downtime(
             raise HTTPException(status_code=404, detail="Maintenance event not found")
     for k, v in data.items():
         setattr(row, k, v)
+    _refuse_future_ended_at(row.ended_at)
     if row.ended_at is not None and row.started_at is not None and row.ended_at < row.started_at:
         raise HTTPException(status_code=422, detail="ended_at cannot be before started_at")
     row.modified_by = current_user.id
@@ -669,8 +701,10 @@ def record_instrument_use(
     if body.experiment_id is not None:
         _refuse_instrument_not_on_experiment(db, body.experiment_id, body.instrument_id)
     refuse_ineligible_instrument(db, body.instrument_id)
+    payload = body.model_dump()
+    payload["used_on"] = current_lab_day()
     row = InstrumentUse(
-        **body.model_dump(),
+        **payload,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -695,6 +729,8 @@ def update_instrument_use(
     if row is None:
         raise HTTPException(status_code=404, detail="Instrument use not found")
     data = explicit_updates(body, row, refuse_null={"active"})
+    if "active" in data and data["active"] is True and row.active is not True:
+        refuse_ineligible_instrument(db, row.instrument_id)
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided use stays voided.")
     for k, v in data.items():

@@ -167,7 +167,8 @@ def _seed_list(conn, list_id: str, name: str, description: str, entries) -> None
                 )
                 SELECT :id, :name, :name, NULL, true, NOW(), NOW(), :list_id
                 WHERE NOT EXISTS (
-                    SELECT 1 FROM list_entries WHERE id = :id OR name = :name
+                    SELECT 1 FROM list_entries
+                    WHERE id = :id OR (list_id = :list_id AND name = :name)
                 )
                 """
             ),
@@ -211,8 +212,10 @@ def _carry_types(conn) -> None:
                 entry_id = str(row["id"]) if taken is None else str(uuid.uuid4())
                 insert_name = key
                 name_taken = conn.execute(
-                    sa.text("SELECT 1 FROM list_entries WHERE name = :n"),
-                    {"n": insert_name},
+                    sa.text(
+                        "SELECT 1 FROM list_entries WHERE list_id = :lid AND name = :n"
+                    ),
+                    {"lid": str(list_id), "n": insert_name},
                 ).scalar()
                 if name_taken is not None:
                     insert_name = f"{key} (instrument type)"
@@ -244,6 +247,11 @@ def _carry_types(conn) -> None:
                 mapped = entry_id
             else:
                 mapped = str(existing)
+        if mapped is not None and row["active"] is False:
+            conn.execute(
+                sa.text("UPDATE list_entries SET active = false WHERE id = :id"),
+                {"id": mapped},
+            )
         conn.execute(
             sa.text(
                 "UPDATE instrument_types SET list_entry_id = :eid WHERE id = :id"
@@ -283,6 +291,16 @@ def _carry_types(conn) -> None:
                 "old": str(row["id"]),
             },
         )
+    conn.execute(
+        sa.text(
+            """
+            UPDATE list_entries le
+            SET active = false
+            FROM instrument_types t
+            WHERE t.list_entry_id = le.id AND t.active IS NOT TRUE
+            """
+        )
+    )
 
 
 def upgrade() -> None:
@@ -372,6 +390,25 @@ def upgrade() -> None:
         "list_entries",
         ["instrument_type_id"],
         ["id"],
+    )
+    conn.execute(
+        sa.text(
+            """
+            WITH dups AS (
+                SELECT id,
+                    row_number() OVER (
+                        PARTITION BY vendor_id, model, serial_number
+                        ORDER BY id
+                    ) AS rn
+                FROM instruments
+                WHERE serial_number IS NOT NULL
+            )
+            UPDATE instruments i
+            SET serial_number = i.serial_number || '-' || substr(i.id::text, 1, 8)
+            FROM dups
+            WHERE i.id = dups.id AND dups.rn > 1
+            """
+        )
     )
     op.create_index(
         "uq_instruments_vendor_model_serial",
@@ -856,6 +893,23 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS uq_instruments_vendor_model_serial")
     op.drop_constraint("fk_instruments_instrument_type_id", "instruments", type_="foreignkey")
     op.execute("ALTER TABLE instrument_types_legacy RENAME TO instrument_types")
+    conn.execute(
+        sa.text(
+            """
+            INSERT INTO instrument_types (
+                id, name, description, vendor, model, active,
+                created_at, modified_at, list_entry_id
+            )
+            SELECT gen_random_uuid(), le.name, le.description, NULL, NULL, le.active,
+                   NOW(), NOW(), le.id
+            FROM list_entries le
+            WHERE le.id IN (SELECT DISTINCT instrument_type_id FROM instruments)
+              AND NOT EXISTS (
+                  SELECT 1 FROM instrument_types t WHERE t.list_entry_id = le.id
+              )
+            """
+        )
+    )
     op.execute(
         "ALTER INDEX IF EXISTS ix_instrument_types_legacy_active "
         "RENAME TO ix_instrument_types_active"
@@ -904,12 +958,28 @@ def downgrade() -> None:
 
     _restore_instrument_types_catalog(conn)
 
-    for name in ("downtime_reasons", "maintenance_types", "instrument_types"):
+    seed_list_ids = (
+        INSTRUMENT_TYPES_LIST_ID,
+        MAINTENANCE_TYPES_LIST_ID,
+        DOWNTIME_REASONS_LIST_ID,
+    )
+    seed_entry_ids = [
+        entry_id
+        for group in (SEED_INSTRUMENT_TYPES, SEED_MAINTENANCE_TYPES, SEED_DOWNTIME_REASONS)
+        for entry_id, _name, _code in group
+    ]
+    for entry_id in seed_entry_ids:
         conn.execute(
-            sa.text("DELETE FROM list_entries WHERE list_id IN (SELECT id FROM lists WHERE name = :n)"),
-            {"n": name},
+            sa.text("DELETE FROM list_entries WHERE id = :id"),
+            {"id": entry_id},
         )
-        conn.execute(sa.text("DELETE FROM lists WHERE name = :n"), {"n": name})
+    for list_id in seed_list_ids:
+        remaining = conn.execute(
+            sa.text("SELECT 1 FROM list_entries WHERE list_id = :id"),
+            {"id": list_id},
+        ).scalar()
+        if remaining is None:
+            conn.execute(sa.text("DELETE FROM lists WHERE id = :id"), {"id": list_id})
 
 
 def _restore_instrument_types_catalog(conn) -> None:

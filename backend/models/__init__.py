@@ -28,6 +28,8 @@ from .list import List, ListEntry
 from .unit import Unit
 from .instrument import (
     Instrument,
+    InstrumentTypeDefault,
+    InstrumentMaintenanceAudit,
     CroSource,
     InstrumentMaintenanceSchedule,
     InstrumentMaintenanceEvent,

@@ -113,7 +113,7 @@ class InstrumentUseCreate(BaseModel):
     lims_run_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
     analysis_id: Optional[UUID] = None
-    used_on: date
+    used_on: Optional[date] = None
     note: Optional[str] = None
 
 

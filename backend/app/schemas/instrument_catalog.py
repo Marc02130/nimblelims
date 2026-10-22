@@ -13,12 +13,14 @@ class InstrumentTypeCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     active: bool = True
+    maintenance_tracked: bool = False
 
 
 class InstrumentTypeUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     active: Optional[bool] = None
+    maintenance_tracked: Optional[bool] = None
 
 
 class InstrumentTypeResponse(BaseModel):
@@ -28,6 +30,7 @@ class InstrumentTypeResponse(BaseModel):
     name: str
     description: Optional[str] = None
     active: bool
+    maintenance_tracked: bool = False
     created_at: datetime
     modified_at: datetime
 
@@ -43,6 +46,7 @@ class InstrumentCreate(BaseModel):
     location_id: Optional[UUID] = None
     status: InstrumentStatus = "in_service"
     active: bool = True
+    maintenance_tracked: Optional[bool] = None
 
 
 class InstrumentUpdate(BaseModel):
@@ -56,6 +60,7 @@ class InstrumentUpdate(BaseModel):
     location_id: Optional[UUID] = None
     status: Optional[InstrumentStatus] = None
     active: Optional[bool] = None
+    maintenance_tracked: Optional[bool] = None
 
 
 class InstrumentResponse(BaseModel):
@@ -72,6 +77,7 @@ class InstrumentResponse(BaseModel):
     location_id: Optional[UUID] = None
     status: str
     active: bool
+    maintenance_tracked: bool
     created_at: datetime
     modified_at: datetime
     instrument_type_name: Optional[str] = None
@@ -82,6 +88,7 @@ class InstrumentResponse(BaseModel):
 class InstrumentEligibilityResponse(BaseModel):
     instrument_id: UUID
     allowed: bool
+    maintenance_tracked: bool
     code: Optional[str] = None
     message: Optional[str] = None
 

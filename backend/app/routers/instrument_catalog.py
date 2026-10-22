@@ -28,7 +28,12 @@ from app.schemas.instrument_catalog import (
 )
 from app.services.instrument_eligibility import instrument_block_reason
 from models.client import Client, Location
-from models.instrument import CroSource, Instrument
+from models.instrument import (
+    CroSource,
+    Instrument,
+    InstrumentMaintenanceAudit,
+    InstrumentTypeDefault,
+)
 from models.list import List as ListModel, ListEntry
 from models.reagent import Vendor
 from models.user import User
@@ -51,7 +56,7 @@ def _active_filter(query, model, user: User, db: Session):
 def _types_list_id(db: Session) -> UUID:
     row = db.query(ListModel).filter(ListModel.name == "instrument_types").first()
     if row is None:
-        raise HTTPException(status_code=500, detail="instrument_types list is not seeded")
+        raise HTTPException(status_code=500, detail="A required list is not seeded")
     return row.id
 
 
@@ -59,14 +64,61 @@ def _type_query(db: Session):
     return db.query(ListEntry).filter(ListEntry.list_id == _types_list_id(db))
 
 
-def _type_out(row: ListEntry) -> InstrumentTypeResponse:
+def _type_maintenance_default(db: Session, type_id: UUID) -> bool:
+    row = (
+        db.query(InstrumentTypeDefault)
+        .filter(InstrumentTypeDefault.instrument_type_id == type_id)
+        .first()
+    )
+    return bool(row.maintenance_tracked) if row is not None else False
+
+
+def _upsert_type_default(
+    db: Session, type_id: UUID, tracked: bool, user: User
+) -> None:
+    row = (
+        db.query(InstrumentTypeDefault)
+        .filter(InstrumentTypeDefault.instrument_type_id == type_id)
+        .first()
+    )
+    if row is None:
+        db.add(
+            InstrumentTypeDefault(
+                instrument_type_id=type_id,
+                maintenance_tracked=tracked,
+                created_by=user.id,
+                modified_by=user.id,
+            )
+        )
+        return
+    row.maintenance_tracked = tracked
+    row.modified_by = user.id
+
+
+def _type_out(db: Session, row: ListEntry) -> InstrumentTypeResponse:
     return InstrumentTypeResponse(
         id=row.id,
         name=row.name,
         description=row.description,
         active=row.active,
+        maintenance_tracked=_type_maintenance_default(db, row.id),
         created_at=row.created_at,
         modified_at=row.modified_at,
+    )
+
+
+def _audit_maintenance_tracked(
+    db: Session, instrument: Instrument, previous: bool, new_value: bool, user: User
+) -> None:
+    if previous == new_value:
+        return
+    db.add(
+        InstrumentMaintenanceAudit(
+            instrument_id=instrument.id,
+            previous_value=previous,
+            new_value=new_value,
+            created_by=user.id,
+        )
     )
 
 
@@ -74,6 +126,19 @@ def _require_type(db: Session, type_id: UUID) -> ListEntry:
     row = _type_query(db).filter(ListEntry.id == type_id).first()
     if row is None:
         raise HTTPException(status_code=400, detail="Invalid instrument type")
+    return row
+
+
+def _require_active_type(db: Session, type_id: UUID) -> ListEntry:
+    row = _require_type(db, type_id)
+    if row.active is not True:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "instrument_type_inactive",
+                "message": "That instrument type is inactive and cannot be used.",
+            },
+        )
     return row
 
 
@@ -93,7 +158,7 @@ def list_instrument_types(
     if search:
         term = f"%{search}%"
         q = q.filter(ListEntry.name.ilike(term))
-    return [_type_out(r) for r in q.order_by(ListEntry.name).all()]
+    return [_type_out(db, r) for r in q.order_by(ListEntry.name).all()]
 
 
 @instrument_types_router.get("/{type_id}", response_model=InstrumentTypeResponse)
@@ -105,7 +170,7 @@ def get_instrument_type(
     row = _type_query(db).filter(ListEntry.id == type_id).first()
     if not row or (not row.active and not _has_config_edit(current_user, db)):
         raise HTTPException(status_code=404, detail="Instrument type not found")
-    return _type_out(row)
+    return _type_out(db, row)
 
 
 @instrument_types_router.post(
@@ -127,13 +192,15 @@ def create_instrument_type(
         modified_by=current_user.id,
     )
     db.add(row)
+    db.flush()
+    _upsert_type_default(db, row.id, body.maintenance_tracked, current_user)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Instrument type name already exists")
     db.refresh(row)
-    return _type_out(row)
+    return _type_out(db, row)
 
 
 @instrument_types_router.patch("/{type_id}", response_model=InstrumentTypeResponse)
@@ -147,11 +214,14 @@ def update_instrument_type(
     if not row:
         raise HTTPException(status_code=404, detail="Instrument type not found")
     data = explicit_updates(body, row, refuse_null={"active"})
+    tracked = data.pop("maintenance_tracked", None)
     if "name" in data and data["name"] != row.name:
         if _type_query(db).filter(ListEntry.name == data["name"]).first():
             raise HTTPException(status_code=400, detail="Instrument type name already exists")
     for k, v in data.items():
         setattr(row, k, v)
+    if tracked is not None:
+        _upsert_type_default(db, row.id, tracked, current_user)
     row.modified_by = current_user.id
     try:
         db.commit()
@@ -159,7 +229,7 @@ def update_instrument_type(
         db.rollback()
         raise HTTPException(status_code=400, detail="Could not update instrument type")
     db.refresh(row)
-    return _type_out(row)
+    return _type_out(db, row)
 
 
 # --- Instruments (instances) ---
@@ -180,6 +250,7 @@ def _instrument_response(row: Instrument) -> InstrumentResponse:
         location_id=row.location_id,
         status=row.status,
         active=row.active,
+        maintenance_tracked=row.maintenance_tracked,
         created_at=row.created_at,
         modified_at=row.modified_at,
         instrument_type_name=t.name if t else None,
@@ -247,13 +318,18 @@ def get_instrument_eligibility(
     reason = instrument_block_reason(db, instrument_id)
     if reason and reason.get("code") == "instrument_not_found":
         raise HTTPException(status_code=404, detail="Instrument not found")
+    row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
+    tracked = bool(row.maintenance_tracked) if row is not None else False
     if reason is None:
         return InstrumentEligibilityResponse(
-            instrument_id=instrument_id, allowed=True
+            instrument_id=instrument_id,
+            allowed=True,
+            maintenance_tracked=tracked,
         )
     return InstrumentEligibilityResponse(
         instrument_id=instrument_id,
         allowed=False,
+        maintenance_tracked=tracked,
         code=reason["code"],
         message=reason["message"],
     )
@@ -267,15 +343,20 @@ def create_instrument(
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
-    _require_type(db, body.instrument_type_id)
+    _require_active_type(db, body.instrument_type_id)
     if body.vendor_id and not db.query(Vendor).filter(Vendor.id == body.vendor_id).first():
         raise HTTPException(status_code=400, detail="Invalid vendor")
     if body.location_id and not db.query(Location).filter(Location.id == body.location_id).first():
         raise HTTPException(status_code=400, detail="Invalid location")
     if db.query(Instrument).filter(Instrument.name == body.name).first():
         raise HTTPException(status_code=400, detail="Instrument name already exists")
+    payload = body.model_dump()
+    if payload.get("maintenance_tracked") is None:
+        payload["maintenance_tracked"] = _type_maintenance_default(
+            db, body.instrument_type_id
+        )
     row = Instrument(
-        **body.model_dump(),
+        **payload,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -305,9 +386,10 @@ def update_instrument(
     row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Instrument not found")
-    data = explicit_updates(body, row, refuse_null={"active", "status"})
+    data = explicit_updates(body, row, refuse_null={"active", "status", "maintenance_tracked"})
+    previous_tracked = row.maintenance_tracked
     if "instrument_type_id" in data:
-        _require_type(db, data["instrument_type_id"])
+        _require_active_type(db, data["instrument_type_id"])
     if "vendor_id" in data and data["vendor_id"] is not None:
         if not db.query(Vendor).filter(Vendor.id == data["vendor_id"]).first():
             raise HTTPException(status_code=400, detail="Invalid vendor")
@@ -321,6 +403,10 @@ def update_instrument(
         setattr(row, k, v)
     if row.status == "retired":
         row.active = False
+    if "maintenance_tracked" in data:
+        _audit_maintenance_tracked(
+            db, row, previous_tracked, row.maintenance_tracked, current_user
+        )
     row.modified_by = current_user.id
     try:
         db.commit()

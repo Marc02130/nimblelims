@@ -22,8 +22,11 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import uuid
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -753,6 +756,21 @@ class LimsRunService:
             raise HTTPException(400, "Run requires analysis_id before import")
 
         import_id = None
+        if not (instrument_id or cro_source_id or parser_id):
+            role = getattr(getattr(self.current_user, "role", None), "name", None)
+            if role != "Administrator":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "import_source_required",
+                        "message": "JSON import requires an instrument or CRO source.",
+                    },
+                )
+            logger.info(
+                "json_import_without_instrument run_id=%s user_id=%s",
+                run_id,
+                self._user_id(),
+            )
         if instrument_id or cro_source_id or parser_id:
             resolved_instrument = instrument_id
             if resolved_instrument:

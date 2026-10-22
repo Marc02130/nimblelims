@@ -70,7 +70,12 @@ def _schema_for(method: str, kind: str):
     from app.schemas.analyte import AnalyteCreate
     from app.schemas.user import RolePermissionsUpdate
     from app.schemas.reagent import ReagentCreate, ReagentVendorCreate, VendorCreate
-    from app.schemas.instrument_catalog import InstrumentCreate, InstrumentUpdate
+    from app.schemas.instrument_catalog import (
+        InstrumentCreate,
+        InstrumentTypeCreate,
+        InstrumentTypeUpdate,
+        InstrumentUpdate,
+    )
     from app.schemas.instrument_ops import MaintenanceScheduleCreate, MaintenanceScheduleUpdate
 
     table = {
@@ -97,6 +102,8 @@ def _schema_for(method: str, kind: str):
         ("POST", "reagent_vendor"): ReagentVendorCreate,
         ("POST", "instrument"): InstrumentCreate,
         ("PATCH", "instrument"): InstrumentUpdate,
+        ("POST", "instrument_type"): InstrumentTypeCreate,
+        ("PATCH", "instrument_type"): InstrumentTypeUpdate,
         ("POST", "instrument_schedule"): MaintenanceScheduleCreate,
         ("PATCH", "instrument_schedule"): MaintenanceScheduleUpdate,
     }
@@ -115,6 +122,7 @@ _PATH_NAMES = {
     r"^/containers/[^/]+/contents/[^/]+$": "/containers/{container_id}/contents/{sample_id}",
     r"^/analyses/[^/]+/analytes$": "/analyses/{analysis_id}/analytes",
     r"^/v1/instruments/[^/]+$": "/v1/instruments/{instrument_id}",
+    r"^/v1/instrument-types/[^/]+$": "/v1/instrument-types/{type_id}",
     r"^/v1/instrument-maintenance-schedules/[^/]+$": "/v1/instrument-maintenance-schedules/{schedule_id}",
 }
 
@@ -582,6 +590,12 @@ def resolve_body(db, user: User, method: str, path: str, body: Any) -> Any:
 
     if path in ("/v1/instruments",) and method == "POST":
         return _resolve_instrument_body(db, data)
+    if path in ("/v1/instrument-types",) and method == "POST":
+        return _resolve_instrument_type_body(db, data)
+    if re.match(r"^/v1/instrument-types/[^/]+$", path) and method == "PATCH":
+        return _resolve_instrument_type_body(db, data)
+    if re.match(r"^/v1/instruments/[^/]+$", path) and method == "PATCH":
+        return _resolve_instrument_body(db, data)
     if path == "/v1/instrument-maintenance-schedules" and method == "POST":
         return _resolve_schedule_body(db, data)
 
@@ -814,6 +828,34 @@ def _current_values(db, user: User, method: str, path: str, body: Any) -> Option
                 entry["column_id"] = str(column_id)
             current.append(entry)
         return {"_rows": current}
+    match = re.match(r"^/v1/instruments/([^/]+)$", path)
+    if method == "PATCH" and match:
+        from models.instrument import Instrument
+
+        row = db.query(Instrument).filter(Instrument.id == _uuid(match.group(1))).first()
+        return None if row is None else {
+            "name": row.name,
+            "maintenance_tracked": row.maintenance_tracked,
+            "active": row.active,
+            "status": row.status,
+        }
+    match = re.match(r"^/v1/instrument-types/([^/]+)$", path)
+    if method == "PATCH" and match:
+        from models.instrument import InstrumentTypeDefault
+
+        row = db.query(ListEntry).filter(ListEntry.id == _uuid(match.group(1))).first()
+        if row is None:
+            return None
+        default = (
+            db.query(InstrumentTypeDefault)
+            .filter(InstrumentTypeDefault.instrument_type_id == row.id)
+            .first()
+        )
+        return {
+            "name": row.name,
+            "maintenance_tracked": bool(default.maintenance_tracked) if default else False,
+            "active": row.active,
+        }
     return None
 
 
@@ -1233,9 +1275,23 @@ def _resolve_instrument_body(db, data: dict) -> dict:
         "instrument_type_id": type_id,
         "vendor_id": _named_id(db, Vendor, _first(data, "vendor_id", "vendor", "vendor_name")),
     }
-    for key in ("description", "model", "serial_number", "asset_tag", "location_id", "status"):
+    for key in ("description", "model", "serial_number", "asset_tag", "location_id"):
         if data.get(key) not in (None, ""):
             out[key] = data[key]
+    if "maintenance_tracked" in data:
+        out["maintenance_tracked"] = data["maintenance_tracked"]
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _resolve_instrument_type_body(db, data: dict) -> dict:
+    out: dict[str, Any] = {
+        "name": _first(data, "name", "display_name", "label"),
+        "description": data.get("description"),
+    }
+    if "active" in data:
+        out["active"] = data["active"]
+    if "maintenance_tracked" in data:
+        out["maintenance_tracked"] = data["maintenance_tracked"]
     return {k: v for k, v in out.items() if v is not None}
 
 

@@ -220,6 +220,9 @@ class LimsRunDataListResponse(BaseModel):
 class ImportDataRequest(BaseModel):
     """Body for POST /lims-runs/{id}/import."""
     rows: List[LimsRunDataRow] = Field(..., min_length=1)
+    instrument_id: Optional[uuid.UUID] = None
+    cro_source_id: Optional[uuid.UUID] = None
+    parser_id: Optional[uuid.UUID] = None
 
 
 class ImportDataResponse(BaseModel):

@@ -20,6 +20,7 @@ INSTRUMENT_INACTIVE = "instrument_inactive"
 INSTRUMENT_RETIRED = "instrument_retired"
 INSTRUMENT_OUT_OF_SERVICE = "instrument_out_of_service"
 INSTRUMENT_OVERDUE = "instrument_overdue"
+INSTRUMENT_NO_SCHEDULE = "instrument_no_schedule"
 
 
 def _stop(code: str, message: str) -> HTTPException:
@@ -66,23 +67,44 @@ def instrument_block_reason(
             "code": INSTRUMENT_DOWN,
             "message": f"{label} is down and cannot be used.",
         }
+    if row.maintenance_tracked is not True:
+        return None
     due = today if today is not None else current_lab_day()
-    overdue = (
+    schedules = (
         db.query(InstrumentMaintenanceSchedule)
         .filter(
             InstrumentMaintenanceSchedule.instrument_id == instrument_id,
             InstrumentMaintenanceSchedule.active.is_(True),
-            InstrumentMaintenanceSchedule.next_due.is_not(None),
-            InstrumentMaintenanceSchedule.next_due < due,
         )
-        .first()
+        .all()
+    )
+    if not schedules:
+        return {
+            "code": INSTRUMENT_NO_SCHEDULE,
+            "message": (
+                f"{label} is tracked for maintenance but has no active schedule "
+                "and cannot be used."
+            ),
+        }
+    overdue = next(
+        (
+            schedule
+            for schedule in schedules
+            if schedule.next_due is None or schedule.next_due < due
+        ),
+        None,
     )
     if overdue is not None:
+        due_text = (
+            overdue.next_due.isoformat()
+            if overdue.next_due is not None
+            else "never calibrated"
+        )
         return {
             "code": INSTRUMENT_OVERDUE,
             "message": (
                 f"{label} is overdue for calibration or maintenance "
-                f"(next due {overdue.next_due.isoformat()}) and cannot be used."
+                f"(next due {due_text}) and cannot be used."
             ),
         }
     return None
