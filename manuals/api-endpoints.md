@@ -2472,6 +2472,24 @@ No DELETE routes. Retire a catalog row with `active: false`; use a lot up with `
 | PATCH | `/v1/reagent-uses/{id}` | `experiment:manage` | `{active: false}` voids and returns the quantity; `{note}`. Un-void (`active: true` on a voided use) is **422** `voided_use_stays_voided`. |
 | GET, PATCH | `/v1/lab-settings` | GET: Administrator or Lab Manager. PATCH: Administrator | `{timezone}` is an IANA name such as `America/New_York`. An unknown or blank name is **422** `invalid_timezone`. A lab manager can read the zone and is **403** on update. Lab Technician, Client, and Configuration Editor are **403** on read and on update. The configuring agent has no allow-list entry for this path, so a non-admin cannot change the zone through the agent. There is no environment fallback. `/auth/me` reports `timezone_configured`. GET returns `timezone_configured=false` and `timezone=null` when the setting is empty. A saved timezone that is no longer a known IANA name makes GET, and every endpoint that resolves the lab zone, **503** `lab_timezone_invalid`. `detail.message` names the bad value and shows `UPDATE lab_settings SET timezone = 'America/New_York';`. 503 means the lab date is unavailable until an administrator repairs the zone. PATCH from an administrator still accepts a valid zone and repairs the row. The API starts without a zone so an administrator can complete the required setup step. Sample, test, and result future-date checks, and the expiration day counts, use this zone's calendar day. |
 
+## Instrument tracking
+
+No DELETE routes. Retire a catalog row with `active: false` or `status: retired`. Void a maintenance event, downtime row, or use with `active: false`. Instruments are lab-wide. Types are list entries on `instrument_types` (not a Schema table). The old `instrument_types` table was renamed `instrument_types_legacy` and is unused (not dropped).
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET / POST, GET / PATCH `{id}` | `/v1/instrument-types` | read: any user with experiment access or `config:edit`; write: `config:edit` | List entries on `instrument_types`. `{name, description?}`. Seeded: Plate reader, qPCR, LC-MS, Liquid handler, Balance, Centrifuge. No vendor/model. DELETE → **405**. |
+| same | `/v1/instruments` | same | `{name, instrument_type_id, vendor_id?, model?, serial_number?, asset_tag?, location_id?, status? (in_service\|out_of_service\|retired, default in_service), description?}`. Serial unique per (vendor_id, model, serial_number) when set. Retiring (`status: retired`) also sets `active` false. DELETE → **405**. |
+| GET | `/v1/instruments/{id}/eligibility` | same | `{allowed, code?, message?}`. Codes: `instrument_down`, `instrument_inactive`, `instrument_retired`, `instrument_out_of_service`, `instrument_overdue`. |
+| same | `/v1/cro-sources` | same | `{name, description?, client_id?}`. DELETE → **405**. |
+| GET / POST, GET / PATCH `{id}` | `/v1/instrument-maintenance-schedules` | write: `config:edit` | `{instrument_id, kind_id` (list `maintenance_types`: PM, calibration, qualification), `interval_days, last_done?, next_due?, service_vendor_id?}`. |
+| GET / POST, PATCH `{id}` | `/v1/instrument-maintenance-events` | write: `experiment:manage` | `{instrument_id, schedule_id?, performed_on, performed_by_user_id? \| performed_by_vendor_id?, passed, certificate_url?, note?}`. A performer is required. A passing event advances the schedule; voiding (`active: false`) recomputes. |
+| GET / POST, PATCH `{id}` | `/v1/instrument-downtime` | write: `experiment:manage` | `{instrument_id, started_at, ended_at?, reason_id` (list `downtime_reasons`: Breakdown, Preventive maintenance, Calibration, Qualification, Facility, Other), `maintenance_event_id?, note?}`. `ended_at` null while down. |
+| GET / POST, PATCH `{id}` | `/v1/instrument-uses` | write: `experiment:manage` | `{instrument_id, lims_run_id? \| experiment_id?, analysis_id?, used_on?, note?}`. At least one of run/experiment. Ineligible instrument → **422** with the eligibility code. Off-list experiment use → **422** `instrument_not_on_experiment`. Neither target → **422** `use_target_required`. Un-void → **422** `voided_use_stays_voided`. |
+| POST / PATCH | `/v1/experiments/{id}/instruments` | `experiment:manage` | POST `{instrument_id}` appends to `config.allowed_instrument_ids`. PATCH `{instrument_id, active: false}` removes it. |
+
+A new import that names an ineligible instrument is **422** with the same codes. An import on a run with an instrument writes an `instrument_uses` row automatically. A data parser names exactly one of `instrument_id`, `cro_source_id`, or `instrument_type_id`.
+
 ## Configuring agent
 
 Gate: `config:edit`. Missing permission: **403** `You can't change configuring-agent settings.`

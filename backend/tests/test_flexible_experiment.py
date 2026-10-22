@@ -144,11 +144,15 @@ def running_run(client: TestClient, auth_headers, draft_run, cohort_sample_id):
 @pytest.fixture
 def run_instrument_id(db_session: Session):
     """An instrument with no data parser attached."""
-    from models.instrument import Instrument, InstrumentType
+    from models.instrument import Instrument
+    from models.list import List, ListEntry
 
-    itype = InstrumentType(name=f"Plate Reader {uuid4().hex[:6]}")
-    db_session.add(itype)
-    db_session.flush()
+    lst = db_session.query(List).filter(List.name == "instrument_types").first()
+    itype = (
+        db_session.query(ListEntry)
+        .filter(ListEntry.list_id == lst.id, ListEntry.active.is_(True))
+        .first()
+    )
     inst = Instrument(name=f"PR-{uuid4().hex[:6]}", instrument_type_id=itype.id)
     db_session.add(inst)
     db_session.flush()
@@ -354,6 +358,29 @@ class TestInstrumentImport:
         )
         assert r.status_code == 400
         assert "no active data parser" in r.json()["detail"].lower()
+
+    def test_import_file_records_instrument_use(self, client, auth_headers, running_run,
+                                                 template_with_parser, run_instrument_id):
+        """An import on a run with an instrument writes instrument_uses."""
+        run_id = running_run["id"]
+        r = client.post(
+            f"/v1/lims-runs/{run_id}/import-file",
+            files={"file": ("plate.csv", INSTRUMENT_CSV.encode(), "text/csv")},
+            data={"instrument_id": run_instrument_id},
+            headers=auth_headers,
+        )
+        assert r.status_code == 200, r.text
+        uses = client.get(
+            "/v1/instrument-uses",
+            headers=auth_headers,
+            params={"lims_run_id": run_id},
+        )
+        assert uses.status_code == 200, uses.text
+        rows = uses.json()
+        assert len(rows) == 1
+        assert rows[0]["instrument_id"] == run_instrument_id
+        assert rows[0]["lims_run_id"] == run_id
+        assert rows[0]["active"] is True
 
     def test_import_missing_expected_columns_returns_422(self, client, auth_headers,
                                                           running_run, template_with_parser,

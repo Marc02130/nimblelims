@@ -147,3 +147,85 @@ def test_create_run_requires_analysis(client, auth_headers, db_session):
     )
     # analysis_id required by schema
     assert r.status_code in (400, 422), r.text
+
+
+def test_parser_matches_exact_instrument_before_type(
+    client, auth_headers, instrument_and_analysis, db_session
+):
+    inst, analysis = instrument_and_analysis
+    type_id = inst["instrument_type_id"]
+    other = client.post(
+        "/v1/instruments",
+        headers=auth_headers,
+        json={
+            "name": f"I2-{uuid.uuid4().hex[:6]}",
+            "instrument_type_id": type_id,
+        },
+    ).json()
+    exact = client.post(
+        "/v1/data-parsers",
+        headers=auth_headers,
+        json={
+            "name": f"Exact-{uuid.uuid4().hex[:6]}",
+            "instrument_id": inst["id"],
+            "parser_config": _parser_config(),
+            "analyses": [{"analysis_id": str(analysis.id), "is_default": True}],
+            "activate": True,
+        },
+    )
+    assert exact.status_code == 201, exact.text
+    typed = client.post(
+        "/v1/data-parsers",
+        headers=auth_headers,
+        json={
+            "name": f"Type-{uuid.uuid4().hex[:6]}",
+            "instrument_type_id": type_id,
+            "parser_config": _parser_config(),
+            "analyses": [{"analysis_id": str(analysis.id), "is_default": True}],
+            "activate": True,
+        },
+    )
+    assert typed.status_code == 201, typed.text
+
+    from app.services.data_parser_service import DataParserService
+
+    svc = DataParserService(db_session)
+    matched = svc.resolve_for_import(
+        analysis_id=analysis.id,
+        instrument_id=uuid.UUID(inst["id"]),
+        cro_source_id=None,
+        parser_id=None,
+    )
+    assert str(matched.id) == exact.json()["id"]
+    fallback = svc.resolve_for_import(
+        analysis_id=analysis.id,
+        instrument_id=uuid.UUID(other["id"]),
+        cro_source_id=None,
+        parser_id=None,
+    )
+    assert str(fallback.id) == typed.json()["id"]
+
+
+def test_parser_xor_exactly_one_of_three(client, auth_headers, instrument_and_analysis):
+    inst, analysis = instrument_and_analysis
+    body = {
+        "name": f"P-{uuid.uuid4().hex[:6]}",
+        "instrument_id": inst["id"],
+        "instrument_type_id": inst["instrument_type_id"],
+        "parser_config": _parser_config(),
+        "analyses": [{"analysis_id": str(analysis.id), "is_default": True}],
+    }
+    r = client.post("/v1/data-parsers", headers=auth_headers, json=body)
+    assert r.status_code == 422
+    typed = client.post(
+        "/v1/data-parsers",
+        headers=auth_headers,
+        json={
+            "name": f"P-{uuid.uuid4().hex[:6]}",
+            "instrument_type_id": inst["instrument_type_id"],
+            "parser_config": _parser_config(),
+            "analyses": [{"analysis_id": str(analysis.id), "is_default": True}],
+        },
+    )
+    assert typed.status_code == 201, typed.text
+    assert typed.json()["instrument_type_id"] == inst["instrument_type_id"]

@@ -1,0 +1,710 @@
+"""Maintenance, downtime, and instrument use. Nothing is deleted.
+
+Schedules and catalog writes need config:edit. Events, downtime, and uses
+are bench work (experiment:manage). Passing events advance the schedule;
+voiding an event recomputes last_done and next_due.
+"""
+from datetime import timedelta
+from typing import List, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm.attributes import flag_modified
+
+from app.core.lab_time import current_lab_day
+from app.core.patch_fields import explicit_updates
+from app.core.rbac import require_config_edit, require_experiment_manage
+from app.core.security import get_current_user
+from app.database import get_db
+from app.schemas.instrument_ops import (
+    DowntimeCreate,
+    DowntimeResponse,
+    DowntimeUpdate,
+    ExperimentInstrumentAdd,
+    ExperimentInstrumentListResponse,
+    ExperimentInstrumentStatus,
+    InstrumentUseCreate,
+    InstrumentUseResponse,
+    InstrumentUseUpdate,
+    MaintenanceEventCreate,
+    MaintenanceEventResponse,
+    MaintenanceEventUpdate,
+    MaintenanceScheduleCreate,
+    MaintenanceScheduleResponse,
+    MaintenanceScheduleUpdate,
+)
+from app.services.instrument_eligibility import refuse_ineligible_instrument
+from models.entry import PREDEFINED_ENTRY_DEFAULTS, Entry
+from models.experiment import Experiment
+from models.flexible_experiment import LimsRun
+from models.instrument import (
+    Instrument,
+    InstrumentDowntime,
+    InstrumentMaintenanceEvent,
+    InstrumentMaintenanceSchedule,
+    InstrumentUse,
+)
+from models.list import List as ListModel, ListEntry
+from models.reagent import Vendor
+from models.user import User
+
+schedules_router = APIRouter(prefix="/instrument-maintenance-schedules", tags=["instruments"])
+events_router = APIRouter(prefix="/instrument-maintenance-events", tags=["instruments"])
+downtime_router = APIRouter(prefix="/instrument-downtime", tags=["instruments"])
+uses_router = APIRouter(prefix="/instrument-uses", tags=["instruments"])
+experiment_instruments_router = APIRouter(prefix="/experiments", tags=["instruments"])
+
+INSTRUMENT_NOT_ON_EXPERIMENT = "instrument_not_on_experiment"
+USE_TARGET_REQUIRED = "use_target_required"
+VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
+
+
+def _refuse(code: str, message: str) -> None:
+    raise HTTPException(status_code=422, detail={"code": code, "message": message})
+
+
+def _commit(db: Session, row, fail: str):
+    try:
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=fail)
+
+
+def _list_entry(db: Session, list_name: str, entry_id: UUID, label: str) -> ListEntry:
+    lst = db.query(ListModel).filter(ListModel.name == list_name).first()
+    if lst is None:
+        raise HTTPException(status_code=500, detail=f"{list_name} list is not seeded")
+    row = (
+        db.query(ListEntry)
+        .filter(ListEntry.id == entry_id, ListEntry.list_id == lst.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=400, detail=f"Invalid {label}")
+    return row
+
+
+def _require_instrument(db: Session, instrument_id: UUID) -> Instrument:
+    row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Instrument not found")
+    return row
+
+
+def _schedule_out(row: InstrumentMaintenanceSchedule) -> MaintenanceScheduleResponse:
+    return MaintenanceScheduleResponse(
+        id=row.id,
+        instrument_id=row.instrument_id,
+        kind_id=row.kind_id,
+        interval_days=row.interval_days,
+        last_done=row.last_done,
+        next_due=row.next_due,
+        service_vendor_id=row.service_vendor_id,
+        active=row.active,
+        created_at=row.created_at,
+        modified_at=row.modified_at,
+        kind_name=row.kind.name if row.kind else None,
+        instrument_name=row.instrument.name if row.instrument else None,
+        service_vendor_name=row.service_vendor.name if row.service_vendor else None,
+    )
+
+
+def _schedule_query(db: Session):
+    return db.query(InstrumentMaintenanceSchedule).options(
+        joinedload(InstrumentMaintenanceSchedule.kind),
+        joinedload(InstrumentMaintenanceSchedule.instrument),
+        joinedload(InstrumentMaintenanceSchedule.service_vendor),
+    )
+
+
+def recompute_schedule(db: Session, schedule: InstrumentMaintenanceSchedule) -> None:
+    """Set last_done / next_due from the latest active passing event, or clear."""
+    latest = (
+        db.query(InstrumentMaintenanceEvent)
+        .filter(
+            InstrumentMaintenanceEvent.schedule_id == schedule.id,
+            InstrumentMaintenanceEvent.active.is_(True),
+            InstrumentMaintenanceEvent.passed.is_(True),
+        )
+        .order_by(
+            InstrumentMaintenanceEvent.performed_on.desc(),
+            InstrumentMaintenanceEvent.created_at.desc(),
+        )
+        .first()
+    )
+    if latest is None:
+        schedule.last_done = None
+        schedule.next_due = None
+        return
+    schedule.last_done = latest.performed_on
+    schedule.next_due = latest.performed_on + timedelta(days=schedule.interval_days)
+
+
+# -------------------------------------------------------------- schedules ---
+
+@schedules_router.get("", response_model=List[MaintenanceScheduleResponse])
+def list_schedules(
+    instrument_id: Optional[UUID] = Query(None),
+    include_inactive: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    q = _schedule_query(db)
+    if instrument_id:
+        q = q.filter(InstrumentMaintenanceSchedule.instrument_id == instrument_id)
+    if not include_inactive:
+        q = q.filter(InstrumentMaintenanceSchedule.active.is_(True))
+    return [_schedule_out(r) for r in q.order_by(InstrumentMaintenanceSchedule.next_due.asc().nulls_last()).all()]
+
+
+@schedules_router.get("/{schedule_id}", response_model=MaintenanceScheduleResponse)
+def get_schedule(
+    schedule_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = _schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    return _schedule_out(row)
+
+
+@schedules_router.post(
+    "", response_model=MaintenanceScheduleResponse, status_code=status.HTTP_201_CREATED
+)
+def create_schedule(
+    body: MaintenanceScheduleCreate,
+    current_user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db),
+):
+    _require_instrument(db, body.instrument_id)
+    _list_entry(db, "maintenance_types", body.kind_id, "maintenance type")
+    if body.service_vendor_id and not db.query(Vendor).filter(Vendor.id == body.service_vendor_id).first():
+        raise HTTPException(status_code=400, detail="Invalid service vendor")
+    row = InstrumentMaintenanceSchedule(
+        **body.model_dump(),
+        created_by=current_user.id,
+        modified_by=current_user.id,
+    )
+    _commit(db, row, "Could not create maintenance schedule")
+    return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == row.id).first())
+
+
+@schedules_router.patch("/{schedule_id}", response_model=MaintenanceScheduleResponse)
+def update_schedule(
+    schedule_id: UUID,
+    body: MaintenanceScheduleUpdate,
+    current_user: User = Depends(require_config_edit),
+    db: Session = Depends(get_db),
+):
+    row = db.query(InstrumentMaintenanceSchedule).filter(
+        InstrumentMaintenanceSchedule.id == schedule_id
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    data = explicit_updates(body, row, refuse_null={"active", "interval_days", "kind_id"})
+    if "kind_id" in data:
+        _list_entry(db, "maintenance_types", data["kind_id"], "maintenance type")
+    if "service_vendor_id" in data and data["service_vendor_id"] is not None:
+        if not db.query(Vendor).filter(Vendor.id == data["service_vendor_id"]).first():
+            raise HTTPException(status_code=400, detail="Invalid service vendor")
+    for k, v in data.items():
+        setattr(row, k, v)
+    if "interval_days" in data:
+        recompute_schedule(db, row)
+    row.modified_by = current_user.id
+    _commit(db, row, "Could not update maintenance schedule")
+    return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
+
+
+# ----------------------------------------------------------------- events ---
+
+def _event_out(row: InstrumentMaintenanceEvent) -> MaintenanceEventResponse:
+    return MaintenanceEventResponse.model_validate(row)
+
+
+@events_router.get("", response_model=List[MaintenanceEventResponse])
+def list_events(
+    instrument_id: Optional[UUID] = Query(None),
+    schedule_id: Optional[UUID] = Query(None),
+    include_voided: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    q = db.query(InstrumentMaintenanceEvent)
+    if instrument_id:
+        q = q.filter(InstrumentMaintenanceEvent.instrument_id == instrument_id)
+    if schedule_id:
+        q = q.filter(InstrumentMaintenanceEvent.schedule_id == schedule_id)
+    if not include_voided:
+        q = q.filter(InstrumentMaintenanceEvent.active.is_(True))
+    return [
+        _event_out(r)
+        for r in q.order_by(
+            InstrumentMaintenanceEvent.performed_on.desc(),
+            InstrumentMaintenanceEvent.created_at.desc(),
+        ).limit(500).all()
+    ]
+
+
+@events_router.post(
+    "", response_model=MaintenanceEventResponse, status_code=status.HTTP_201_CREATED
+)
+def create_event(
+    body: MaintenanceEventCreate,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    _require_instrument(db, body.instrument_id)
+    if body.performed_by_user_id is None and body.performed_by_vendor_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Name who performed the work (user or service vendor)",
+        )
+    if body.performed_by_user_id and not db.query(User).filter(User.id == body.performed_by_user_id).first():
+        raise HTTPException(status_code=400, detail="Invalid performed_by_user_id")
+    if body.performed_by_vendor_id and not db.query(Vendor).filter(Vendor.id == body.performed_by_vendor_id).first():
+        raise HTTPException(status_code=400, detail="Invalid performed_by_vendor_id")
+    schedule = None
+    if body.schedule_id:
+        schedule = (
+            db.query(InstrumentMaintenanceSchedule)
+            .filter(InstrumentMaintenanceSchedule.id == body.schedule_id)
+            .first()
+        )
+        if schedule is None:
+            raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+        if schedule.instrument_id != body.instrument_id:
+            raise HTTPException(status_code=400, detail="Schedule belongs to a different instrument")
+    row = InstrumentMaintenanceEvent(
+        **body.model_dump(),
+        created_by=current_user.id,
+        modified_by=current_user.id,
+    )
+    db.add(row)
+    db.flush()
+    if schedule is not None and row.passed and row.active:
+        recompute_schedule(db, schedule)
+        schedule.modified_by = current_user.id
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not record maintenance event")
+    db.refresh(row)
+    return _event_out(row)
+
+
+@events_router.patch("/{event_id}", response_model=MaintenanceEventResponse)
+def update_event(
+    event_id: UUID,
+    body: MaintenanceEventUpdate,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(InstrumentMaintenanceEvent)
+        .filter(InstrumentMaintenanceEvent.id == event_id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
+    data = explicit_updates(body, row, refuse_null={"active"})
+    if "active" in data and data["active"] is False and row.active is False:
+        _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
+    for k, v in data.items():
+        setattr(row, k, v)
+    row.modified_by = current_user.id
+    db.flush()
+    if row.schedule_id:
+        schedule = (
+            db.query(InstrumentMaintenanceSchedule)
+            .filter(InstrumentMaintenanceSchedule.id == row.schedule_id)
+            .first()
+        )
+        if schedule is not None:
+            recompute_schedule(db, schedule)
+            schedule.modified_by = current_user.id
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not update maintenance event")
+    db.refresh(row)
+    return _event_out(row)
+
+
+# --------------------------------------------------------------- downtime ---
+
+def _downtime_out(row: InstrumentDowntime) -> DowntimeResponse:
+    return DowntimeResponse(
+        id=row.id,
+        instrument_id=row.instrument_id,
+        started_at=row.started_at,
+        ended_at=row.ended_at,
+        reason_id=row.reason_id,
+        maintenance_event_id=row.maintenance_event_id,
+        note=row.note,
+        active=row.active,
+        created_at=row.created_at,
+        modified_at=row.modified_at,
+        reason_name=row.reason.name if row.reason else None,
+        instrument_name=row.instrument.name if row.instrument else None,
+    )
+
+
+def _downtime_query(db: Session):
+    return db.query(InstrumentDowntime).options(
+        joinedload(InstrumentDowntime.reason),
+        joinedload(InstrumentDowntime.instrument),
+    )
+
+
+@downtime_router.get("", response_model=List[DowntimeResponse])
+def list_downtime(
+    instrument_id: Optional[UUID] = Query(None),
+    open_only: bool = Query(False),
+    include_inactive: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    q = _downtime_query(db)
+    if instrument_id:
+        q = q.filter(InstrumentDowntime.instrument_id == instrument_id)
+    if open_only:
+        q = q.filter(InstrumentDowntime.ended_at.is_(None), InstrumentDowntime.active.is_(True))
+    if not include_inactive:
+        q = q.filter(InstrumentDowntime.active.is_(True))
+    return [
+        _downtime_out(r)
+        for r in q.order_by(InstrumentDowntime.started_at.desc()).limit(500).all()
+    ]
+
+
+@downtime_router.post("", response_model=DowntimeResponse, status_code=status.HTTP_201_CREATED)
+def create_downtime(
+    body: DowntimeCreate,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    _require_instrument(db, body.instrument_id)
+    _list_entry(db, "downtime_reasons", body.reason_id, "downtime reason")
+    if body.maintenance_event_id:
+        ev = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == body.maintenance_event_id)
+            .first()
+        )
+        if ev is None:
+            raise HTTPException(status_code=404, detail="Maintenance event not found")
+    row = InstrumentDowntime(
+        **body.model_dump(),
+        created_by=current_user.id,
+        modified_by=current_user.id,
+    )
+    _commit(db, row, "Could not record downtime")
+    return _downtime_out(_downtime_query(db).filter(InstrumentDowntime.id == row.id).first())
+
+
+@downtime_router.patch("/{downtime_id}", response_model=DowntimeResponse)
+def update_downtime(
+    downtime_id: UUID,
+    body: DowntimeUpdate,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    row = db.query(InstrumentDowntime).filter(InstrumentDowntime.id == downtime_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Downtime not found")
+    data = explicit_updates(body, row, refuse_null={"active"})
+    if "reason_id" in data:
+        _list_entry(db, "downtime_reasons", data["reason_id"], "downtime reason")
+    if "maintenance_event_id" in data and data["maintenance_event_id"] is not None:
+        ev = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == data["maintenance_event_id"])
+            .first()
+        )
+        if ev is None:
+            raise HTTPException(status_code=404, detail="Maintenance event not found")
+    for k, v in data.items():
+        setattr(row, k, v)
+    if row.ended_at is not None and row.started_at is not None and row.ended_at < row.started_at:
+        raise HTTPException(status_code=422, detail="ended_at cannot be before started_at")
+    row.modified_by = current_user.id
+    _commit(db, row, "Could not update downtime")
+    return _downtime_out(_downtime_query(db).filter(InstrumentDowntime.id == downtime_id).first())
+
+
+# ----------------------------------------------------- experiment list ---
+
+def _stored_ids(config: object, key: str) -> List[str]:
+    if not isinstance(config, dict):
+        return []
+    raw_ids = config.get(key)
+    if raw_ids is None or not isinstance(raw_ids, list):
+        return []
+    stored: List[str] = []
+    for raw in raw_ids:
+        if raw is None:
+            continue
+        try:
+            stored.append(str(UUID(str(raw))))
+        except (ValueError, TypeError):
+            continue
+    return stored
+
+
+def _instrument_list_response(experiment_id: UUID, entry) -> ExperimentInstrumentListResponse:
+    return ExperimentInstrumentListResponse(
+        experiment_id=experiment_id,
+        entry_id=entry.id,
+        allowed_instrument_ids=_stored_ids(entry.config, "allowed_instrument_ids"),
+        removed_instrument_ids=_stored_ids(entry.config, "removed_instrument_ids"),
+    )
+
+
+def _instrument_entry_for(db: Session, experiment_id: UUID):
+    rows = (
+        db.query(Entry)
+        .filter(Entry.experiment_id == experiment_id, Entry.active.is_(True))
+        .order_by(Entry.sort_order.asc(), Entry.created_at.asc())
+        .all()
+    )
+    for row in rows:
+        if row.entry_type == "instrument" or row.predefined_entry_key == "instruments":
+            return row
+    return None
+
+
+def save_experiment_instrument(
+    db: Session, experiment_id: UUID, instrument_id: UUID, current_user: User
+) -> tuple[ExperimentInstrumentListResponse, bool]:
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if experiment is None:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    refuse_ineligible_instrument(db, instrument_id)
+    key = str(instrument_id)
+    entry = _instrument_entry_for(db, experiment_id)
+    if entry is None:
+        decl = PREDEFINED_ENTRY_DEFAULTS["instruments"]
+        max_sort = (
+            db.query(func.max(Entry.sort_order))
+            .filter(Entry.experiment_id == experiment_id, Entry.active.is_(True))
+            .scalar()
+        )
+        sort_order = 0 if max_sort is None else int(max_sort) + 1
+        entry = Entry(
+            experiment_id=experiment_id,
+            entry_type="instrument",
+            name=decl["name"],
+            description=decl.get("description"),
+            predefined_entry_key="instruments",
+            sort_order=sort_order,
+            config={"allowed_instrument_ids": [key], "status": "draft"},
+            active=True,
+            created_by=current_user.id,
+            modified_by=current_user.id,
+        )
+        db.add(entry)
+        _commit(db, entry, "Could not save the instrument on this experiment")
+        return _instrument_list_response(experiment_id, entry), True
+
+    stored = _stored_ids(entry.config, "allowed_instrument_ids")
+    removed = _stored_ids(entry.config, "removed_instrument_ids")
+    if key in stored:
+        return _instrument_list_response(experiment_id, entry), False
+    config = dict(entry.config) if isinstance(entry.config, dict) else {}
+    if key in removed:
+        config["removed_instrument_ids"] = [item for item in removed if item != key]
+    config["allowed_instrument_ids"] = stored + [key]
+    config.setdefault("status", "draft")
+    entry.config = config
+    flag_modified(entry, "config")
+    entry.modified_by = current_user.id
+    _commit(db, entry, "Could not save the instrument on this experiment")
+    return _instrument_list_response(experiment_id, entry), True
+
+
+def remove_experiment_instrument(
+    db: Session, experiment_id: UUID, instrument_id: UUID, current_user: User
+) -> ExperimentInstrumentListResponse:
+    experiment = db.query(Experiment).filter(Experiment.id == experiment_id).first()
+    if experiment is None:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    entry = _instrument_entry_for(db, experiment_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Experiment has no instrument list")
+    key = str(instrument_id)
+    stored = _stored_ids(entry.config, "allowed_instrument_ids")
+    removed = _stored_ids(entry.config, "removed_instrument_ids")
+    if key not in stored:
+        if key in removed:
+            return _instrument_list_response(experiment_id, entry)
+        raise HTTPException(status_code=404, detail="Instrument is not on this experiment")
+    config = dict(entry.config) if isinstance(entry.config, dict) else {}
+    config["allowed_instrument_ids"] = [item for item in stored if item != key]
+    if key not in removed:
+        config["removed_instrument_ids"] = removed + [key]
+    config.setdefault("status", "draft")
+    entry.config = config
+    flag_modified(entry, "config")
+    entry.modified_by = current_user.id
+    _commit(db, entry, "Could not remove the instrument from this experiment")
+    return _instrument_list_response(experiment_id, entry)
+
+
+def _instrument_label(db: Session, instrument_id: UUID) -> str:
+    row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
+    if row is not None and row.name:
+        return row.name
+    return "This instrument"
+
+
+def _refuse_instrument_not_on_experiment(db: Session, experiment_id: UUID, instrument_id: UUID) -> None:
+    entry = _instrument_entry_for(db, experiment_id)
+    stored = _stored_ids(entry.config, "allowed_instrument_ids") if entry is not None else []
+    if str(instrument_id) in stored:
+        return
+    label = _instrument_label(db, instrument_id)
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "code": INSTRUMENT_NOT_ON_EXPERIMENT,
+            "message": f"{label} isn't on this experiment. Add it before recording use.",
+        },
+    )
+
+
+@experiment_instruments_router.post(
+    "/{experiment_id}/instruments",
+    response_model=ExperimentInstrumentListResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_experiment_instrument(
+    experiment_id: UUID,
+    body: ExperimentInstrumentAdd,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    payload, created = save_experiment_instrument(db, experiment_id, body.instrument_id, current_user)
+    if created:
+        return payload
+    return Response(
+        content=payload.model_dump_json(),
+        media_type="application/json",
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@experiment_instruments_router.patch(
+    "/{experiment_id}/instruments",
+    response_model=ExperimentInstrumentListResponse,
+)
+def update_experiment_instrument(
+    experiment_id: UUID,
+    body: ExperimentInstrumentStatus,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    if body.active is not False:
+        _refuse(
+            "instrument_remove_required",
+            "Set active to false to remove the instrument. Add it again to restore it.",
+        )
+    return remove_experiment_instrument(db, experiment_id, body.instrument_id, current_user)
+
+
+# -------------------------------------------------------------------- uses ---
+
+def _use_out(row: InstrumentUse) -> InstrumentUseResponse:
+    out = InstrumentUseResponse.model_validate(row)
+    out.instrument_name = row.instrument.name if row.instrument else None
+    return out
+
+
+@uses_router.get("", response_model=List[InstrumentUseResponse])
+def list_instrument_uses(
+    lims_run_id: Optional[UUID] = Query(None),
+    experiment_id: Optional[UUID] = Query(None),
+    instrument_id: Optional[UUID] = Query(None),
+    include_voided: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    q = db.query(InstrumentUse).options(joinedload(InstrumentUse.instrument))
+    if lims_run_id:
+        q = q.filter(InstrumentUse.lims_run_id == lims_run_id)
+    if experiment_id:
+        q = q.filter(InstrumentUse.experiment_id == experiment_id)
+    if instrument_id:
+        q = q.filter(InstrumentUse.instrument_id == instrument_id)
+    if not include_voided:
+        q = q.filter(InstrumentUse.active.is_(True))
+    return [
+        _use_out(r)
+        for r in q.order_by(InstrumentUse.used_on.desc(), InstrumentUse.created_at.desc()).limit(500).all()
+    ]
+
+
+@uses_router.post("", response_model=InstrumentUseResponse, status_code=status.HTTP_201_CREATED)
+def record_instrument_use(
+    body: InstrumentUseCreate,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    if body.lims_run_id is None and body.experiment_id is None:
+        _refuse(USE_TARGET_REQUIRED, "Record the use on a LIMS run or an experiment")
+    if body.lims_run_id is not None and not db.query(LimsRun).filter(LimsRun.id == body.lims_run_id).first():
+        raise HTTPException(status_code=404, detail="LIMS run not found")
+    if body.experiment_id is not None and not db.query(Experiment).filter(Experiment.id == body.experiment_id).first():
+        raise HTTPException(status_code=404, detail="Experiment not found")
+    if body.experiment_id is not None:
+        _refuse_instrument_not_on_experiment(db, body.experiment_id, body.instrument_id)
+    refuse_ineligible_instrument(db, body.instrument_id)
+    row = InstrumentUse(
+        **body.model_dump(),
+        created_by=current_user.id,
+        modified_by=current_user.id,
+    )
+    _commit(db, row, "Could not record instrument use")
+    row = (
+        db.query(InstrumentUse)
+        .options(joinedload(InstrumentUse.instrument))
+        .filter(InstrumentUse.id == row.id)
+        .first()
+    )
+    return _use_out(row)
+
+
+@uses_router.patch("/{use_id}", response_model=InstrumentUseResponse)
+def update_instrument_use(
+    use_id: UUID,
+    body: InstrumentUseUpdate,
+    current_user: User = Depends(require_experiment_manage),
+    db: Session = Depends(get_db),
+):
+    row = db.query(InstrumentUse).filter(InstrumentUse.id == use_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Instrument use not found")
+    data = explicit_updates(body, row, refuse_null={"active"})
+    if "active" in data and data["active"] is False and row.active is False:
+        _refuse(VOIDED_USE_STAYS_VOIDED, "A voided use stays voided.")
+    for k, v in data.items():
+        setattr(row, k, v)
+    row.modified_by = current_user.id
+    _commit(db, row, "Could not update instrument use")
+    row = (
+        db.query(InstrumentUse)
+        .options(joinedload(InstrumentUse.instrument))
+        .filter(InstrumentUse.id == use_id)
+        .first()
+    )
+    return _use_out(row)

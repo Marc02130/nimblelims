@@ -21,6 +21,12 @@ jest.mock('../services/apiService', () => ({
     getSampleTypeTransitions: jest.fn(),
     getFieldDefinitions: jest.fn(),
     getReagents: jest.fn(),
+    getInstruments: jest.fn(),
+    getInstrumentEligibility: jest.fn(),
+    getInstrumentUses: jest.fn(),
+    recordInstrumentUse: jest.fn(),
+    addExperimentInstrument: jest.fn(),
+    setExperimentInstrumentActive: jest.fn(),
     createExperimentTemplate: jest.fn(),
     updateExperimentTemplate: jest.fn(),
     getExperimentEntries: jest.fn(),
@@ -55,6 +61,9 @@ beforeEach(() => {
     { id: 'r1', name: 'Qubit dsDNA HS', active: true },
     { id: 'r2', name: 'Ethanol', active: true },
   ]);
+  api.getInstruments.mockResolvedValue([]);
+  api.getInstrumentEligibility.mockResolvedValue({ allowed: true });
+  api.getInstrumentUses.mockResolvedValue([]);
   api.createExperimentTemplate.mockResolvedValue({ id: 't1' });
   api.getExperimentEntries.mockResolvedValue({ entries: [] });
   api.getLists.mockResolvedValue([]);
@@ -333,8 +342,8 @@ describe('Experiment reagent capture', () => {
     fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
     fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
     fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText('Used on'), { target: { value: '2026-10-01' } });
-    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'opened today' } });
+    fireEvent.change(screen.getAllByLabelText('Used on')[0], { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getAllByLabelText('Note')[0], { target: { value: 'opened today' } });
     expect(screen.getByText('Leave empty for today')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Record' }));
     await waitFor(() => expect(api.recordReagentUse).toHaveBeenCalled());
@@ -345,8 +354,8 @@ describe('Experiment reagent capture', () => {
       used_on: '2026-10-01',
       note: 'opened today',
     });
-    await waitFor(() => expect(screen.getByLabelText('Used on')).toHaveValue(''));
-    expect(screen.getByLabelText('Note')).toHaveValue('');
+    await waitFor(() => expect(screen.getAllByLabelText('Used on')[0]).toHaveValue(''));
+    expect(screen.getAllByLabelText('Note')[0]).toHaveValue('');
   });
 
   test('keeps Used on and Note when the API refuses the use', async () => {
@@ -359,12 +368,12 @@ describe('Experiment reagent capture', () => {
     fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
     fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
     fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '5' } });
-    fireEvent.change(screen.getByLabelText('Used on'), { target: { value: '2026-10-01' } });
-    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'opened today' } });
+    fireEvent.change(screen.getAllByLabelText('Used on')[0], { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getAllByLabelText('Note')[0], { target: { value: 'opened today' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record' }));
     expect(await screen.findByText('Lot L-OK has 1 mL left')).toBeInTheDocument();
-    expect(screen.getByLabelText('Used on')).toHaveValue('2026-10-01');
-    expect(screen.getByLabelText('Note')).toHaveValue('opened today');
+    expect(screen.getAllByLabelText('Used on')[0]).toHaveValue('2026-10-01');
+    expect(screen.getAllByLabelText('Note')[0]).toHaveValue('opened today');
   });
 
   test('caps Used on at the browser today and shows a future-date refusal', async () => {
@@ -384,7 +393,7 @@ describe('Experiment reagent capture', () => {
     fireEvent.mouseDown(await screen.findByLabelText('Lot for Qubit dsDNA HS'));
     fireEvent.click(await screen.findByRole('option', { name: /L-OK/ }));
     fireEvent.change(screen.getByLabelText(/Quantity for Qubit dsDNA HS/), { target: { value: '1' } });
-    expect(screen.getByLabelText('Used on')).toHaveAttribute('max', localDateString());
+    expect(screen.getAllByLabelText('Used on')[0]).toHaveAttribute('max', localDateString());
     fireEvent.click(screen.getByRole('button', { name: 'Record' }));
     expect(
       await screen.findByText('Used on 2026-10-19 is after today in the lab timezone (2026-10-18).'),

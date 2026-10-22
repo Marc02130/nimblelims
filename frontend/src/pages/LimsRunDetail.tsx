@@ -44,6 +44,7 @@ import ValueChoicesPanel from '../components/runs/ValueChoicesPanel';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 import StartCohortPanel from '../components/experiments/StartCohortPanel';
 import ReagentUsePanel from '../components/reagents/ReagentUsePanel';
+import InstrumentUsePanel from '../components/instruments/InstrumentUsePanel';
 
 const apiErrorMsg = (err: any, fallback: string): string => {
   const detail = err?.response?.data?.detail;
@@ -312,6 +313,7 @@ const LimsRunDetail: React.FC = () => {
           version: p.version,
           instrument_id: p.instrument_id || null,
           cro_source_id: p.cro_source_id || null,
+          instrument_type_id: p.instrument_type_id || null,
         })),
       );
     } catch (err: any) {
@@ -322,8 +324,8 @@ const LimsRunDetail: React.FC = () => {
 
   const submitImport = async (parser: ParserOption, file: File) => {
     if (!runId) return;
-    if (!parser.instrument_id && !parser.cro_source_id) {
-      setImportError('This parser has no instrument or CRO source');
+    if (!parser.instrument_id && !parser.cro_source_id && !parser.instrument_type_id) {
+      setImportError('This parser has no instrument, instrument type, or CRO source');
       return;
     }
     setImporting(true);
@@ -802,6 +804,7 @@ const LimsRunDetail: React.FC = () => {
       )}
 
       {runId && <ReagentUsePanel limsRunId={runId} analysisId={run.analysis_id} />}
+      {runId && <InstrumentUsePanel limsRunId={runId} />}
 
       <RunImportDialog
         open={importOpen}

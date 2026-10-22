@@ -29,6 +29,13 @@ def test_wrapper_mate_and_lookup():
     assert spec["cardinality"] == 1
     assert spec["atomic_pair"] is False
     assert spec["mint"] is False
+    assert wrapper_id_for_key("instruments") == "instruments"
+    assert wrapper_mate_key("instruments") is None
+    spec = WRAPPER_CATALOG["instruments"]
+    assert spec["keys"] == ("instruments",)
+    assert spec["cardinality"] == 1
+    assert spec["atomic_pair"] is False
+    assert spec["mint"] is False
 
 
 def test_wrapper_capacity_one_pair_ok_two_plans_not():

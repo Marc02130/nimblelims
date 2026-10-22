@@ -274,18 +274,44 @@ def _expect_date(conn, table: str, column: str, row_id) -> None:
         raise AssertionError(f"{table}.{column} is {value!r}, expected {LAB_DAY}")
 
 
+def _instant_names(conn, names: set[str]) -> set[str]:
+    """0108 renames instrument_types; 0102's frozen list still uses the old name."""
+    tables = {
+        row[0]
+        for row in conn.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
+        )
+    }
+    out = set()
+    for qualified in names:
+        table, column = qualified.split(".", 1)
+        if (
+            table == "instrument_types"
+            and "instrument_types" not in tables
+            and "instrument_types_legacy" in tables
+        ):
+            out.add(f"instrument_types_legacy.{column}")
+        else:
+            out.add(qualified)
+    return out
+
+
 def _assert_catalog(conn, instants_are_aware: bool) -> None:
     naive = _typed(conn, "timestamp without time zone")
     aware = _typed(conn, "timestamp with time zone")
     dates = _typed(conn, "date")
+    instants = _instant_names(conn, set(INSTANT_TIMESTAMP_COLUMNS))
     assert set(SQL_DATE_COLUMNS) <= dates
     assert set(CALENDAR_TIMESTAMP_COLUMNS) <= naive
     if instants_are_aware:
-        assert set(INSTANT_TIMESTAMP_COLUMNS) <= aware
-        assert set(INSTANT_TIMESTAMP_COLUMNS).isdisjoint(naive)
+        assert instants <= aware
+        assert instants.isdisjoint(naive)
     else:
-        assert set(INSTANT_TIMESTAMP_COLUMNS) <= naive
-        assert naive == set(INSTANT_TIMESTAMP_COLUMNS) | set(CALENDAR_TIMESTAMP_COLUMNS)
+        assert instants <= naive
+        assert naive == instants | set(CALENDAR_TIMESTAMP_COLUMNS)
 
 
 def _typed(conn, data_type: str) -> set[str]:
@@ -304,15 +330,32 @@ def _typed(conn, data_type: str) -> set[str]:
 
 
 def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
-    """0101 is before ELISA catalog rows. Head adds an empty table and catalog rows.
+    """0101 is before ELISA and instrument-tracking catalog rows.
 
-    Every other table keeps the same row count. The new table is empty.
+    Head adds empty tables, renames instrument_types, and seeds lists.
+    Every other table keeps the same row count.
     """
     extra = set(after) - set(before)
-    assert extra <= {"result_acceptances"}
+    allowed_extra = {
+        "result_acceptances",
+        "instrument_downtime",
+        "instrument_maintenance_events",
+        "instrument_maintenance_schedules",
+        "instrument_uses",
+        "instrument_types_legacy",
+    }
+    assert extra <= allowed_extra
     for name in extra:
         assert after[name] == 0
-    skip = {"schema_tables", "schema_columns", "schema_privileges"} | extra
+    missing = set(before) - set(after)
+    assert missing <= {"instrument_types"}
+    skip = {
+        "schema_tables",
+        "schema_columns",
+        "schema_privileges",
+        "lists",
+        "list_entries",
+    } | extra | missing
     left = {key: value for key, value in before.items() if key not in skip}
     right = {key: value for key, value in after.items() if key not in skip}
     assert left == right

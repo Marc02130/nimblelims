@@ -10,6 +10,7 @@ Types of Entries (entry_type):
 - 'experiment_data'        : Purpose-specific table/form (plan lines, header); rows not auto from cohort
 - 'predefined_action'      : OOB behaviors (aliquot/pool execute, etc.)
 - 'reagent'                : Default catalog reagents for this experiment; any active reagent can be added, then the lot
+- 'instrument'             : Default catalog instruments for this experiment; any eligible instrument can be added, then recorded as used
 - 'display_table'          : Read-only structured display (legacy)
 - Legacy aliases (normalized on write): 'sample_data' → experiment_sample_data,
   'experiment_detail' → experiment_data
@@ -50,6 +51,7 @@ ENTRY_TYPES = frozenset(
         "experiment_data",
         "predefined_action",
         "reagent",
+        "instrument",
         "display_table",
         # legacy
         "sample_data",
@@ -125,6 +127,7 @@ PREDEFINED_ENTRY_KEYS = frozenset(
         "aliquot_pool_plan",  # experiment_data — plan lines + execute
         "aliquots_pools",  # experiment_sample_data — post-execute view
         "reagents",  # reagent — default catalog reagents; any active reagent can be added, then the lot
+        "instruments",  # instrument — default catalog instruments; any eligible instrument can be added, then recorded as used
     }
 )
 
@@ -174,6 +177,14 @@ PREDEFINED_ENTRY_DEFAULTS = {
         "description": "Default catalog reagents; the lab tech can add any active reagent and then picks the lot",
         "config": {
             "allowed_reagent_ids": [],
+        },
+    },
+    "instruments": {
+        "entry_type": "instrument",
+        "name": "Instruments",
+        "description": "Default catalog instruments; the lab tech can add any eligible instrument and record its use",
+        "config": {
+            "allowed_instrument_ids": [],
         },
     },
 }

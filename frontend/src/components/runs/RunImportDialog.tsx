@@ -20,6 +20,7 @@ export interface ParserOption {
   version?: number;
   instrument_id?: string | null;
   cro_source_id?: string | null;
+  instrument_type_id?: string | null;
 }
 
 export interface UnmatchedImportRow {

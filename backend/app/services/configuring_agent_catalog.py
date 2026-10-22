@@ -70,6 +70,8 @@ def _schema_for(method: str, kind: str):
     from app.schemas.analyte import AnalyteCreate
     from app.schemas.user import RolePermissionsUpdate
     from app.schemas.reagent import ReagentCreate, ReagentVendorCreate, VendorCreate
+    from app.schemas.instrument_catalog import InstrumentCreate, InstrumentUpdate
+    from app.schemas.instrument_ops import MaintenanceScheduleCreate, MaintenanceScheduleUpdate
 
     table = {
         ("POST", "analysis"): AnalysisCreate,
@@ -93,6 +95,10 @@ def _schema_for(method: str, kind: str):
         ("POST", "vendor"): VendorCreate,
         ("POST", "reagent"): ReagentCreate,
         ("POST", "reagent_vendor"): ReagentVendorCreate,
+        ("POST", "instrument"): InstrumentCreate,
+        ("PATCH", "instrument"): InstrumentUpdate,
+        ("POST", "instrument_schedule"): MaintenanceScheduleCreate,
+        ("PATCH", "instrument_schedule"): MaintenanceScheduleUpdate,
     }
     return table.get((method, kind))
 
@@ -108,6 +114,8 @@ _PATH_NAMES = {
     r"^/roles/[^/]+/permissions$": "/roles/{role_id}/permissions",
     r"^/containers/[^/]+/contents/[^/]+$": "/containers/{container_id}/contents/{sample_id}",
     r"^/analyses/[^/]+/analytes$": "/analyses/{analysis_id}/analytes",
+    r"^/v1/instruments/[^/]+$": "/v1/instruments/{instrument_id}",
+    r"^/v1/instrument-maintenance-schedules/[^/]+$": "/v1/instrument-maintenance-schedules/{schedule_id}",
 }
 
 
@@ -280,6 +288,7 @@ def catalog_snapshot(db, user: User) -> dict[str, Any]:
         "units": _named_rows(db, "unit"),
         "vendors": _named_rows(db, "vendor"),
         "reagents": _named_rows(db, "reagent"),
+        "instruments": _named_rows(db, "instrument"),
         "screen_keys": list(SCREEN_KEYS),
     }
 
@@ -313,6 +322,10 @@ def _model_for(kind: str):
         from models.reagent import Reagent
 
         return Reagent
+    if kind == "instrument":
+        from models.instrument import Instrument
+
+        return Instrument
     raise KeyError(kind)
 
 
@@ -355,6 +368,7 @@ def catalog_text(snapshot: dict[str, Any]) -> str:
         ("units", "Units"),
         ("vendors", "Vendors"),
         ("reagents", "Reagents"),
+        ("instruments", "Instruments"),
     ):
         lines.append(f"{label}: " + (", ".join(f"{r['name']}={r['id']}" for r in snapshot.get(key) or []) or "none"))
     lines.append("Layout screen_key values: " + ", ".join(snapshot.get("screen_keys") or []))
@@ -565,6 +579,11 @@ def resolve_body(db, user: User, method: str, path: str, body: Any) -> Any:
 
     if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors") and method == "POST":
         return _resolve_reagent_body(db, path, data)
+
+    if path in ("/v1/instruments",) and method == "POST":
+        return _resolve_instrument_body(db, data)
+    if path == "/v1/instrument-maintenance-schedules" and method == "POST":
+        return _resolve_schedule_body(db, data)
 
     if path == "/containers/types" and method == "POST":
         if "name" not in data and _first(data, "display_name", "label"):
@@ -879,6 +898,8 @@ def _candidates(db, user: User, method: str, path: str, body: dict) -> list[tupl
         return [("vendor", r["name"]) for r in _named_rows(db, "vendor")]
     if path == "/v1/reagents":
         return [("reagent", r["name"]) for r in _named_rows(db, "reagent")]
+    if path == "/v1/instruments":
+        return [("instrument", r["name"]) for r in _named_rows(db, "instrument")]
     entry = re.match(r"^/lists/([^/]+)/entries$", path)
     if entry:
         lst = find_list(db, entry.group(1))
@@ -1187,3 +1208,63 @@ def _resolve_source_body(db, data: dict) -> dict:
         if data.get(key) not in (None, ""):
             out[key] = data[key]
     return out
+
+
+def _resolve_instrument_body(db, data: dict) -> dict:
+    from models.instrument import Instrument
+    from models.list import List, ListEntry
+    from models.reagent import Vendor
+
+    types = db.query(List).filter(List.name == "instrument_types").first()
+    type_ref = _first(data, "instrument_type_id", "instrument_type", "type")
+    type_id = type_ref
+    if type_ref and _uuid(type_ref) is None and types is not None:
+        row = (
+            db.query(ListEntry)
+            .filter(
+                ListEntry.list_id == types.id,
+                func.lower(ListEntry.name) == str(type_ref).strip().lower(),
+            )
+            .first()
+        )
+        type_id = str(row.id) if row is not None else type_ref
+    out: dict[str, Any] = {
+        "name": _first(data, "name", "display_name", "label"),
+        "instrument_type_id": type_id,
+        "vendor_id": _named_id(db, Vendor, _first(data, "vendor_id", "vendor", "vendor_name")),
+    }
+    for key in ("description", "model", "serial_number", "asset_tag", "location_id", "status"):
+        if data.get(key) not in (None, ""):
+            out[key] = data[key]
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _resolve_schedule_body(db, data: dict) -> dict:
+    from models.instrument import Instrument
+    from models.list import List, ListEntry
+    from models.reagent import Vendor
+
+    kinds = db.query(List).filter(List.name == "maintenance_types").first()
+    kind_ref = _first(data, "kind_id", "kind", "maintenance_type")
+    kind_id = kind_ref
+    if kind_ref and _uuid(kind_ref) is None and kinds is not None:
+        row = (
+            db.query(ListEntry)
+            .filter(
+                ListEntry.list_id == kinds.id,
+                func.lower(ListEntry.name) == str(kind_ref).strip().lower(),
+            )
+            .first()
+        )
+        kind_id = str(row.id) if row is not None else kind_ref
+    out: dict[str, Any] = {
+        "instrument_id": _named_id(
+            db, Instrument, _first(data, "instrument_id", "instrument", "instrument_name")
+        ),
+        "kind_id": kind_id,
+        "interval_days": data.get("interval_days"),
+        "service_vendor_id": _named_id(
+            db, Vendor, _first(data, "service_vendor_id", "service_vendor", "vendor")
+        ),
+    }
+    return {k: v for k, v in out.items() if v is not None}
