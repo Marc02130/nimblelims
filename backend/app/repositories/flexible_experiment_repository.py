@@ -155,6 +155,8 @@ class LimsRunDataRepository:
                 container_id=row.get("container_id"),
                 well_position=row.get("well_position"),
                 sample_id=row.get("sample_id"),
+                sample_key=row.get("sample_key"),
+                link_note=row.get("link_note"),
                 row_data=row["row_data"],
                 import_id=row.get("import_id"),
                 created_by=created_by,

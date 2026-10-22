@@ -44,6 +44,7 @@ INSTANT_FIELDS = frozenset(
         "used_at",
         "locked_until",
         "locked_at",
+        "rejected_at",
         "revoked_at",
         "submitted_at",
         "plan_updated_at",
