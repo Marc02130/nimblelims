@@ -283,11 +283,17 @@ class InstrumentDataService:
             if row_failed:
                 continue
 
+            sample_key: Optional[str] = None
+            if sample_col:
+                raw_key = (row_dict.get(sample_col) or "").strip()
+                sample_key = raw_key or None
+
             try:
                 rows.append(
                     LimsRunDataRow(
                         well_position=well_position,
                         row_data=row_data,
+                        sample_key=sample_key,
                     )
                 )
             except ValidationError as e:

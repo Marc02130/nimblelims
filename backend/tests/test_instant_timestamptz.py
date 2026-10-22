@@ -143,7 +143,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
 
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
-            assert _counts(conn) == before_counts
+            _assert_counts_after_later_migrations(before_counts, _counts(conn))
             assert _names(conn, _trigger_sql(), "samples") == before_triggers
             assert _names(conn, _index_sql(), "samples") == before_indexes
             assert _names(conn, _policy_sql(), "samples") == before_policies
@@ -160,7 +160,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
 
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
-            assert _counts(conn) == before_counts
+            _assert_counts_after_later_migrations(before_counts, _counts(conn))
             _assert_catalog(conn, instants_are_aware=True)
             _assert_upgraded_values(conn, targets)
     finally:
@@ -301,6 +301,21 @@ def _typed(conn, data_type: str) -> set[str]:
         {"data_type": data_type},
     )
     return {f"{table}.{column}" for table, column in rows}
+
+
+def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
+    """0101 is before ELISA catalog rows. Head adds an empty table and catalog rows.
+
+    Every other table keeps the same row count. The new table is empty.
+    """
+    extra = set(after) - set(before)
+    assert extra <= {"result_acceptances"}
+    for name in extra:
+        assert after[name] == 0
+    skip = {"schema_tables", "schema_columns", "schema_privileges"} | extra
+    left = {key: value for key, value in before.items() if key not in skip}
+    right = {key: value for key, value in after.items() if key not in skip}
+    assert left == right
 
 
 def _counts(conn) -> dict:

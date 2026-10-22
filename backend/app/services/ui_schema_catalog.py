@@ -50,6 +50,8 @@ LAB_TABLES: tuple[str, ...] = (
     "reagent_vendors",
     "reagent_lots",
     "reagent_uses",
+    # Reviewer pick of which run's value is accepted (ELISA rerun).
+    "result_acceptances",
 )
 
 SYSTEM_TABLES: tuple[str, ...] = (
@@ -119,6 +121,7 @@ DISPLAY_NAMES: Mapping[str, str] = {
     "reagent_vendors": "Reagent vendors",
     "reagent_lots": "Reagent lots",
     "reagent_uses": "Reagent uses",
+    "result_acceptances": "Result acceptances",
     "container_types": "Container types",
     "instrument_types": "Instrument types",
     "sample_type_transitions": "Sample type transitions",

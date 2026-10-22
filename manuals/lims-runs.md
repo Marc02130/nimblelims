@@ -38,7 +38,9 @@ Operator SoT: [HOWTO.md](HOWTO.md) § Later execution. **X-1** (2026-09-11).
 
 - Table: `lims_runs`
 - Status is a strict enum (`LimsRunStatus`) with two lifecycles controlled by the template's `lifecycle_type`.
-- Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`, plus `created_at` and `modified_at`. Those columns are `timestamptz`. The API sends each of them as UTC with `Z`. The run page shows them in the browser's local time, so a run created at 7:23 PM US Eastern is `2026-10-18T23:23:00Z`, not 11:23 PM.
+- Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`, `rejected_at`, plus `created_at` and `modified_at`. Those columns are `timestamptz`. The API sends each of them as UTC with `Z`. The run page shows them in the browser's local time, so a run created at 7:23 PM US Eastern is `2026-10-18T23:23:00Z`, not 11:23 PM.
+- `status_reason` and `rejected_at` record a plate reject. Status becomes `failed`. Imported rows stay.
+- `replaces_run_id` on a rerun points at the run it replaces. The replaced run is not removed.
 - Special field: `fit_in_progress` (mutex for curve fitting).
 - **`analysis_id`** (required FK → `analyses`): assay this run is for. Set on create/edit; required to start, import, and publish. On publish, instrument data is promoted to Tests/Results for that analysis.
 
@@ -63,6 +65,8 @@ draft → ordered → running → results_received → complete → published
 - Import of data is only permitted in `running` or `results_received`.
 - `complete → published` requires the `experiment:publish` permission.
 - Cancel is allowed from any non-terminal state.
+- **Reject plate** (`POST /v1/lims-runs/{id}/reject`, body `{reason}`) is allowed from any state that can transition to `failed` (running, results received, complete, and the earlier non-terminal states). Published is terminal. The reason is required. Status becomes `failed`. Rows stay.
+- **Create rerun** (`POST /v1/lims-runs/{id}/rerun`) is allowed once the run has left draft. The new run is a draft with the same template, analysis, and cohort sample ids (not locked, so Start locks them and reuses Tests). `replaces_run_id` is the original run.
 
 ### Promote-on-publish (structured Tests / Results)
 
@@ -76,8 +80,9 @@ Shipped v1 — see `.docs/internal/ideas/run-results.md`.
 | **Tests** | Use the active Test created or attached at the first LimsRun start for `(sample_id, analysis_id)`. If any cohort sample lacks one, WO-7 returns **422**, refuses the whole run, writes no Results, invents no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `8cfa2a9` and remains history on `b005cfe`; overall P2 Pass remains unsigned. Historical `9c4f9da` stays signed not Pass |
 | **First-start freeze** | **Not closed. Freeze skip unsigned.** First start **wrote** `{}` onto new Test `99b692d3` (not SQL NULL, not a skipped classic row). That `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}` or later-start no-overwrite of `{}` as a verified freeze skip. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. `if test: continue` is **not** a freeze. **OQ-WO-6:** an earlier LimsRun must not share the asked-for `analysis_id` (extract is not a special assay) |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
-| **Conflicts** | Same run → update; other run / manual result owns triple → **409**, publish blocked |
-| **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm |
+| **Conflicts** | Same run → update; a result owned by a run in this run's `replaces_run_id` chain → **held** (publish continues and does not overwrite that result); any other run or manual result → **409**, publish blocked |
+| **Accepted value** | On the rerun, `GET/POST /v1/lims-runs/{id}/value-choices`. The reviewer picks this run or the run it replaces. The result row shows the pick. `result_acceptances` keeps both values. The previous active choice becomes inactive. Nothing is deleted. POST requires `experiment:publish`. |
+| **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm, including `held_count` |
 | **Permissions** | **Publish** may create/update Results on this path, but may not create the WO-7 Test |
 | **Batch size** | Env `LIMS_PROMOTE_BATCH_SIZE` (default **200**) |
 
@@ -86,7 +91,9 @@ Instrument JSONB remains SoT for raw import; Results are the published structure
 ## Data Model Characteristics
 
 - Data is stored as flexible `row_data` (JSONB) per row (`lims_run_data`).
+- File import copies the parser `sample_col` into `sample_key` and sets `sample_id` when that key matches `samples.client_sample_id` (one match wins over the sample name) or, with no client-id match, `samples.name`. `link_note` explains an unmatched row. The row is still stored.
 - Association to samples is lighter than ELN Experiments (direct `sample_id` on data rows).
+- `result_acceptances` stores the reviewer's pick (`active` true for the current choice). Registered in the schema catalog with row level security through the sample's project, same shape as other sample-scoped lab tables.
 - `TemplateWellDefinition` (added for dose-response) provides relational storage for well-level concentrations, roles, and replicate groups.
 - This model currently has a bias toward plate/well-based instrument data.
 - Structured LIMS **results** after publish: `results.lims_run_id`, `results.replicate`; results are **not** named entities (no global `name`).
@@ -115,6 +122,7 @@ Instrument JSONB remains SoT for raw import; Results are the published structure
 - Data model leans toward wells + instrument rows. Not ideal for all ADME/PK time-course or non-plate data without stretching.
 - Strong current coupling to dose-response features in UI and supporting tables.
 - No generic "result columns + calculations" framework yet beyond dose-response.
+- ELISA plate math is not applied on import: no 4PL standard curve, no back-calculated concentration, no duplicate CV, no kit-lot QC pass/fail, and no LLOQ/ULOQ flags. Publish stores the analyte-matched column as entered (alias the column, for example `corr`). The existing dose-response fit is a compound curve with control codes. It does not read a plate standard curve.
 - Processes/steps tracking exists in the database but is not surfaced in the main Run detail UI.
 - Workflow engine has no actions for creating or advancing Runs.
 
@@ -150,7 +158,8 @@ You can still enforce strict state-machine rules in the application service laye
 
 - Routes: `/runs`, `/runs/:id`, `/runs/:id/dose-response`
 - Main pages: RunsManagement, LimsRunDetail (Overview / Data / Dose Response tabs)
-  - Overview: **Analysis** and cohort required to start; first start locks the cohort, creates or attaches each Test, and writes asked-for params (new-Test write **Pass** on `99b692d3`; classic skip **OPEN**). **Publish** opens promotion preview. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, creates no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `8cfa2a9` and remains history on `b005cfe`. Overall P2 Pass remains unsigned. `9c4f9da` / `b005cfe` remain signed history.
+  - Overview: **Analysis** and cohort required to start; first start locks the cohort, creates or attaches each Test, and writes asked-for params (new-Test write **Pass** on `99b692d3`; classic skip **OPEN**). **Import** (running or results received) opens a parser and file dialog. **Reject plate** asks for a reason. **Create rerun** opens the new draft. A rerun shows the run it replaces and, when both sides have a value, **Accepted value**. **Publish** opens promotion preview. If any cohort Test is missing, WO-7 refuses the whole publish with **422**, writes no Results, creates no Test, and leaves the run `complete`. Publish-refuse is **Tobias-signed Pass** on `8cfa2a9` and remains history on `b005cfe`. Overall P2 Pass remains unsigned. `9c4f9da` / `b005cfe` remain signed history.
+  - Data: well, sample key (or "—" when the identifier was blank), the unmatched reason, and the row JSON. Unmatched rows are listed, not hidden.
 - API under `/v1/lims-runs` (including `GET …/promotion/preview`, publish = `PATCH …/complete`)
 
 ## Next Steps / Open Questions

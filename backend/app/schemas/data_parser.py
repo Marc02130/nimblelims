@@ -107,9 +107,21 @@ class LimsRunImportRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UnmatchedImportRow(BaseModel):
+    """A kept row that did not bind to a sample."""
+
+    row_index: int
+    well_position: Optional[str] = None
+    sample_key: Optional[str] = None
+    reason: str
+
+
 class ImportFileResponse(BaseModel):
     imported: int
     skipped: int
+    linked: int = 0
+    unmatched_count: int = 0
+    unmatched: List[UnmatchedImportRow] = []
     warnings: List[str] = []
     import_id: UUID
     parser_id: UUID

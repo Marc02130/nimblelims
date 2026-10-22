@@ -27,6 +27,9 @@ class SampleBase(BaseModel):
     project_id: Optional[UUID] = Field(None, description="ID of project (optional, auto-created if not provided)")
     qc_type: Optional[UUID] = Field(None, description="ID of QC type from list_entries")
     client_sample_id: Optional[str] = Field(None, max_length=255, description="Client-provided sample ID")
+    volume_ul: Optional[float] = Field(None, description="Volume received, in µL")
+    receipt_condition: Optional[str] = Field(None, max_length=255, description="Condition at receipt")
+    thaw_count: Optional[int] = Field(None, description="Freeze-thaw count recorded at receipt")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
 
@@ -485,6 +488,16 @@ class SampleReceiveRequest(BaseModel):
     )
     temperature: Optional[float] = None
     client_sample_id: Optional[str] = Field(None, max_length=255)
+    date_sampled: Optional[datetime] = Field(
+        None, description="Collection date (calendar day). Not a future day."
+    )
+    volume_ul: Optional[float] = Field(None, description="Volume received, in µL")
+    receipt_condition: Optional[str] = Field(None, max_length=255)
+    thaw_count: Optional[int] = Field(None, ge=0)
+    extra_fields: Optional[Dict[str, Any]] = Field(
+        None,
+        description="UI-schema extra columns on samples, same as PATCH /samples/{id}",
+    )
 
     @validator("container_barcode")
     def strip_primary_barcode(cls, v: str) -> str:
@@ -505,6 +518,25 @@ class SampleReceiveRequest(BaseModel):
         if v is not None and (v < -273.15 or v > 1000):
             raise ValueError("Temperature must be between -273.15°C and 1000°C")
         return v
+
+    @validator("date_sampled")
+    def validate_collection_date(cls, v):
+        if v is not None and is_future(v):
+            raise ValueError("Collection date cannot be in the future")
+        return store_calendar_day(v)
+
+    @validator("volume_ul")
+    def validate_volume(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Volume must be zero or greater")
+        return v
+
+    @validator("receipt_condition")
+    def strip_condition(cls, v):
+        if v is None:
+            return None
+        text = v.strip()
+        return text or None
 
     @validator("analysis_ids")
     def reject_nonempty_analysis_ids(cls, v: List[UUID]) -> List[UUID]:
@@ -539,6 +571,10 @@ class SampleReceiveResponse(BaseModel):
     sample_id: UUID
     sample_name: str
     status: UUID
+    date_sampled: Optional[date] = None
+    volume_ul: Optional[float] = None
+    receipt_condition: Optional[str] = None
+    thaw_count: Optional[int] = None
     project_id: UUID
     received_date: Optional[date] = None
     containers: List[ReceivedContainerInfo]

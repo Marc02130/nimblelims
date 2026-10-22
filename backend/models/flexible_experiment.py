@@ -124,6 +124,16 @@ class LimsRun(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=True)
     canceled_at = Column(DateTime(timezone=True), nullable=True)
+    # Plate reject (SOP §13): status stays `failed`, the reason is kept, rows stay.
+    status_reason = Column(Text, nullable=True)
+    rejected_at = Column(DateTime(timezone=True), nullable=True)
+    # Rerun points at the run it replaces. The replaced run is not deleted.
+    replaces_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('lims_runs.id'),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -171,6 +181,11 @@ class LimsRunData(Base):
         nullable=True,
         index=True,
     )
+    # File identifier from parser sample_col, and why it did not link.
+    # Unmatched rows stay. link_note is null when the row is linked or when
+    # the parser has no sample column.
+    sample_key = Column(String(255), nullable=True)
+    link_note = Column(Text, nullable=True)
     row_data = Column(JSONB, nullable=False, server_default='{}')
     import_id = Column(
         PostgresUUID(as_uuid=True),

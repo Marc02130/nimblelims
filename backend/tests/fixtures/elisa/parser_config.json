@@ -1,0 +1,54 @@
+{
+  "schema_version": "1",
+  "delimiter": ",",
+  "encoding": "utf-8",
+  "skip_rows": 20,
+  "header_row": 0,
+  "well_col": "Well",
+  "sample_col": "Sample Name",
+  "columns": [
+    {
+      "source_col": "Well",
+      "field_name": "well",
+      "data_type": "string"
+    },
+    {
+      "source_col": "Well ID",
+      "field_name": "well_id",
+      "data_type": "string"
+    },
+    {
+      "source_col": "Sample Name",
+      "field_name": "sample_name",
+      "data_type": "string"
+    },
+    {
+      "source_col": "Replicate",
+      "field_name": "replicate",
+      "data_type": "integer"
+    },
+    {
+      "source_col": "Conc/Dil",
+      "field_name": "conc_dil",
+      "data_type": "float"
+    },
+    {
+      "source_col": "OD450",
+      "field_name": "od450",
+      "data_type": "float",
+      "unit": "OD"
+    },
+    {
+      "source_col": "OD570",
+      "field_name": "od570",
+      "data_type": "float",
+      "unit": "OD"
+    },
+    {
+      "source_col": "Corrected (450-570)",
+      "field_name": "corr",
+      "data_type": "float",
+      "unit": "OD"
+    }
+  ]
+}
