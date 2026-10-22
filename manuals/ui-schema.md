@@ -28,9 +28,9 @@ Membership is an allow-list in `backend/app/services/ui_schema_catalog.py`, then
 
 | Badge | Tables |
 |-------|--------|
-| **Lab** | samples, containers, contents, tests, results, batches, projects, client_projects, experiments, lims_runs, work_orders, asked_for, routing_map, analyses, analytes, test_batteries, instruments, locations, eln_processes, plus every table created from the Tables tab |
-| **System** | container_types, instrument_types, sample_type_transitions, clients, users, roles |
-| **Not schema tables** | `lists`, `list_entries` (list items), and `units`. Off the Schema screen. Edit lists under **Lists** (`/admin/lists`) and units under **Units** (`/admin/units`). |
+| **Lab** | samples, containers, contents, tests, results, batches, projects, client_projects, experiments, lims_runs, work_orders, asked_for, routing_map, analyses, analytes, test_batteries, instruments, locations, eln_processes, vendors, reagents, reagent_vendors, reagent_lots, reagent_uses, instrument_maintenance_schedules, instrument_maintenance_events, instrument_downtime, instrument_uses, plus every table created from the Tables tab |
+| **System** | container_types, sample_type_transitions, clients, users, roles |
+| **Not schema tables** | `lists`, `list_entries` (list items), and `units`. Off the Schema screen. Edit lists under **Lists** (`/admin/lists`) and units under **Units** (`/admin/units`). Instrument kinds, maintenance kinds, and downtime reasons are lists (`instrument_types`, `maintenance_types`, `downtime_reasons`), not Schema tables. The old `instrument_types` table was renamed `instrument_types_legacy` and is unused (not dropped). |
 | Hidden | Engine internals: `alembic_version`, `revoked_tokens`, `login_throttle`, permission plumbing, the `schema_*` registry, `ui_schema_ddl_log`, legacy field/attribute config tables (`custom_attributes_config`, `field_definitions`, `name_templates`) |
 
 `lists`, `list_entries`, and `units` are in `NOT_SCHEMA_TABLES`, not `SYSTEM_TABLES`. Lab tables other than Samples stay on the browser so side links can be declared over real FKs. A new column on those tables is not offered (`can_add_columns` is true only for `samples` and tables created here) and would not be read back except on Samples.
