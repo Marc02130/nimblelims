@@ -1,6 +1,6 @@
 """Optional per-instrument maintenance tracking.
 
-Revision ID: 0110_instrument_maintenance_tracked
+Revision ID: 0110_maintenance_tracked
 Revises: 0109_instrument_legacy_lock
 
 Marc (2026-10-22): maintenance is optional. Some labs use their own metrology
@@ -8,6 +8,9 @@ system. ``instruments.maintenance_tracked`` is NOT NULL default false.
 Existing rows stay false. The type default lives on
 ``instrument_type_defaults`` (side table, registered in Schema) so
 ``list_entries`` is not widened for every list.
+
+Revision id stays at or under 32 characters because
+``alembic_version.version_num`` is varchar(32).
 
 Revokes only. No new GRANTs. Nothing is dropped.
 """
@@ -21,7 +24,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0110_instrument_maintenance_tracked"
+revision = "0110_maintenance_tracked"
 down_revision = "0109_instrument_legacy_lock"
 branch_labels = None
 depends_on = None
