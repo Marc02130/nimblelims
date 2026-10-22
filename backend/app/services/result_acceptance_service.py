@@ -26,6 +26,11 @@ from models.test import Test
 from models.user import User
 
 
+def _is_failed(run: LimsRun) -> bool:
+    status_value = run.status.value if hasattr(run.status, "value") else str(run.status)
+    return status_value == "failed"
+
+
 def _explicit_replicate(row_data: Dict[str, Any]) -> int:
     for key in ("replicate", "rep", "Replicate", "Rep"):
         if key in row_data and row_data[key] is not None and str(row_data[key]).strip() != "":
@@ -101,6 +106,15 @@ class ResultAcceptanceService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="A reason is required",
             )
+        chosen_run = run if body.accepted_lims_run_id == run.id else other
+        if _is_failed(chosen_run) and not body.override_failed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Accepting a value from a failed or rejected run requires "
+                    "override_failed and a reason"
+                ),
+            )
 
         test = (
             self.db.query(Test)
@@ -137,7 +151,6 @@ class ResultAcceptanceService:
             existing.raw_result = picked.raw_result
             existing.lims_run_id = picked.lims_run_id
             existing.modified_by = user_id
-            existing.entered_by = user_id or existing.entered_by
             existing.entry_date = current_lab_day()
         else:
             if not user_id:
@@ -179,6 +192,7 @@ class ResultAcceptanceService:
                 previous_lims_run_id=previous_run,
                 previous_value=previous_value,
                 reason=reason,
+                override_failed=bool(body.override_failed),
                 active=True,
                 created_by=user_id,
                 modified_by=user_id,

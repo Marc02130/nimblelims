@@ -65,6 +65,33 @@ describe('ValueChoicesPanel', () => {
         replicate: 1,
         accepted_lims_run_id: 'run-new',
         reason: 'Rerun within range',
+        override_failed: false,
+      });
+    });
+  });
+
+  test('a rejected plate needs the override before accept', async () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <ValueChoicesPanel runId="run-new" />
+      </ThemeProvider>
+    );
+    expect(await screen.findByText('IL6-SER-0001')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/Plate 1 \(failed\)/));
+    fireEvent.change(screen.getByLabelText('Reason for IL6-SER-0001'), {
+      target: { value: 'Original plate stands' },
+    });
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Override rejected plate for IL6-SER-0001'));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await waitFor(() => {
+      expect(mockAccept).toHaveBeenCalledWith('run-new', {
+        sample_id: 's1',
+        analyte_id: 'a1',
+        replicate: 1,
+        accepted_lims_run_id: 'run-old',
+        reason: 'Original plate stands',
+        override_failed: true,
       });
     });
   });

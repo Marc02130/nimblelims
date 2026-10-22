@@ -251,10 +251,14 @@ def create_rerun(
 @router.get("/{run_id}/value-choices", response_model=List[ValueChoiceRead])
 def list_value_choices(
     run_id: UUID,
-    service: LimsRunService = Depends(_run_service),
+    db: Session = Depends(get_db),
+    reviewer: User = Depends(require_permission("experiment:publish")),
 ):
-    """Values from this rerun and the run it replaces. Nothing is removed."""
-    return ResultAcceptanceService(service.db, current_user=service.current_user).list_for_run(run_id)
+    """Values from this rerun and the run it replaces. Nothing is removed.
+
+    Same permission as accepting a value: experiment:publish.
+    """
+    return ResultAcceptanceService(db, current_user=reviewer).list_for_run(run_id)
 
 
 @router.post("/{run_id}/value-choices", response_model=ValueChoiceRead)
@@ -264,7 +268,10 @@ def accept_value(
     db: Session = Depends(get_db),
     reviewer: User = Depends(require_permission("experiment:publish")),
 ):
-    """Record which value is accepted. The other value stays on its run."""
+    """Record which value is accepted. The other value stays on its run.
+
+    Same permission as listing choices: experiment:publish.
+    """
     return ResultAcceptanceService(db, current_user=reviewer).accept(run_id, body)
 
 

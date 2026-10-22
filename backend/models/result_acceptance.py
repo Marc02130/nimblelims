@@ -54,6 +54,7 @@ class ResultAcceptance(Base):
     )
     previous_value = Column(Text, nullable=True)
     reason = Column(Text, nullable=False)
+    override_failed = Column(Boolean, nullable=False, server_default="false", default=False)
     active = Column(Boolean, nullable=False, server_default="true", default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(

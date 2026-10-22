@@ -36,7 +36,23 @@ def read_upload_capped(
         except ValueError:
             pass
 
-    content = file.file.read()
+    # Read at most one byte past the cap. Do not read the rest of the body.
+    limit = max_bytes + 1
+    chunks: list[bytes] = []
+    read_total = 0
+    while read_total < limit:
+        chunk = file.file.read(limit - read_total)
+        if not chunk:
+            break
+        if not isinstance(chunk, (bytes, bytearray)):
+            chunk = str(chunk).encode("utf-8")
+        if read_total + len(chunk) > limit:
+            chunk = bytes(chunk[: limit - read_total])
+        else:
+            chunk = bytes(chunk)
+        chunks.append(chunk)
+        read_total += len(chunk)
+    content = b"".join(chunks)
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
