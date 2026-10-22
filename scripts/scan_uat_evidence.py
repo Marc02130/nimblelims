@@ -33,7 +33,9 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   a truncated or length-overflowed chunk, a bad CRC, an
   invalid ``PLTE`` size, a ``tRNS`` that does not fit the
   color type or arrives after ``IDAT``, a duplicate
-  ancillary chunk, an ``sRGB`` intent above 3, a ``pHYs``
+  ``IHDR``, ``PLTE``, or ancillary chunk, an ``sRGB`` /
+  ``gAMA`` / ``cHRM`` / ``pHYs`` after ``PLTE`` or
+  ``IDAT``, an ``sRGB`` intent above 3, a ``pHYs``
   unit above 1, ``iCCP`` (blocked until a real screenshot
   needs it), or an unwalkable PNG that still has IEND plus
   tail. ``tEXt``, ``zTXt``, ``iTXt``, ``eXIf``, and unknown
@@ -108,12 +110,18 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   ``hexdump -C`` lines and 50-column wrapped base64. Octal
   needles escape only bytes ``>= 0x80``. JSON-escape and
   simple tar-escape needles cover ``\\t``, ``\\001`` /
-  ``\\u0001``, and ``\\\\``. Unbalanced quotes in
+  ``\\u0001``, and ``\\\\``. ``json.dumps(secret)[1:-1]``
+  needles use ``ensure_ascii`` both True and False so a
+  JSON ``\\"``, ``\\u00e9``, ``\\u001b``, or tab mixed
+  with ``é`` still hits. One GNU-tar quoting needle uses
+  tar escapes for controls and octal for bytes ``>= 0x80``.
+  Unbalanced quotes in
   ``--secrets-file`` exit 2. A peel that would emit more
   than 65536 escape pieces fail-closed instead of
   materializing a multi-gigabyte pair-run, including when
   no secret is configured. Overlapping configured-secret
-  spans extend rather than drop.
+  spans extend rather than drop. Per-layer secret spans
+  are deduped before the merge sort.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -300,6 +308,9 @@ _PNG_ALLOWED_CHUNKS = frozenset(
 _PNG_ANCILLARY_ONCE = frozenset(
     {b"sRGB", b"pHYs", b"gAMA", b"cHRM", b"tRNS"}
 )
+_PNG_BEFORE_PLTE_IDAT = frozenset({b"sRGB", b"gAMA", b"cHRM", b"pHYs"})
+# Kept for a future iCCP re-allow (Marc: block until a real
+# screenshot needs it). Walk rejects iCCP as unknown today.
 _PNG_ICCP_INFLATE_MAX = 1024 * 1024
 _PNG_CHUNK_SIZES = {
     b"IHDR": 13,
@@ -964,7 +975,7 @@ def _secret_orig_spans(
         for match in _WORD_RE.finditer(text):
             if "\\" in match.group():
                 spans.append((match.start(), match.end(), tag))
-    return spans
+    return _dedupe_spans(spans)
 
 
 def _orig_span(
@@ -1125,10 +1136,21 @@ def _map_orig_spans(
     return mapped
 
 
+def _dedupe_spans(
+    spans: list[tuple[int, int, str]],
+) -> list[tuple[int, int, str]]:
+    """Drop exact duplicate spans before the merge sort."""
+    if len(spans) < 2:
+        return spans
+    return list(dict.fromkeys(spans))
+
+
 def _merge_sorted_spans(
     spans: list[tuple[int, int, str]],
 ) -> list[tuple[int, int, str]]:
-    ordered = sorted(spans, key=lambda item: (item[0], -(item[1] - item[0])))
+    ordered = sorted(
+        _dedupe_spans(spans), key=lambda item: (item[0], -(item[1] - item[0]))
+    )
     kept: list[tuple[int, int, str]] = []
     for start, stop, tag in ordered:
         if kept and start < kept[-1][1]:
@@ -1137,23 +1159,6 @@ def _merge_sorted_spans(
             continue
         kept.append((start, stop, tag))
     return kept
-
-
-def _span_overlaps(
-    kept: list[tuple[int, int, str]],
-    start: int,
-    stop: int,
-    starts: list[int],
-) -> bool:
-    if not kept:
-        return False
-    idx = bisect.bisect_right(starts, start) - 1
-    if idx >= 0 and start < kept[idx][1]:
-        return True
-    nxt = idx + 1
-    if nxt < len(kept) and kept[nxt][0] < stop:
-        return True
-    return False
 
 
 def _replace_mapped_spans(
@@ -1239,6 +1244,33 @@ def _tar_simple_escape_needle(secret: str) -> str:
     return "".join(out)
 
 
+def _gnu_tar_quote_needle(secret: str) -> str:
+    """One GNU-tar quote: tar escapes for controls, octal for bytes >= 0x80."""
+    raw = secret.encode("utf-8", errors="surrogateescape")
+    if not raw:
+        return ""
+    out: list[str] = []
+    changed = False
+    for byte in raw:
+        if byte >= 0x80:
+            out.append(f"\\{byte:03o}")
+            changed = True
+        elif byte in _CTRL_SIMPLE:
+            out.append(_CTRL_SIMPLE[byte])
+            changed = True
+        elif byte == 0x5C:
+            out.append("\\\\")
+            changed = True
+        elif byte < 32 or byte == 127:
+            out.append(f"\\{byte:03o}")
+            changed = True
+        else:
+            out.append(chr(byte))
+    if not changed:
+        return ""
+    return "".join(out)
+
+
 def _secret_needles(secret: str) -> list[str]:
     needles = [secret]
     folded = unicodedata.normalize("NFKC", secret)
@@ -1262,6 +1294,20 @@ def _secret_needles(secret: str) -> list[str]:
     folded_tar = _tar_simple_escape_needle(folded) if folded != secret else ""
     if folded_tar and folded_tar not in needles:
         needles.append(folded_tar)
+    for ensure_ascii in (True, False):
+        dumped = json.dumps(secret, ensure_ascii=ensure_ascii)[1:-1]
+        if dumped and dumped not in needles:
+            needles.append(dumped)
+        if folded != secret:
+            folded_dump = json.dumps(folded, ensure_ascii=ensure_ascii)[1:-1]
+            if folded_dump and folded_dump not in needles:
+                needles.append(folded_dump)
+    tar_quote = _gnu_tar_quote_needle(secret)
+    if tar_quote and tar_quote not in needles:
+        needles.append(tar_quote)
+    folded_quote = _gnu_tar_quote_needle(folded) if folded != secret else ""
+    if folded_quote and folded_quote not in needles:
+        needles.append(folded_quote)
     for base in tuple(needles):
         encoded = quote(base, safe="")
         if encoded and encoded not in needles:
@@ -2078,7 +2124,11 @@ def archive_kind(data: bytes) -> str | None:
 
 
 def _png_iccp_name_ok(name: bytes) -> bool:
-    """PNG iCCP profile name: 1–79 Latin-1 printable, no odd spaces."""
+    """PNG iCCP profile name: 1–79 Latin-1 printable, no odd spaces.
+
+    Kept for a future iCCP re-allow (Marc: block until a real
+    screenshot needs it). The walk rejects iCCP as unknown today.
+    """
     if not (1 <= len(name) <= 79):
         return False
     if any(not (32 <= byte <= 126 or 161 <= byte <= 255) for byte in name):
@@ -2087,7 +2137,11 @@ def _png_iccp_name_ok(name: bytes) -> bool:
 
 
 def _png_zlib_bounded(stream: bytes) -> bool:
-    """True when ``stream`` is a complete zlib payload under the inflate cap."""
+    """True when ``stream`` is a complete zlib payload under the inflate cap.
+
+    Kept for a future iCCP re-allow (Marc: block until a real
+    screenshot needs it).
+    """
     if not stream:
         return False
     decoder = zlib.decompressobj()
@@ -2129,6 +2183,7 @@ def _png_zlib_bounded(stream: bytes) -> bool:
 
 
 def _png_iccp_ok(payload: bytes) -> bool:
+    """Kept for a future iCCP re-allow (Marc: block until a screenshot needs it)."""
     nul = payload.find(b"\x00")
     if nul < 0 or not _png_iccp_name_ok(payload[:nul]):
         return False
@@ -2176,11 +2231,13 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     Magic-plus-bytes reviewed PNGs do not have a complete first chunk
     and stay refuse-binary. Allowed ancillary chunks have fixed
     lengths (``pHYs`` 9, ``gAMA`` 4, ``sRGB`` 1, ``cHRM`` 32).
-    ``PLTE`` must be 3–768 bytes and a multiple of 3. ``tRNS`` must
-    fit the color type and come before ``IDAT``. Duplicate
-    ancillary chunks are rejected. ``sRGB`` intent must be 0–3
-    and the ``pHYs`` unit byte must be 0 or 1. ``iCCP`` is
-    blocked until a real screenshot needs it.
+    ``PLTE`` must be 3–768 bytes and a multiple of 3. ``IHDR``
+    and ``PLTE`` may appear only once. ``tRNS`` must fit the
+    color type and come before ``IDAT``. Duplicate ancillary
+    chunks are rejected. ``sRGB``, ``gAMA``, ``cHRM``, and
+    ``pHYs`` must come before ``PLTE`` and ``IDAT``. ``sRGB``
+    intent must be 0–3 and the ``pHYs`` unit byte must be 0
+    or 1. ``iCCP`` is blocked until a real screenshot needs it.
     """
     if not data.startswith(PNG_MAGIC) or len(data) < 8:
         return False
@@ -2194,6 +2251,7 @@ def _png_disallowed_chunk(data: bytes) -> bool:
         return pos + 12 + first_size <= length
     color_type: int | None = None
     palette_entries = 0
+    seen_ihdr = False
     seen_plte = False
     seen_idat = False
     seen_ancillary: set[bytes] = set()
@@ -2215,10 +2273,15 @@ def _png_disallowed_chunk(data: bytes) -> bool:
             if name in seen_ancillary:
                 return True
             seen_ancillary.add(name)
+        if name in _PNG_BEFORE_PLTE_IDAT and (seen_plte or seen_idat):
+            return True
         if name == b"IHDR":
+            if seen_ihdr:
+                return True
+            seen_ihdr = True
             color_type = payload[9] if size == 13 else None
         elif name == b"PLTE":
-            if size < 3 or size > 768 or size % 3:
+            if seen_plte or size < 3 or size > 768 or size % 3:
                 return True
             seen_plte = True
             palette_entries = size // 3
