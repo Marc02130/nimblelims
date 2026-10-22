@@ -29,7 +29,7 @@ from app.schemas.instrument_catalog import (
 from app.services.instrument_eligibility import instrument_block_reason
 from models.client import Client, Location
 from models.instrument import CroSource, Instrument
-from models.list import List, ListEntry
+from models.list import List as ListModel, ListEntry
 from models.reagent import Vendor
 from models.user import User
 
@@ -49,7 +49,7 @@ def _active_filter(query, model, user: User, db: Session):
 
 
 def _types_list_id(db: Session) -> UUID:
-    row = db.query(List).filter(List.name == "instrument_types").first()
+    row = db.query(ListModel).filter(ListModel.name == "instrument_types").first()
     if row is None:
         raise HTTPException(status_code=500, detail="instrument_types list is not seeded")
     return row.id

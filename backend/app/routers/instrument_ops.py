@@ -47,7 +47,7 @@ from models.instrument import (
     InstrumentMaintenanceSchedule,
     InstrumentUse,
 )
-from models.list import List, ListEntry
+from models.list import List as ListModel, ListEntry
 from models.reagent import Vendor
 from models.user import User
 
@@ -78,7 +78,7 @@ def _commit(db: Session, row, fail: str):
 
 
 def _list_entry(db: Session, list_name: str, entry_id: UUID, label: str) -> ListEntry:
-    lst = db.query(List).filter(List.name == list_name).first()
+    lst = db.query(ListModel).filter(ListModel.name == list_name).first()
     if lst is None:
         raise HTTPException(status_code=500, detail=f"{list_name} list is not seeded")
     row = (
