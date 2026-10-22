@@ -4542,8 +4542,17 @@ def test_octal_needle_via_tar_c(tmp_path, capsys):
     evidence = tmp_path / "evidence"
     evidence.mkdir()
     (evidence / "notes.txt").write_text(f"tar: {octal}: Cannot open\n", encoding="utf-8")
+    secrets_path = tmp_path / "secrets.env"
+    secrets_path.write_text(f"DEV_SEED_ADMIN_PASSWORD={secret}\n", encoding="utf-8")
     code, _out, err = _run(
-        [str(evidence), "--no-allowlist"], capsys, (secret, octal)
+        [
+            str(evidence),
+            "--no-allowlist",
+            "--secrets-file",
+            str(secrets_path),
+        ],
+        capsys,
+        (secret, octal),
     )
     if code != 1 or "configured" not in err:
         raise AssertionError("octal high-byte secret was not a configured hit")
