@@ -1267,7 +1267,4 @@ def _resolve_schedule_body(db, data: dict) -> dict:
             db, Vendor, _first(data, "service_vendor_id", "service_vendor", "vendor")
         ),
     }
-    for key in ("last_done", "next_due", "active"):
-        if key in data:
-            out[key] = data[key]
     return {k: v for k, v in out.items() if v is not None}

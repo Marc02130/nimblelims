@@ -193,8 +193,6 @@ def create_schedule(
         created_by=current_user.id,
         modified_by=current_user.id,
     )
-    if row.last_done is not None and row.next_due is None:
-        row.next_due = row.last_done + timedelta(days=row.interval_days)
     _commit(db, row, "Could not create maintenance schedule")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == row.id).first())
 
@@ -219,8 +217,8 @@ def update_schedule(
             raise HTTPException(status_code=400, detail="Invalid service vendor")
     for k, v in data.items():
         setattr(row, k, v)
-    if "interval_days" in data and row.last_done is not None:
-        row.next_due = row.last_done + timedelta(days=row.interval_days)
+    if "interval_days" in data:
+        recompute_schedule(db, row)
     row.modified_by = current_user.id
     _commit(db, row, "Could not update maintenance schedule")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())

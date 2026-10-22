@@ -476,6 +476,13 @@ def _instrument_schedule(db, user, method: str, path: str, body: dict) -> list[A
     from app.routers.instrument_ops import create_schedule, update_schedule
     from app.schemas.instrument_ops import MaintenanceScheduleCreate, MaintenanceScheduleUpdate
 
+    blocked = {"active", "last_done", "next_due"} & set(body or {})
+    if blocked:
+        raise CannotExpress(
+            "A maintenance schedule's last_done and next_due come from events, "
+            "and active is not set by this configuration run. "
+            "Send interval, kind, and instrument only."
+        )
     if method == "POST" and path == "/v1/instrument-maintenance-schedules":
         created = create_schedule(MaintenanceScheduleCreate.model_validate(body), user, db)
         return [AppliedChange("instrument_schedule", created.kind_name or str(created.id), created.id)]

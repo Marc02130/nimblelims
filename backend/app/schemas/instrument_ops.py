@@ -11,8 +11,6 @@ class MaintenanceScheduleCreate(BaseModel):
     instrument_id: UUID
     kind_id: UUID
     interval_days: int = Field(..., gt=0)
-    last_done: Optional[date] = None
-    next_due: Optional[date] = None
     service_vendor_id: Optional[UUID] = None
     active: bool = True
 
@@ -20,8 +18,6 @@ class MaintenanceScheduleCreate(BaseModel):
 class MaintenanceScheduleUpdate(BaseModel):
     kind_id: Optional[UUID] = None
     interval_days: Optional[int] = Field(None, gt=0)
-    last_done: Optional[date] = None
-    next_due: Optional[date] = None
     service_vendor_id: Optional[UUID] = None
     active: Optional[bool] = None
 

@@ -248,11 +248,23 @@ def test_open_downtime_and_overdue_block(client, admin_h, db_session, test_admin
         json={
             "instrument_id": inst["id"],
             "kind_id": kind["id"],
-            "interval_days": 30,
-            "next_due": str(date.today() - timedelta(days=1)),
+            "interval_days": 1,
         },
     )
     assert sched.status_code == 201, sched.text
+    performed = date.today() - timedelta(days=2)
+    event = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched.json()["id"],
+            "performed_on": str(performed),
+            "performed_by_user_id": str(test_admin_user.id),
+            "passed": True,
+        },
+    )
+    assert event.status_code == 201, event.text
     overdue = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
     assert overdue["allowed"] is False
     assert overdue["code"] == "instrument_overdue"
@@ -346,6 +358,57 @@ def test_passing_event_advances_and_void_recomputes(client, admin_h, test_admin_
     ).json()
     assert recomputed["last_done"] == str(first_day)
     assert recomputed["next_due"] == str(first_day + timedelta(days=10))
+
+
+def test_schedule_create_and_update_ignore_due_fields(client, admin_h):
+    inst = _instrument(client, admin_h)
+    kind = _list_entry(client, admin_h, "maintenance_types", "PM")
+    yesterday = str(date.today() - timedelta(days=1))
+    created = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "kind_id": kind["id"],
+            "interval_days": 30,
+            "last_done": yesterday,
+            "next_due": yesterday,
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["last_done"] is None
+    assert body["next_due"] is None
+    patched = client.patch(
+        f"/v1/instrument-maintenance-schedules/{body['id']}",
+        headers=admin_h,
+        json={"last_done": yesterday, "next_due": yesterday, "interval_days": 14},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["last_done"] is None
+    assert patched.json()["next_due"] is None
+
+
+def test_agent_refuses_schedule_due_and_active_fields():
+    from app.services.configuring_agent_apply import CannotExpress, _instrument_schedule
+
+    path = "/v1/instrument-maintenance-schedules"
+    for extra in (
+        {"last_done": "2020-01-01"},
+        {"next_due": "2020-01-01"},
+        {"active": False},
+    ):
+        body = {"instrument_id": "x", "kind_id": "y", "interval_days": 30, **extra}
+        classified = allow.classify_call("POST", path, body)
+        assert classified.ok is False
+        assert classified.gap
+        assert "events" in classified.gap
+        try:
+            _instrument_schedule(None, None, "POST", path, body)
+        except CannotExpress as exc:
+            assert "events" in exc.gap
+        else:
+            raise AssertionError("apply should refuse last_done, next_due, and active")
 
 
 def test_agent_may_create_instruments_and_schedules_not_events_or_downtime():

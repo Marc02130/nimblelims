@@ -197,6 +197,16 @@ def _body_gap(method: str, path: str, body: Any) -> Optional[str]:
                 "The only container change this run makes is Amount \u2192 0 (retire). "
                 "Send amount 0 and nothing else."
             )
+    if path == "/v1/instrument-maintenance-schedules" or path.startswith(
+        "/v1/instrument-maintenance-schedules/"
+    ):
+        blocked = {"active", "last_done", "next_due"} & set(body)
+        if blocked:
+            return (
+                "A maintenance schedule's last_done and next_due come from events, "
+                "and active is not set by this configuration run. "
+                "Send interval, kind, and instrument only."
+            )
     return None
 
 
