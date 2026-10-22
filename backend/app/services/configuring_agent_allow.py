@@ -44,6 +44,17 @@ REAGENT_LOT_GAP = (
     "(POST /v1/reagent-uses). A lot number or expiry in an SOP is example data."
 )
 _REAGENT_BENCH = ("/v1/reagent-lots", "/v1/reagent-uses")
+INSTRUMENT_BENCH_GAP = (
+    "Instrument maintenance events, downtime and instrument use are recorded at the bench, "
+    "not by this configuration run: log them on the Instruments screen "
+    "(POST /v1/instrument-maintenance-events, POST /v1/instrument-downtime, POST /v1/instrument-uses). "
+    "An instrument serial or asset tag in an SOP is example data."
+)
+_INSTRUMENT_BENCH = (
+    "/v1/instrument-maintenance-events",
+    "/v1/instrument-downtime",
+    "/v1/instrument-uses",
+)
 
 _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/schema/tables$"), "schema_tables", "schema:edit", "table"),
@@ -76,6 +87,10 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/vendors$"), "other", "config:edit", "vendor"),
     ("POST", re.compile(r"^/v1/reagents$"), "other", "config:edit", "reagent"),
     ("POST", re.compile(r"^/v1/reagent-vendors$"), "other", "config:edit", "reagent_vendor"),
+    ("POST", re.compile(r"^/v1/instruments$"), "other", "config:edit", "instrument"),
+    ("PATCH", re.compile(r"^/v1/instruments/[^/]+$"), "other", "config:edit", "instrument"),
+    ("POST", re.compile(r"^/v1/instrument-maintenance-schedules$"), "other", "config:edit", "instrument_schedule"),
+    ("PATCH", re.compile(r"^/v1/instrument-maintenance-schedules/[^/]+$"), "other", "config:edit", "instrument_schedule"),
 )
 
 DROP_DELETE_GAP = (
@@ -200,6 +215,9 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
     for prefix in _REAGENT_BENCH:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, REAGENT_LOT_GAP)
+    for prefix in _INSTRUMENT_BENCH:
+        if path == prefix or path.startswith(prefix + "/"):
+            return Classified(False, "other", None, None, INSTRUMENT_BENCH_GAP)
     for prefix, reason in _OUT_OF_SCOPE:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, reason)

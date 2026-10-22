@@ -26,7 +26,17 @@ from .work_order import RoutingMap, WorkOrder, StepAcceptedSampleType
 from .batch import Batch, BatchContainer
 from .list import List, ListEntry
 from .unit import Unit
-from .instrument import InstrumentType, Instrument, CroSource
+from .instrument import (
+    Instrument,
+    CroSource,
+    InstrumentMaintenanceSchedule,
+    InstrumentMaintenanceEvent,
+    InstrumentDowntime,
+    InstrumentUse,
+    INSTRUMENT_TYPES_LIST_ID,
+    MAINTENANCE_TYPES_LIST_ID,
+    DOWNTIME_REASONS_LIST_ID,
+)
 from .reagent import Vendor, Reagent, ReagentVendor, ReagentLot, ReagentUse
 from .custom_attributes_config import CustomAttributeConfig
 from .help_entry import HelpEntry

@@ -54,6 +54,7 @@ class DataParserService:
             description=p.description,
             instrument_id=p.instrument_id,
             cro_source_id=p.cro_source_id,
+            instrument_type_id=p.instrument_type_id,
             version_group_id=p.version_group_id,
             version=p.version,
             active=p.active,
@@ -62,17 +63,34 @@ class DataParserService:
             analyses=links,
             instrument_name=p.instrument.name if p.instrument else None,
             cro_source_name=p.cro_source.name if p.cro_source else None,
+            instrument_type_name=p.instrument_type.name if p.instrument_type else None,
             created_at=p.created_at,
             modified_at=p.modified_at,
         )
 
-    def _require_source(self, instrument_id, cro_source_id) -> None:
+    def _require_source(self, instrument_id, cro_source_id, instrument_type_id=None) -> None:
+        from models.list import List, ListEntry
+
         if instrument_id:
             if not self.db.query(Instrument).filter(Instrument.id == instrument_id).first():
                 raise HTTPException(400, "Invalid instrument_id")
         if cro_source_id:
             if not self.db.query(CroSource).filter(CroSource.id == cro_source_id).first():
                 raise HTTPException(400, "Invalid cro_source_id")
+        if instrument_type_id:
+            types_list = self.db.query(List).filter(List.name == "instrument_types").first()
+            row = (
+                self.db.query(ListEntry)
+                .filter(
+                    ListEntry.id == instrument_type_id,
+                    ListEntry.list_id == types_list.id if types_list else None,
+                )
+                .first()
+                if types_list
+                else None
+            )
+            if not row:
+                raise HTTPException(400, "Invalid instrument_type_id")
 
     def _require_analyses(self, links: List[ParserAnalysisLink]) -> None:
         for link in links:
@@ -90,6 +108,7 @@ class DataParserService:
         active_only: bool = True,
         instrument_id: Optional[uuid.UUID] = None,
         cro_source_id: Optional[uuid.UUID] = None,
+        instrument_type_id: Optional[uuid.UUID] = None,
         analysis_id: Optional[uuid.UUID] = None,
         version_group_id: Optional[uuid.UUID] = None,
     ) -> List[DataParserRead]:
@@ -97,6 +116,7 @@ class DataParserService:
             joinedload(DataParser.analyses_links),
             joinedload(DataParser.instrument),
             joinedload(DataParser.cro_source),
+            joinedload(DataParser.instrument_type),
         )
         if active_only:
             q = q.filter(DataParser.active.is_(True))
@@ -104,6 +124,8 @@ class DataParserService:
             q = q.filter(DataParser.instrument_id == instrument_id)
         if cro_source_id:
             q = q.filter(DataParser.cro_source_id == cro_source_id)
+        if instrument_type_id:
+            q = q.filter(DataParser.instrument_type_id == instrument_type_id)
         if version_group_id:
             q = q.filter(DataParser.version_group_id == version_group_id)
         if analysis_id:
@@ -118,6 +140,7 @@ class DataParserService:
                 joinedload(DataParser.analyses_links),
                 joinedload(DataParser.instrument),
                 joinedload(DataParser.cro_source),
+                joinedload(DataParser.instrument_type),
             )
             .filter(DataParser.id == parser_id)
             .first()
@@ -128,7 +151,7 @@ class DataParserService:
 
     def create(self, body: DataParserCreate) -> DataParserRead:
         cfg = self._validate_config(body.parser_config)
-        self._require_source(body.instrument_id, body.cro_source_id)
+        self._require_source(body.instrument_id, body.cro_source_id, body.instrument_type_id)
         self._require_analyses(body.analyses)
 
         parser_id = uuid.uuid4()
@@ -139,6 +162,7 @@ class DataParserService:
             description=body.description,
             instrument_id=body.instrument_id,
             cro_source_id=body.cro_source_id,
+            instrument_type_id=body.instrument_type_id,
             version_group_id=group_id,
             version=1,
             active=False,
@@ -188,6 +212,7 @@ class DataParserService:
             description=body.description if body.description is not None else existing.description,
             instrument_id=existing.instrument_id,
             cro_source_id=existing.cro_source_id,
+            instrument_type_id=existing.instrument_type_id,
             version_group_id=version_group_id,
             version=max_v + 1,
             active=False,
@@ -314,12 +339,25 @@ class DataParserService:
         if has_i == has_c:
             raise HTTPException(400, "Exactly one of instrument_id or cro_source_id required")
 
+        instrument = None
+        if instrument_id:
+            instrument = self.db.query(Instrument).filter(Instrument.id == instrument_id).first()
+            if instrument is None:
+                raise HTTPException(400, "Invalid instrument_id")
+
         if parser_id:
             p = self.get(parser_id)
             if not p.active:
                 raise HTTPException(400, "Parser version is not active")
-            if instrument_id and p.instrument_id != instrument_id:
-                raise HTTPException(400, "Parser does not match instrument")
+            if instrument_id:
+                exact = p.instrument_id == instrument_id
+                type_match = (
+                    p.instrument_type_id is not None
+                    and instrument is not None
+                    and p.instrument_type_id == instrument.instrument_type_id
+                )
+                if not exact and not type_match:
+                    raise HTTPException(400, "Parser does not match instrument")
             if cro_source_id and p.cro_source_id != cro_source_id:
                 raise HTTPException(400, "Parser does not match CRO source")
             linked = any(l.analysis_id == analysis_id for l in p.analyses_links)
@@ -337,11 +375,17 @@ class DataParserService:
             )
         )
         if instrument_id:
-            q = q.filter(DataParser.instrument_id == instrument_id)
+            exact = q.filter(DataParser.instrument_id == instrument_id).all()
+            if exact:
+                candidates = exact
+            else:
+                type_id = instrument.instrument_type_id if instrument is not None else None
+                candidates = (
+                    q.filter(DataParser.instrument_type_id == type_id).all() if type_id else []
+                )
         else:
-            q = q.filter(DataParser.cro_source_id == cro_source_id)
+            candidates = q.filter(DataParser.cro_source_id == cro_source_id).all()
 
-        candidates = q.all()
         if not candidates:
             raise HTTPException(
                 400,

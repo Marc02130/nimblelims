@@ -24,6 +24,7 @@ MIGRATION = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "v
 
 
 MIGRATION_0090 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0090_reagent_tracking.py")
+MIGRATION_0106 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0106_instrument_tracking.py")
 
 
 def _migration(path=MIGRATION):
@@ -43,7 +44,12 @@ def _display_set(conn):
 
 def test_frozen_migration_list_matches_the_live_display_rule():
     module = _migration()
+    m0106 = _migration(MIGRATION_0106)
     frozen = {t[0]: (t[1], t[2]) for t in module.TABLES + _migration(MIGRATION_0090).TABLES}
+    for name in getattr(m0106, "REMOVED", ()):
+        frozen.pop(name, None)
+    for t in m0106.TABLES:
+        frozen[t[0]] = (t[1], t[2])
     live = {
         n: (catalog.kind_for(n), catalog.display_name_for(n))
         for n in list(catalog.LAB_TABLES) + list(catalog.SYSTEM_TABLES)

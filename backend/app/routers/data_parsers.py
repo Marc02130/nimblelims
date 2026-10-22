@@ -35,6 +35,7 @@ def list_data_parsers(
     active_only: bool = Query(True),
     instrument_id: Optional[UUID] = None,
     cro_source_id: Optional[UUID] = None,
+    instrument_type_id: Optional[UUID] = None,
     analysis_id: Optional[UUID] = None,
     version_group_id: Optional[UUID] = None,
     svc: DataParserService = Depends(_svc),
@@ -43,6 +44,7 @@ def list_data_parsers(
         active_only=active_only,
         instrument_id=instrument_id,
         cro_source_id=cro_source_id,
+        instrument_type_id=instrument_type_id,
         analysis_id=analysis_id,
         version_group_id=version_group_id,
     )

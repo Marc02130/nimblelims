@@ -660,15 +660,25 @@ class LimsRunService:
 
         import_id = None
         if instrument_id or cro_source_id or parser_id:
+            resolved_instrument = instrument_id
+            if resolved_instrument:
+                from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+                refuse_ineligible_instrument(self.db, resolved_instrument)
             parser = self.data_parser_svc.resolve_for_import(
                 analysis_id=run.analysis_id,
                 instrument_id=instrument_id,
                 cro_source_id=cro_source_id,
                 parser_id=parser_id,
             )
+            resolved_instrument = instrument_id or parser.instrument_id
+            if resolved_instrument:
+                from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+                refuse_ineligible_instrument(self.db, resolved_instrument)
             imp = self._create_import_event(
                 run_id=run_id,
-                instrument_id=instrument_id or parser.instrument_id,
+                instrument_id=resolved_instrument,
                 cro_source_id=cro_source_id or parser.cro_source_id,
                 parser_id=parser.id,
                 filename=filename,
@@ -722,12 +732,21 @@ class LimsRunService:
         if not run.analysis_id:
             raise HTTPException(400, "Run requires analysis_id before import")
 
+        if instrument_id:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, instrument_id)
         parser = self.data_parser_svc.resolve_for_import(
             analysis_id=run.analysis_id,
             instrument_id=instrument_id,
             cro_source_id=cro_source_id,
             parser_id=parser_id,
         )
+        resolved_instrument = instrument_id or parser.instrument_id
+        if resolved_instrument:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, resolved_instrument)
         rows, warnings, _hard = InstrumentDataService(parser.parser_config).parse(
             file_bytes, raise_on_hard=True
         )
@@ -736,7 +755,7 @@ class LimsRunService:
 
         imp = self._create_import_event(
             run_id=run_id,
-            instrument_id=instrument_id or parser.instrument_id,
+            instrument_id=resolved_instrument,
             cro_source_id=cro_source_id or parser.cro_source_id,
             parser_id=parser.id,
             filename=filename,
@@ -821,6 +840,21 @@ class LimsRunService:
         )
         self.db.add(imp)
         self.db.flush()
+        if instrument_id:
+            from app.core.lab_time import current_lab_day
+            from models.instrument import InstrumentUse
+
+            use = InstrumentUse(
+                instrument_id=instrument_id,
+                lims_run_id=run_id,
+                analysis_id=self.get_run(run_id).analysis_id,
+                used_on=current_lab_day(),
+                note="Recorded automatically from import",
+                created_by=self._user_id(),
+                modified_by=self._user_id(),
+            )
+            self.db.add(use)
+            self.db.flush()
         return imp
 
     def get_data_rows(

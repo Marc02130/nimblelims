@@ -196,7 +196,8 @@ class DataParser(Base):
     Versioned declarative parse instructions for instrument or CRO files.
 
     Each row is one immutable version. Logical parser = version_group_id.
-    Exactly one of instrument_id / cro_source_id. At most one active per group.
+    Exactly one of instrument_id / cro_source_id / instrument_type_id.
+    At most one active per group.
     """
     __tablename__ = 'data_parsers'
 
@@ -216,6 +217,12 @@ class DataParser(Base):
         nullable=True,
         index=True,
     )
+    instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('list_entries.id'),
+        nullable=True,
+        index=True,
+    )
     version_group_id = Column(PostgresUUID(as_uuid=True), nullable=False, index=True)
     version = Column(Integer, nullable=False, default=1)
     active = Column(Boolean, nullable=False, default=False)
@@ -226,6 +233,7 @@ class DataParser(Base):
 
     instrument = relationship("Instrument", foreign_keys=[instrument_id])
     cro_source = relationship("CroSource", foreign_keys=[cro_source_id])
+    instrument_type = relationship("ListEntry", foreign_keys=[instrument_type_id])
     analyses_links = relationship(
         "ParserAnalysis",
         back_populates="parser",

@@ -120,6 +120,66 @@ def _install_access_functions(engine):
         conn.commit()
 
 
+def _seed_instrument_tracking_lists(engine) -> None:
+    """Seed the lists 0106 would insert so create_all tests match a migrated DB."""
+    from models.instrument import (
+        DOWNTIME_REASONS_LIST_ID,
+        INSTRUMENT_TYPES_LIST_ID,
+        MAINTENANCE_TYPES_LIST_ID,
+    )
+
+    types = [
+        (INSTRUMENT_TYPES_LIST_ID, "instrument_types", "Instrument kinds",
+         [
+             ("a1000001-0002-4001-8001-000000000001", "Plate reader", "plate_reader"),
+             ("a1000001-0002-4001-8001-000000000002", "qPCR", "qpcr"),
+             ("a1000001-0002-4001-8001-000000000003", "LC-MS", "lc_ms"),
+             ("a1000001-0002-4001-8001-000000000004", "Liquid handler", "liquid_handler"),
+             ("a1000001-0002-4001-8001-000000000005", "Balance", "balance"),
+             ("a1000001-0002-4001-8001-000000000006", "Centrifuge", "centrifuge"),
+         ]),
+        (MAINTENANCE_TYPES_LIST_ID, "maintenance_types", "Instrument maintenance kinds",
+         [
+             ("a1000001-0003-4001-8001-000000000001", "PM", "pm"),
+             ("a1000001-0003-4001-8001-000000000002", "calibration", "calibration"),
+             ("a1000001-0003-4001-8001-000000000003", "qualification", "qualification"),
+         ]),
+        (DOWNTIME_REASONS_LIST_ID, "downtime_reasons", "Why an instrument is down",
+         [
+             ("a1000001-0004-4001-8001-000000000001", "Breakdown", "breakdown"),
+             ("a1000001-0004-4001-8001-000000000002", "Preventive maintenance", "preventive_maintenance"),
+             ("a1000001-0004-4001-8001-000000000003", "Calibration", "calibration_downtime"),
+             ("a1000001-0004-4001-8001-000000000004", "Qualification", "qualification_downtime"),
+             ("a1000001-0004-4001-8001-000000000005", "Facility", "facility"),
+             ("a1000001-0004-4001-8001-000000000006", "Other", "other"),
+         ]),
+    ]
+    with engine.begin() as conn:
+        for list_id, name, description, entries in types:
+            conn.execute(
+                text(
+                    "INSERT INTO lists (id, name, description, active) "
+                    "VALUES (:id, :name, :description, true) "
+                    "ON CONFLICT (id) DO NOTHING"
+                ),
+                {"id": list_id, "name": name, "description": description},
+            )
+            for entry_id, entry_name, code in entries:
+                conn.execute(
+                    text(
+                        "INSERT INTO list_entries (id, name, description, code, active, list_id) "
+                        "VALUES (:id, :name, :name, :code, true, :list_id) "
+                        "ON CONFLICT (id) DO NOTHING"
+                    ),
+                    {
+                        "id": entry_id,
+                        "name": entry_name,
+                        "code": code,
+                        "list_id": list_id,
+                    },
+                )
+
+
 def _install_lab_day_function(engine) -> None:
     """results.entry_date defaults to current_lab_day(), which must exist first."""
     import importlib.util
@@ -149,6 +209,7 @@ def db_engine(pg_container):
     _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
+    _seed_instrument_tracking_lists(engine)
     # Commit UTC so parallel connections see it. db_session also upserts
     # UTC inside the test transaction because some tests commit a delete
     # of this row (test_load_parallel) and later tests must still have a zone.

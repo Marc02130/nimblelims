@@ -79,6 +79,7 @@ def _reject_template_accepted_sample_types(
 
 
 REAGENT_ENTRY_INVALID = "reagent_entry_invalid"
+INSTRUMENT_ENTRY_INVALID = "instrument_entry_invalid"
 
 
 def _stamp_reagent_entries(entries: Any) -> Any:
@@ -94,6 +95,9 @@ def _stamp_reagent_entries(entries: Any) -> Any:
         if stamped.get("entry_type") == "reagent" or stamped.get("predefined_entry_key") == "reagents":
             stamped["entry_type"] = "reagent"
             stamped["predefined_entry_key"] = "reagents"
+        if stamped.get("entry_type") == "instrument" or stamped.get("predefined_entry_key") == "instruments":
+            stamped["entry_type"] = "instrument"
+            stamped["predefined_entry_key"] = "instruments"
         out.append(stamped)
     return out
 
@@ -148,6 +152,59 @@ def _reject_invalid_reagent_entries(
             if row is None or row.active is not True:
                 raise _reagent_entry_invalid(
                     "A Reagent entry lists a reagent that is not an active catalog reagent."
+                )
+
+
+def _instrument_entry_invalid(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"code": INSTRUMENT_ENTRY_INVALID, "message": message},
+    )
+
+
+def _reject_invalid_instrument_entries(
+    db: Session, template_definition: Optional[Dict[str, Any]]
+) -> None:
+    """An Instruments entry names one or more active catalog instruments."""
+    if template_definition is None:
+        return
+    entries = template_definition.get("entries") or []
+    if not isinstance(entries, list):
+        return
+    from models.instrument import Instrument
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("entry_type") != "instrument" and entry.get("predefined_entry_key") != "instruments":
+            continue
+        config = entry.get("config")
+        raw_ids = config.get("allowed_instrument_ids") if isinstance(config, dict) else None
+        if raw_ids is None or not isinstance(raw_ids, list) or len(raw_ids) == 0:
+            raise _instrument_entry_invalid(
+                "An Instruments entry must list at least one instrument from the catalog."
+            )
+        parsed: List[UUID] = []
+        for raw in raw_ids:
+            if raw is None:
+                raise _instrument_entry_invalid(
+                    "An Instruments entry lists a value that is not an instrument id."
+                )
+            try:
+                parsed.append(UUID(str(raw)))
+            except (ValueError, TypeError):
+                raise _instrument_entry_invalid(
+                    "An Instruments entry lists a value that is not an instrument id."
+                )
+        found = {
+            row.id: row
+            for row in db.query(Instrument).filter(Instrument.id.in_(parsed)).all()
+        }
+        for instrument_id in parsed:
+            row = found.get(instrument_id)
+            if row is None or row.active is not True:
+                raise _instrument_entry_invalid(
+                    "An Instruments entry lists an instrument that is not an active catalog instrument."
                 )
 
 
@@ -424,6 +481,7 @@ class ExperimentService:
             )
         definition = _with_aliquot_pair(data.template_definition)
         _reject_invalid_reagent_entries(self.db, definition)
+        _reject_invalid_instrument_entries(self.db, definition)
         t = self.repo.create_template(
             name=data.name,
             description=data.description,
@@ -455,6 +513,7 @@ class ExperimentService:
         if data.template_definition is not None:
             definition = _with_aliquot_pair(data.template_definition)
             _reject_invalid_reagent_entries(self.db, definition)
+            _reject_invalid_instrument_entries(self.db, definition)
             update_kwargs["template_definition"] = definition
         if data.custom_attributes is not None:
             update_kwargs["custom_attributes"] = data.custom_attributes

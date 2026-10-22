@@ -19,16 +19,22 @@ class DataParserCreate(BaseModel):
     description: Optional[str] = None
     instrument_id: Optional[UUID] = None
     cro_source_id: Optional[UUID] = None
+    instrument_type_id: Optional[UUID] = None
     parser_config: ParserConfig
     analyses: List[ParserAnalysisLink] = Field(..., min_length=1)
     activate: bool = False
 
     @model_validator(mode="after")
     def source_xor(self):
-        has_i = self.instrument_id is not None
-        has_c = self.cro_source_id is not None
-        if has_i == has_c:
-            raise ValueError("Exactly one of instrument_id or cro_source_id is required")
+        n = sum(
+            1
+            for v in (self.instrument_id, self.cro_source_id, self.instrument_type_id)
+            if v is not None
+        )
+        if n != 1:
+            raise ValueError(
+                "Exactly one of instrument_id, cro_source_id, or instrument_type_id is required"
+            )
         return self
 
 
@@ -47,6 +53,7 @@ class DataParserRead(BaseModel):
     description: Optional[str]
     instrument_id: Optional[UUID]
     cro_source_id: Optional[UUID]
+    instrument_type_id: Optional[UUID] = None
     version_group_id: UUID
     version: int
     active: bool
@@ -55,6 +62,7 @@ class DataParserRead(BaseModel):
     analyses: List[ParserAnalysisLink] = []
     instrument_name: Optional[str] = None
     cro_source_name: Optional[str] = None
+    instrument_type_name: Optional[str] = None
     created_at: datetime
     modified_at: datetime
 

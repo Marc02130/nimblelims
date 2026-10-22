@@ -306,6 +306,12 @@ def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> 
         return _transition(db, user, body)
     if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors"):
         return _reagent_catalog(db, user, path, body)
+    if path == "/v1/instruments" or path.startswith("/v1/instruments/"):
+        return _instrument_catalog(db, user, method, path, body)
+    if path == "/v1/instrument-maintenance-schedules" or path.startswith(
+        "/v1/instrument-maintenance-schedules/"
+    ):
+        return _instrument_schedule(db, user, method, path, body)
     if path.startswith("/users/"):
         return _user_role(db, user, path, body)
     if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
@@ -452,6 +458,30 @@ def _reagent_catalog(db, user, path: str, body: dict) -> list[AppliedChange]:
         return [AppliedChange("vendor", created.name, created.id)]
     created = create_reagent(ReagentCreate.model_validate(body), user, db)
     return [AppliedChange("reagent", created.name, created.id)]
+
+
+def _instrument_catalog(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+    from app.routers.instrument_catalog import create_instrument, update_instrument
+    from app.schemas.instrument_catalog import InstrumentCreate, InstrumentUpdate
+
+    if method == "POST" and path == "/v1/instruments":
+        created = create_instrument(InstrumentCreate.model_validate(body), user, db)
+        return [AppliedChange("instrument", created.name, created.id)]
+    instrument_id = _uuid_from_path(path)
+    updated = update_instrument(instrument_id, InstrumentUpdate.model_validate(body), user, db)
+    return [AppliedChange("instrument", updated.name, updated.id)]
+
+
+def _instrument_schedule(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+    from app.routers.instrument_ops import create_schedule, update_schedule
+    from app.schemas.instrument_ops import MaintenanceScheduleCreate, MaintenanceScheduleUpdate
+
+    if method == "POST" and path == "/v1/instrument-maintenance-schedules":
+        created = create_schedule(MaintenanceScheduleCreate.model_validate(body), user, db)
+        return [AppliedChange("instrument_schedule", created.kind_name or str(created.id), created.id)]
+    schedule_id = _uuid_from_path(path)
+    updated = update_schedule(schedule_id, MaintenanceScheduleUpdate.model_validate(body), user, db)
+    return [AppliedChange("instrument_schedule", updated.kind_name or str(updated.id), updated.id)]
 
 
 def _transition(db, user, body: dict) -> list[AppliedChange]:

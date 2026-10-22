@@ -50,11 +50,14 @@ LAB_TABLES: tuple[str, ...] = (
     "reagent_vendors",
     "reagent_lots",
     "reagent_uses",
+    "instrument_maintenance_schedules",
+    "instrument_maintenance_events",
+    "instrument_downtime",
+    "instrument_uses",
 )
 
 SYSTEM_TABLES: tuple[str, ...] = (
     "container_types",
-    "instrument_types",
     "sample_type_transitions",
     "clients",
     "users",
@@ -119,8 +122,11 @@ DISPLAY_NAMES: Mapping[str, str] = {
     "reagent_vendors": "Reagent vendors",
     "reagent_lots": "Reagent lots",
     "reagent_uses": "Reagent uses",
+    "instrument_maintenance_schedules": "Instrument maintenance schedules",
+    "instrument_maintenance_events": "Instrument maintenance events",
+    "instrument_downtime": "Instrument downtime",
+    "instrument_uses": "Instrument uses",
     "container_types": "Container types",
-    "instrument_types": "Instrument types",
     "sample_type_transitions": "Sample type transitions",
     "clients": "Clients",
     "users": "Users",

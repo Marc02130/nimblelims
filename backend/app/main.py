@@ -14,7 +14,7 @@ from app.core.lab_time import (
     LabTimezoneUnset,
     require_lab_timezone_on_startup,
 )
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, instrument_ops, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings
 import logging
 
 # S3: refuse missing/default JWT secret unless explicit local insecure flags.
@@ -98,6 +98,11 @@ app.include_router(units.router, prefix="/units", tags=["units"])
 app.include_router(instrument_catalog.instrument_types_router, prefix="/v1")
 app.include_router(instrument_catalog.instruments_router, prefix="/v1")
 app.include_router(instrument_catalog.cro_sources_router, prefix="/v1")
+app.include_router(instrument_ops.schedules_router, prefix="/v1")
+app.include_router(instrument_ops.events_router, prefix="/v1")
+app.include_router(instrument_ops.downtime_router, prefix="/v1")
+app.include_router(instrument_ops.uses_router, prefix="/v1")
+app.include_router(instrument_ops.experiment_instruments_router, prefix="/v1")
 app.include_router(reagents.vendors_router, prefix="/v1")
 app.include_router(reagents.reagents_router, prefix="/v1")
 app.include_router(reagents.reagent_vendors_router, prefix="/v1")
