@@ -1332,3 +1332,44 @@ def test_verify_nons_pace_backslash_name_is_fast(tmp_path):
         raise AssertionError("configured secret leaked from small tgz verify")
     if verified.returncode != 2:
         raise AssertionError("small no-space-backslash tgz did not fail verify")
+
+
+def test_verify_json_dumps_and_gnu_tar_needles_leave_no_8gram(tmp_path):
+    shapes = (
+        ("quote", '"'),
+        ("eacute", "\u00e9"),
+        ("esc", "\x1b"),
+        ("tab-eacute", "\t\u00e9"),
+    )
+    for label, marker in shapes:
+        secret = _runtime_env_secret(marker)
+        ascii_json = json.dumps(secret, ensure_ascii=True)[1:-1]
+        tar_quote = scan._gnu_tar_quote_needle(secret)
+        archive = tmp_path / f"{label}.tgz"
+        _crafted_hardlink_tgz(archive, f"round/{secret}", "round/missing-target")
+        env = os.environ.copy()
+        env["DEV_SEED_ADMIN_PASSWORD"] = secret
+        env["LC_ALL"] = "C"
+        env["LANG"] = "C"
+        verified = subprocess.run(
+            ["python3", str(PACK), "--verify", str(archive), "--no-allowlist"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        shown = verified.stdout + verified.stderr
+        for source in (secret, ascii_json, tar_quote):
+            if not source:
+                continue
+            if len(source) < 8:
+                if source in shown:
+                    raise AssertionError("configured secret leaked on --verify")
+                continue
+            for index in range(len(source) - 7):
+                if source[index : index + 8] in shown:
+                    raise AssertionError("configured secret 8-gram leaked on --verify")
+        if verified.returncode != 2:
+            raise AssertionError("crafted dumps/tar-quoted pack did not fail verify")
+        if "<redacted name hmac:" not in verified.stderr:
+            raise AssertionError("tar stderr was not redacted")

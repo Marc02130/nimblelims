@@ -4917,3 +4917,148 @@ def test_hexdump_c_unwrap_is_linear_time():
         raise AssertionError("large hexdump -C unwrap missed the JWT")
     if small_elapsed > 0 and large_elapsed / small_elapsed > 8.0:
         raise AssertionError("hexdump -C unwrap exceeded 8x from 256 to 1024 copies")
+
+
+def test_json_dumps_and_gnu_tar_needles(tmp_path, capsys):
+    shapes = (
+        ("quote", '"'),
+        ("eacute", "\u00e9"),
+        ("esc", "\x1b"),
+        ("tab-eacute", "\t\u00e9"),
+    )
+    for label, marker in shapes:
+        secret = _runtime_env_secret(marker)
+        ascii_json = json.dumps(secret, ensure_ascii=True)[1:-1]
+        raw_json = json.dumps(secret, ensure_ascii=False)[1:-1]
+        tar_quote = scan._gnu_tar_quote_needle(secret)
+        needles = scan._secret_needles(secret)
+        if ascii_json not in needles or raw_json not in needles:
+            raise AssertionError("json.dumps needle was not registered")
+        if tar_quote and tar_quote not in needles:
+            raise AssertionError("GNU-tar quoting needle was not registered")
+        for form in (ascii_json, raw_json, tar_quote):
+            if not form:
+                continue
+            hits = scan.scan_text(("notes.txt",), form + "\n", (secret,))
+            shown_hits = "\n".join(hit.format() for hit in hits)
+            _assert_no_secret_grams(shown_hits, secret)
+            if not any(hit.kind == scan.KIND_CONFIGURED for hit in hits):
+                raise AssertionError("scan_text missed a dumps/tar-quoted secret")
+            shown = scan.redact_text(form, (secret,))
+            _assert_no_secret_grams(shown, secret)
+            if len(form) >= 8:
+                for index in range(len(form) - 7):
+                    if form[index : index + 8] in shown:
+                        raise AssertionError("escaped secret 8-gram leaked")
+        evidence = tmp_path / f"ev-{label}-{uuid.uuid4().hex[:8]}"
+        evidence.mkdir()
+        (evidence / "notes.txt").write_text(ascii_json + "\n", encoding="utf-8")
+        secrets_path = tmp_path / f"secrets-{evidence.name}.env"
+        secrets_path.write_text(
+            f"DEV_SEED_ADMIN_PASSWORD='{secret}'\n", encoding="utf-8"
+        )
+        code, out, err = _run(
+            [
+                str(evidence),
+                "--no-allowlist",
+                "--secrets-file",
+                str(secrets_path),
+            ],
+            capsys,
+            (secret, ascii_json),
+        )
+        if code != 1 or "configured" not in err:
+            raise AssertionError("JSON-dumped secret was not a configured hit")
+        _assert_no_secret_grams(out + err, secret)
+
+
+def test_png_duplicate_ihdr_and_plte_are_blocked(tmp_path, capsys):
+    dup_ihdr = _png_file(2, _png_chunk(b"IHDR", _ihdr_data(2)))
+    _assert_png_scan(tmp_path, capsys, dup_ihdr, ok=False)
+    dup_plte = _png_file(
+        3,
+        _png_chunk(b"PLTE", b"\x00\x01\x02"),
+        _png_chunk(b"PLTE", b"\x03\x04\x05"),
+    )
+    _assert_png_scan(tmp_path, capsys, dup_plte, ok=False)
+
+
+def test_png_color_chunks_after_plte_or_idat_are_blocked(tmp_path, capsys):
+    phys = (2835).to_bytes(4, "big") + (2835).to_bytes(4, "big") + b"\x01"
+    extras = (
+        (b"sRGB", b"\x00"),
+        (b"gAMA", (45455).to_bytes(4, "big")),
+        (b"cHRM", b"\x00" * 32),
+        (b"pHYs", phys),
+    )
+    for name, data in extras:
+        after_plte = _png_file(
+            3,
+            _png_chunk(b"PLTE", b"\x00\x01\x02"),
+            _png_chunk(name, data),
+        )
+        _assert_png_scan(tmp_path, capsys, after_plte, ok=False)
+        after_idat = _png_file(
+            2,
+            _png_chunk(b"IDAT", b"\x00"),
+            _png_chunk(name, data),
+        )
+        _assert_png_scan(tmp_path, capsys, after_idat, ok=False)
+
+
+def test_png_iccp_helpers_stay_covered():
+    """Unit-cover kept iCCP helpers so they are not untested dead code."""
+    if not scan._png_iccp_name_ok(b"ICC Profile"):
+        raise AssertionError("valid iCCP name was rejected")
+    if scan._png_iccp_name_ok(b" leading"):
+        raise AssertionError("leading-space iCCP name was accepted")
+    if scan._png_iccp_name_ok(b"A" * 80):
+        raise AssertionError("80-byte iCCP name was accepted")
+    if scan._png_iccp_name_ok(b"has  two"):
+        raise AssertionError("double-space iCCP name was accepted")
+    if not scan._png_iccp_ok(_iccp_payload()):
+        raise AssertionError("valid iCCP payload was rejected")
+    if scan._png_iccp_ok(_iccp_payload(name=b" leading")):
+        raise AssertionError("bad iCCP name payload was accepted")
+    if scan._png_iccp_ok(_iccp_payload(method=1)):
+        raise AssertionError("non-zero iCCP method was accepted")
+    bomb = _iccp_payload(raw=b"\x00" * (scan._PNG_ICCP_INFLATE_MAX + 1))
+    if scan._png_iccp_ok(bomb):
+        raise AssertionError("iCCP inflate bomb was accepted")
+    truncated = b"ICC Profile\x00\x00" + zlib.compress(b"hello")[:-4]
+    if scan._png_iccp_ok(truncated):
+        raise AssertionError("truncated iCCP zlib was accepted")
+    if not scan._png_zlib_bounded(zlib.compress(b"icc")):
+        raise AssertionError("bounded zlib helper rejected a clean stream")
+    if scan._png_zlib_bounded(zlib.compress(b"hello")[:-4]):
+        raise AssertionError("bounded zlib helper accepted a truncated stream")
+
+
+def test_first_layer_past_piece_bound_is_not_peeled_again(monkeypatch):
+    calls = {"n": 0}
+    real = scan._map_unescape_once
+
+    def counted(text: str):
+        calls["n"] += 1
+        return real(text)
+
+    monkeypatch.setattr(scan, "_map_unescape_once", counted)
+    blob = "\\" * (2 * scan._UNESCAPE_PIECE_BOUND + 4)
+    layers = scan._unescape_layers(blob)
+    if calls["n"] != 1:
+        raise AssertionError("first layer past the bound was peeled again")
+    if len(layers) != 1:
+        raise AssertionError("over-bound first layer produced extra peels")
+
+
+def test_per_layer_secret_spans_are_deduped():
+    secret = "seed" + uuid.uuid4().hex[:12]
+    text = f"pre {secret} post"
+    spans = scan._secret_orig_spans(text, (secret,))
+    if not spans:
+        raise AssertionError("plain configured secret produced no spans")
+    if len(spans) != len(set(spans)):
+        raise AssertionError("per-layer secret spans were not deduped")
+    merged = scan._merge_sorted_spans(spans + spans)
+    if len(merged) != 1:
+        raise AssertionError("deduped merge did not collapse to one span")
