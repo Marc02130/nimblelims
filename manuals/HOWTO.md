@@ -49,10 +49,12 @@ Received, due, test, review, report, entry, sampled, and batch or project start 
 
 1. Set sticky **sample type** and **project**. Session-sticky; they stay after each commit.
 2. Scan or type the **primary barcode**. Optionally **Add** more barcodes for the **same** sample (more tubes, not aliquots). **Marc lock:** that second blood tube **may** carry its **own asked-for and own route** (equivalent aliquot / extra container on the same Sample). **Leadership Confirm:** two blood tubes → two process assignments (`container_id`); ELISA route and WGS/extract stay apart. Do not teach both tubes as one asked-for.
-3. Optional temperature and client sample ID.
-4. **Receive**. Toast. Barcodes clear. Focus returns to primary.
+3. Optional temperature, client sample ID, **collection date**, **volume (µL)**, **condition**, and **thaw count**. Collection date is the calendar day the sample was drawn and cannot be a future day. Volume and thaw count are zero or greater. Leave a field blank to omit it.
+4. **Receive**. Toast. Barcodes and those receipt fields clear. Sticky type, project, and container type stay. Focus returns to primary. A refused receive keeps what was typed.
 
 **Happy path = stay on `/receive` and scan the next tube.** The loop ends on the form. Nothing else is owed at the bench: the sample is **Available for Testing** and waits. Do not send the tech to Asked-for after a commit.
+
+**Receipt fields:** collection date is `date_sampled`. Volume, condition, and thaw count are `volume_ul`, `receipt_condition`, and `thaw_count` on the sample. They are sent on `POST /samples/receive`. When a receive layout exists (Tables & forms, screen `receive`), writable fields on that layout that are not already on this form appear under the built-in fields and are sent as `extra_fields`. With no saved layout, only the built-in fields show.
 
 **One transaction:** Sample + first vessel (and any additional vessels) + Contents. Lab sample ID comes from the name template — **no sample-ID field**. Tube barcode is `containers.name`. Status is **Available for Testing**.
 
@@ -171,6 +173,10 @@ The execute substrate is already in the app. Requested analysis does **not** ope
 | **Experiments** → Experiment Templates (`/experiments/templates`) | Template authoring. Same permission. |
 | **Experiments** → Processes (`/experiments/processes`) | ELN process **definitions** and **instances**. Assign samples (Samples list → **Assign to process**, or on the process). Start a step (Experiment or lazy LimsRun). |
 | **Experiments** → Runs (`/runs`) | **LIMS Runs** (not ELN Experiments): create/start/import/review/publish. Every run has an **analysis**. |
+
+**Import, reject, and rerun:** On a running run, or a CRO run in results received, **Import** on the run page picks an active parser for that analysis and uploads the reader file (`POST /v1/lims-runs/{id}/import-file`). The parser also needs its instrument or CRO source; the dialog sends the one stored on the parser. The parser's sample column (Gen5 exports use **Sample Name**) is matched to the client sample ID, then to the sample name. Rows that do not match stay on the Data tab with the reason. They are not dropped. **Publish** writes a result only for a linked row whose column matches an analyte name or alias. Plate math (4PL curve, back-calculated concentration, duplicate CV, kit QC ranges, LLOQ/ULOQ) is not in this build. Alias the column that should be stored, such as `corr`, until that calculation ships.
+
+**Reject plate** is available while the run is running, results received, or complete. A reason is required. Status becomes **failed**, `rejected_at` is set, and every imported row stays. Nothing is deleted. When one QC level fails, the whole plate is rejected and every sample on it is rerun. **Create rerun** (any run that is not still a draft) makes a new draft with the same template, analysis, and cohort, and sets `replaces_run_id` to this run. Start that rerun so the existing Tests are reused, import the new file, and publish. If the replaced run already owns the result, publish holds that slot instead of returning 409. On the rerun overview, **Accepted value** lists both values. A reviewer with `experiment:publish` picks one and gives a reason. The result row shows the accepted value. The other value stays on `result_acceptances` and in the import. A later pick marks the earlier choice inactive.
 
 Deeper handbooks: [processes.md](processes.md), [experiments.md](experiments.md), [lims-runs.md](lims-runs.md).
 

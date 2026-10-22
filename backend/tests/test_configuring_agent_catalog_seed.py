@@ -24,6 +24,7 @@ MIGRATION = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "v
 
 
 MIGRATION_0090 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0090_reagent_tracking.py")
+MIGRATION_0107 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0107_elisa_run_gaps.py")
 
 
 def _migration(path=MIGRATION):
@@ -43,7 +44,12 @@ def _display_set(conn):
 
 def test_frozen_migration_list_matches_the_live_display_rule():
     module = _migration()
-    frozen = {t[0]: (t[1], t[2]) for t in module.TABLES + _migration(MIGRATION_0090).TABLES}
+    frozen = {
+        t[0]: (t[1], t[2])
+        for t in module.TABLES
+        + _migration(MIGRATION_0090).TABLES
+        + _migration(MIGRATION_0107).TABLES
+    }
     live = {
         n: (catalog.kind_for(n), catalog.display_name_for(n))
         for n in list(catalog.LAB_TABLES) + list(catalog.SYSTEM_TABLES)
@@ -140,9 +146,13 @@ def test_downgrade_removes_only_its_rows_and_upgrade_restores_them(migrated_engi
     from alembic.runtime.migration import MigrationContext
 
     module = _migration()
-    # 0090 registers the reagent tables with the same helpers; include them so
+    # 0090 and 0107 register later tables with the same helpers; include them so
     # the round trip covers every catalog row on a fresh DB.
-    module.TABLES = module.TABLES + _migration(MIGRATION_0090).TABLES
+    module.TABLES = (
+        module.TABLES
+        + _migration(MIGRATION_0090).TABLES
+        + _migration(MIGRATION_0107).TABLES
+    )
     with migrated_engine.connect() as conn:
         transaction = conn.begin()
         try:
