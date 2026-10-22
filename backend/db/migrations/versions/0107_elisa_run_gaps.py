@@ -17,7 +17,7 @@ result_acceptances is registered in the Schema catalog the same way 0089
 registers a lab table. New columns on samples and lims_runs are added to the
 existing catalog rows so the column list matches Postgres.
 
-This revision revises 0105. After merge, 0106_instrument_tracking revises this
+This revision revises 0105. After merge, 0108_instrument_tracking revises this
 revision so the chain is a single head.
 """
 from __future__ import annotations

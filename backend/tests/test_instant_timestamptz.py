@@ -275,7 +275,7 @@ def _expect_date(conn, table: str, column: str, row_id) -> None:
 
 
 def _instant_names(conn, names: set[str]) -> set[str]:
-    """0106 renames instrument_types; 0102's frozen list still uses the old name."""
+    """0108 renames instrument_types; 0102's frozen list still uses the old name."""
     tables = {
         row[0]
         for row in conn.execute(

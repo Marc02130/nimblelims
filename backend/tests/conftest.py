@@ -121,7 +121,7 @@ def _install_access_functions(engine):
 
 
 def _seed_instrument_tracking_lists(engine) -> None:
-    """Seed the lists 0106 would insert so create_all tests match a migrated DB."""
+    """Seed the lists 0108 would insert so create_all tests match a migrated DB."""
     from models.instrument import (
         DOWNTIME_REASONS_LIST_ID,
         INSTRUMENT_TYPES_LIST_ID,
