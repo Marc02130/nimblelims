@@ -29,9 +29,14 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   text (including ``LZIP`` and ``Rar!`` in UTF-8 text)
 - bytes after the IEND chunk of a PNG, a chunk outside the
   reviewed allowlist (``IHDR``, ``PLTE``, ``IDAT``, ``IEND``,
-  ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``), a truncated or
-  length-overflowed chunk, a bad CRC, an invalid ``PLTE``
-  size, or an unwalkable PNG that still has IEND plus tail.
+  ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``, ``tRNS``, ``iCCP``),
+  a truncated or length-overflowed chunk, a bad CRC, an
+  invalid ``PLTE`` size, a ``tRNS`` that does not fit the
+  color type or arrives after ``IDAT``, an ``iCCP`` that
+  fails name / method / bounded-zlib / placement checks, or
+  an unwalkable PNG that still has IEND plus tail. ``tEXt``,
+  ``zTXt``, ``iTXt``, ``eXIf``, and unknown chunks stay
+  blocked.
   The first chunk must be ``IHDR`` before the file is walked
   as a chunk stream so reviewed magic-plus-bytes PNGs stay
   refuse-binary. A backslash-dot is a tar escape. Compact
@@ -271,8 +276,20 @@ _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
 _DIGIT_RE = re.compile(r"[0-9]")
 _PNG_ALLOWED_CHUNKS = frozenset(
-    {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"sRGB", b"pHYs", b"gAMA", b"cHRM"}
+    {
+        b"IHDR",
+        b"PLTE",
+        b"IDAT",
+        b"IEND",
+        b"sRGB",
+        b"pHYs",
+        b"gAMA",
+        b"cHRM",
+        b"tRNS",
+        b"iCCP",
+    }
 )
+_PNG_ICCP_INFLATE_MAX = 1024 * 1024
 _PNG_CHUNK_SIZES = {
     b"IHDR": 13,
     b"sRGB": 1,
@@ -2000,6 +2017,79 @@ def archive_kind(data: bytes) -> str | None:
     return None
 
 
+def _png_iccp_name_ok(name: bytes) -> bool:
+    """PNG iCCP profile name: 1–79 Latin-1 printable, no odd spaces."""
+    if not (1 <= len(name) <= 79):
+        return False
+    if any(not (32 <= byte <= 126 or 161 <= byte <= 255) for byte in name):
+        return False
+    return name[0] != 32 and name[-1] != 32 and b"  " not in name
+
+
+def _png_zlib_bounded(stream: bytes) -> bool:
+    """True when ``stream`` is a complete zlib payload under the inflate cap."""
+    if not stream:
+        return False
+    decoder = zlib.decompressobj()
+    produced = 0
+    offset = 0
+    try:
+        while offset < len(stream) and not decoder.eof:
+            room = _PNG_ICCP_INFLATE_MAX - produced
+            if room <= 0:
+                return False
+            chunk = stream[offset : offset + 4096]
+            offset += len(chunk)
+            out = decoder.decompress(chunk, max_length=room)
+            produced += len(out)
+            if produced > _PNG_ICCP_INFLATE_MAX:
+                return False
+            while decoder.unconsumed_tail and not decoder.eof:
+                room = _PNG_ICCP_INFLATE_MAX - produced
+                if room <= 0:
+                    return False
+                more = decoder.decompress(decoder.unconsumed_tail, max_length=room)
+                if not more:
+                    return False
+                produced += len(more)
+                if produced > _PNG_ICCP_INFLATE_MAX:
+                    return False
+        if not decoder.eof:
+            room = _PNG_ICCP_INFLATE_MAX - produced
+            if room <= 0:
+                return False
+            produced += len(decoder.decompress(b"", max_length=room))
+        return bool(
+            decoder.eof
+            and produced <= _PNG_ICCP_INFLATE_MAX
+            and not decoder.unused_data
+        )
+    except zlib.error:
+        return False
+
+
+def _png_iccp_ok(payload: bytes) -> bool:
+    nul = payload.find(b"\x00")
+    if nul < 0 or not _png_iccp_name_ok(payload[:nul]):
+        return False
+    rest = payload[nul + 1 :]
+    if not rest or rest[0] != 0:
+        return False
+    return _png_zlib_bounded(rest[1:])
+
+
+def _png_trns_ok(
+    color_type: int, size: int, seen_plte: bool, palette_entries: int
+) -> bool:
+    if color_type == 0:
+        return size == 2
+    if color_type == 2:
+        return size == 6
+    if color_type == 3:
+        return seen_plte and 1 <= size <= palette_entries
+    return False
+
+
 def _png_walked_iend_end(data: bytes) -> int:
     """End offset of the IEND chunk reached by walking lengths; -1 if not."""
     if not data.startswith(PNG_MAGIC) or len(data) < 16:
@@ -2026,7 +2116,10 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     Magic-plus-bytes reviewed PNGs do not have a complete first chunk
     and stay refuse-binary. Allowed ancillary chunks have fixed
     lengths (``pHYs`` 9, ``gAMA`` 4, ``sRGB`` 1, ``cHRM`` 32).
-    ``PLTE`` must be 3–768 bytes and a multiple of 3.
+    ``PLTE`` must be 3–768 bytes and a multiple of 3. ``tRNS`` must
+    fit the color type and come before ``IDAT``. ``iCCP`` needs a
+    valid name, method 0, a bounded zlib profile, and must appear
+    before ``PLTE``/``IDAT``, at most once, and not with ``sRGB``.
     """
     if not data.startswith(PNG_MAGIC) or len(data) < 8:
         return False
@@ -2038,6 +2131,12 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     first_size = int.from_bytes(data[pos : pos + 4], "big")
     if first_name != b"IHDR":
         return pos + 12 + first_size <= length
+    color_type: int | None = None
+    palette_entries = 0
+    seen_plte = False
+    seen_idat = False
+    seen_iccp = False
+    seen_srgb = False
     while pos + 12 <= length:
         size = int.from_bytes(data[pos : pos + 4], "big")
         if pos + 12 + size > length:
@@ -2052,8 +2151,30 @@ def _png_disallowed_chunk(data: bytes) -> bool:
         want = _PNG_CHUNK_SIZES.get(name)
         if want is not None and size != want:
             return True
-        if name == b"PLTE" and (size < 3 or size > 768 or size % 3):
-            return True
+        if name == b"IHDR":
+            color_type = payload[9] if size == 13 else None
+        elif name == b"PLTE":
+            if size < 3 or size > 768 or size % 3:
+                return True
+            seen_plte = True
+            palette_entries = size // 3
+        elif name == b"IDAT":
+            seen_idat = True
+        elif name == b"tRNS":
+            if seen_idat or color_type is None:
+                return True
+            if not _png_trns_ok(color_type, size, seen_plte, palette_entries):
+                return True
+        elif name == b"iCCP":
+            if seen_iccp or seen_srgb or seen_plte or seen_idat:
+                return True
+            if not _png_iccp_ok(payload):
+                return True
+            seen_iccp = True
+        elif name == b"sRGB":
+            if seen_iccp:
+                return True
+            seen_srgb = True
         pos += 12 + size
         if name == b"IEND":
             return False
