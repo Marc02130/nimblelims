@@ -29,14 +29,15 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   text (including ``LZIP`` and ``Rar!`` in UTF-8 text)
 - bytes after the IEND chunk of a PNG, a chunk outside the
   reviewed allowlist (``IHDR``, ``PLTE``, ``IDAT``, ``IEND``,
-  ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``, ``tRNS``, ``iCCP``),
+  ``sRGB``, ``pHYs``, ``gAMA``, ``cHRM``, ``tRNS``),
   a truncated or length-overflowed chunk, a bad CRC, an
   invalid ``PLTE`` size, a ``tRNS`` that does not fit the
-  color type or arrives after ``IDAT``, an ``iCCP`` that
-  fails name / method / bounded-zlib / placement checks, or
-  an unwalkable PNG that still has IEND plus tail. ``tEXt``,
-  ``zTXt``, ``iTXt``, ``eXIf``, and unknown chunks stay
-  blocked.
+  color type or arrives after ``IDAT``, a duplicate
+  ancillary chunk, an ``sRGB`` intent above 3, a ``pHYs``
+  unit above 1, ``iCCP`` (blocked until a real screenshot
+  needs it), or an unwalkable PNG that still has IEND plus
+  tail. ``tEXt``, ``zTXt``, ``iTXt``, ``eXIf``, and unknown
+  chunks stay blocked.
   The first chunk must be ``IHDR`` before the file is walked
   as a chunk stream so reviewed magic-plus-bytes PNGs stay
   refuse-binary. A backslash-dot is a tar escape. Compact
@@ -103,11 +104,16 @@ Exit 0 when the tree is clean. Exit 1 and list hits when it finds any of:
   ``re.finditer`` pass. A compact ``YYYYMMDDThhmm[ss][Z]``
   substring is not a password-pool hit. Wrapped 76-column
   standard base64, PEM, and MIME bodies decode to a JWT.
-  xxd default, ``-p``, and ``-g1`` hex dumps join. Octal
-  needles escape only bytes ``>= 0x80``. Unbalanced quotes
-  in ``--secrets-file`` exit 2. A peel that would emit more
+  xxd default, ``-p``, and ``-g1`` hex dumps join, as do
+  ``hexdump -C`` lines and 50-column wrapped base64. Octal
+  needles escape only bytes ``>= 0x80``. JSON-escape and
+  simple tar-escape needles cover ``\\t``, ``\\001`` /
+  ``\\u0001``, and ``\\\\``. Unbalanced quotes in
+  ``--secrets-file`` exit 2. A peel that would emit more
   than 65536 escape pieces fail-closed instead of
-  materializing a multi-gigabyte pair-run.
+  materializing a multi-gigabyte pair-run, including when
+  no secret is configured. Overlapping configured-secret
+  spans extend rather than drop.
   A JWT line, including a ``%2E``/``%252E``-encoded token, is
   a jwt hit and not a pool hit.
 - an unreadable directory or file
@@ -268,9 +274,12 @@ _JWT_DOT_ESCAPE_RE = re.compile(
 )
 _XXD_OFFSET_RE = re.compile(r"^[ \t]*[0-9a-fA-F]{4,}:[ \t]+(.*)$")
 _XXD_PLAIN_RE = re.compile(r"^[0-9a-fA-F]{16,}$")
+_HEXDUMP_C_RE = re.compile(
+    r"^[ \t]*[0-9a-fA-F]{5,}[ \t]{2}((?:[0-9a-fA-F]{2}[ \t]+)+)\|"
+)
 _PEM_FENCE_RE = re.compile(r"^-----BEGIN |^-----END ")
 _WRAP_TOKEN_RE = re.compile(r"[A-Za-z0-9+/_=.-]+")
-_WRAP_WIDTHS = frozenset({60, 64, 72, 76})
+_WRAP_WIDTHS = frozenset({50, 60, 64, 72, 76})
 _NEEDS_DECODE_RE = re.compile(r"[%\\\u0080-\U0010ffff]")
 _UPPER_RE = re.compile(r"[A-Z]")
 _LOWER_RE = re.compile(r"[a-z]")
@@ -286,8 +295,10 @@ _PNG_ALLOWED_CHUNKS = frozenset(
         b"gAMA",
         b"cHRM",
         b"tRNS",
-        b"iCCP",
     }
+)
+_PNG_ANCILLARY_ONCE = frozenset(
+    {b"sRGB", b"pHYs", b"gAMA", b"cHRM", b"tRNS"}
 )
 _PNG_ICCP_INFLATE_MAX = 1024 * 1024
 _PNG_CHUNK_SIZES = {
@@ -489,7 +500,7 @@ def _join_tar_newlines(text: str) -> str:
 
 
 def _unwrap_wrapped_encodings(text: str) -> str:
-    """Join wrapped base64/base64url (60/64/72/76), PEM bodies, and xxd hex."""
+    """Join wrapped base64/base64url (50/60/64/72/76), PEM, xxd, and hexdump -C."""
     if "\n" not in text and "\r" not in text:
         return text
     lines = text.splitlines()
@@ -536,6 +547,19 @@ def _unwrap_wrapped_encodings(text: str) -> str:
             hex_part = xxd.group(1).split("  ", 1)[0]
             digits = "".join(
                 char for char in hex_part if char in "0123456789abcdefABCDEF"
+            )
+            if len(digits) >= 2 and len(digits) % 2 == 0:
+                xxd_bytes.extend(bytes.fromhex(digits))
+            continue
+        hexdump_c = _HEXDUMP_C_RE.match(line)
+        if hexdump_c is not None:
+            flush()
+            if xxd_plain:
+                flush_xxd()
+            digits = "".join(
+                char
+                for char in hexdump_c.group(1)
+                if char in "0123456789abcdefABCDEF"
             )
             if len(digits) >= 2 and len(digits) % 2 == 0:
                 xxd_bytes.extend(bytes.fromhex(digits))
@@ -918,16 +942,18 @@ def _secret_orig_spans(
     A tar-escaped ``\\\\`` plus hex that looks like octal must match
     the first unescaped layer, before a later octal peel. Every
     layer is searched; leftover escapes after ``_UNESCAPE_BOUND``
-    peels fail-closed on the original backslash run.
+    peels or ``_UNESCAPE_PIECE_BOUND`` pieces fail-closed on the
+    original backslash run even when no secret is configured.
     """
     spans = list(_iter_secret_spans(text, secrets))
-    if "\\" not in text or not secrets:
+    if "\\" not in text:
         return spans
     layers = _unescape_layers(text)
-    for prepared, pieces in layers:
-        spans.extend(
-            _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
-        )
+    if secrets:
+        for prepared, pieces in layers:
+            spans.extend(
+                _map_orig_spans(pieces, _iter_secret_spans(prepared, secrets))
+            )
     over_pieces = any(
         len(pieces) >= _UNESCAPE_PIECE_BOUND for _prepared, pieces in layers
     )
@@ -1106,6 +1132,8 @@ def _merge_sorted_spans(
     kept: list[tuple[int, int, str]] = []
     for start, stop, tag in ordered:
         if kept and start < kept[-1][1]:
+            if stop > kept[-1][1]:
+                kept[-1] = (kept[-1][0], stop, kept[-1][2])
             continue
         kept.append((start, stop, tag))
     return kept
@@ -1148,28 +1176,14 @@ def _replace_mapped_spans(
         if not kept:
             kept = _merge_sorted_spans(mapped)
             continue
-        starts = [item[0] for item in kept]
-        extra = [
-            (start, stop, tag)
-            for start, stop, tag in mapped
-            if not _span_overlaps(kept, start, stop, starts)
-        ]
-        if extra:
-            kept = _merge_sorted_spans(kept + extra)
+        kept = _merge_sorted_spans(kept + mapped)
     for group in orig_groups:
         if not group:
             continue
         if not kept:
             kept = _merge_sorted_spans(group)
             continue
-        starts = [item[0] for item in kept]
-        extra = [
-            (start, stop, tag)
-            for start, stop, tag in group
-            if not _span_overlaps(kept, start, stop, starts)
-        ]
-        if extra:
-            kept = _merge_sorted_spans(kept + extra)
+        kept = _merge_sorted_spans(kept + list(group))
     parts: list[str] = []
     cursor = 0
     for start, stop, tag in kept:
@@ -1191,6 +1205,40 @@ def _octal_utf8_needle(secret: str) -> str:
     )
 
 
+def _json_escape_needle(secret: str) -> str:
+    """JSON-escape tab, SOH, and backslash so ``scan_text`` can match dumps."""
+    if not any(char in secret for char in ("\t", "\x01", "\\")):
+        return ""
+    out: list[str] = []
+    for char in secret:
+        if char == "\\":
+            out.append("\\\\")
+        elif char == "\t":
+            out.append("\\t")
+        elif char == "\x01":
+            out.append("\\u0001")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def _tar_simple_escape_needle(secret: str) -> str:
+    """Simple tar-escape tab, SOH, and backslash next to the octal needle."""
+    if not any(char in secret for char in ("\t", "\x01", "\\")):
+        return ""
+    out: list[str] = []
+    for char in secret:
+        if char == "\\":
+            out.append("\\\\")
+        elif char == "\t":
+            out.append("\\t")
+        elif char == "\x01":
+            out.append("\\001")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
 def _secret_needles(secret: str) -> list[str]:
     needles = [secret]
     folded = unicodedata.normalize("NFKC", secret)
@@ -1202,6 +1250,18 @@ def _secret_needles(secret: str) -> list[str]:
     folded_octal = _octal_utf8_needle(folded) if folded != secret else ""
     if folded_octal and folded_octal not in needles:
         needles.append(folded_octal)
+    json_esc = _json_escape_needle(secret)
+    if json_esc and json_esc not in needles:
+        needles.append(json_esc)
+    tar_esc = _tar_simple_escape_needle(secret)
+    if tar_esc and tar_esc not in needles:
+        needles.append(tar_esc)
+    folded_json = _json_escape_needle(folded) if folded != secret else ""
+    if folded_json and folded_json not in needles:
+        needles.append(folded_json)
+    folded_tar = _tar_simple_escape_needle(folded) if folded != secret else ""
+    if folded_tar and folded_tar not in needles:
+        needles.append(folded_tar)
     for base in tuple(needles):
         encoded = quote(base, safe="")
         if encoded and encoded not in needles:
@@ -2117,9 +2177,10 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     and stay refuse-binary. Allowed ancillary chunks have fixed
     lengths (``pHYs`` 9, ``gAMA`` 4, ``sRGB`` 1, ``cHRM`` 32).
     ``PLTE`` must be 3–768 bytes and a multiple of 3. ``tRNS`` must
-    fit the color type and come before ``IDAT``. ``iCCP`` needs a
-    valid name, method 0, a bounded zlib profile, and must appear
-    before ``PLTE``/``IDAT``, at most once, and not with ``sRGB``.
+    fit the color type and come before ``IDAT``. Duplicate
+    ancillary chunks are rejected. ``sRGB`` intent must be 0–3
+    and the ``pHYs`` unit byte must be 0 or 1. ``iCCP`` is
+    blocked until a real screenshot needs it.
     """
     if not data.startswith(PNG_MAGIC) or len(data) < 8:
         return False
@@ -2135,8 +2196,7 @@ def _png_disallowed_chunk(data: bytes) -> bool:
     palette_entries = 0
     seen_plte = False
     seen_idat = False
-    seen_iccp = False
-    seen_srgb = False
+    seen_ancillary: set[bytes] = set()
     while pos + 12 <= length:
         size = int.from_bytes(data[pos : pos + 4], "big")
         if pos + 12 + size > length:
@@ -2151,6 +2211,10 @@ def _png_disallowed_chunk(data: bytes) -> bool:
         want = _PNG_CHUNK_SIZES.get(name)
         if want is not None and size != want:
             return True
+        if name in _PNG_ANCILLARY_ONCE:
+            if name in seen_ancillary:
+                return True
+            seen_ancillary.add(name)
         if name == b"IHDR":
             color_type = payload[9] if size == 13 else None
         elif name == b"PLTE":
@@ -2165,16 +2229,12 @@ def _png_disallowed_chunk(data: bytes) -> bool:
                 return True
             if not _png_trns_ok(color_type, size, seen_plte, palette_entries):
                 return True
-        elif name == b"iCCP":
-            if seen_iccp or seen_srgb or seen_plte or seen_idat:
-                return True
-            if not _png_iccp_ok(payload):
-                return True
-            seen_iccp = True
         elif name == b"sRGB":
-            if seen_iccp:
+            if payload[0] > 3:
                 return True
-            seen_srgb = True
+        elif name == b"pHYs":
+            if payload[8] > 1:
+                return True
         pos += 12 + size
         if name == b"IEND":
             return False
