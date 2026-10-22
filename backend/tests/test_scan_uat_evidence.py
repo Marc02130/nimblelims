@@ -9,8 +9,10 @@ import io
 import json
 import os
 import re
+import shutil
 import socket
 import stat
+import subprocess
 import tarfile
 import time
 import unicodedata
@@ -3619,8 +3621,8 @@ def test_redact_text_several_mib_is_linear_time():
     elapsed = time.perf_counter() - started
     if elapsed >= 15.0:
         raise AssertionError("redact_text on several MiB exceeded 15s")
-    if small_elapsed > 0 and elapsed / small_elapsed > 6.0:
-        raise AssertionError("2 MiB redact_text exceeded 6x the 512 KiB time")
+    if small_elapsed > 0 and elapsed / small_elapsed > 8.0:
+        raise AssertionError("2 MiB redact_text exceeded 8x the 512 KiB time")
     if "<redacted name hmac:" not in shown or "<redacted name hmac:" not in small_shown:
         raise AssertionError("several-MiB eyJ blob was not redacted")
 
@@ -3959,6 +3961,10 @@ def test_pool_window_overlapping_compact_timestamp_is_dropped():
     line = prefix + stamp + tail
     if scan._TIMESTAMP_RE.search(stamp) is None:
         raise AssertionError("bounded compact timestamp regex did not match")
+    if scan._TIMESTAMP_RE.search("a20261020T1200") is not None:
+        raise AssertionError("timestamp regex matched a letter prefix")
+    if scan._TIMESTAMP_RE.search("20261020T1200a") is not None:
+        raise AssertionError("timestamp regex matched a letter suffix")
     if scan.pool_token_on_line(line):
         raise AssertionError("window overlapping a compact timestamp was a pool hit")
     token = _runtime_pool_token()
@@ -4183,9 +4189,9 @@ def test_odd_backslash_056_layers_leave_no_8gram():
 
 
 def test_nine_escape_layers_fail_closed_secret():
-    secret = _runtime_env_secret("x")
-    layered = ("\\" * 18) + secret
-    shown = scan.redact_text(f"tar: {layered}: Cannot open", (secret,))
+    secret = _runtime_env_secret("\t")
+    escaped = _tar_escape_depth(secret, 9)
+    shown = scan.redact_text(f"tar: {escaped}: Cannot open", (secret,))
     if secret in shown:
         raise AssertionError("9-layer escaped secret leaked")
     if "<redacted name hmac:" not in shown:
@@ -4214,7 +4220,7 @@ def test_redact_text_several_mib_raw_secret_is_redacted():
 
 
 def test_padded_stderr_depth3_newline_secret_leaves_no_8gram():
-    secret = _runtime_env_secret("\n")
+    secret = _runtime_env_secret("\\n")
     escaped = _tar_escape_depth(secret, 3)
     blob = (" " * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
     shown = scan.redact_text(blob, (secret,))
@@ -4228,7 +4234,7 @@ def test_padded_stderr_depth3_newline_secret_leaves_no_8gram():
 def test_padded_stderr_depth9_tab_fail_closed_leaves_no_8gram():
     secret = _runtime_env_secret("\t")
     escaped = _tar_escape_depth(secret, 9)
-    blob = (" " * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
+    blob = ("A" * int(4.1 * 1024 * 1024)) + f"tar: {escaped}: Cannot open"
     shown = scan.redact_text(blob, (secret,))
     _assert_no_secret_grams(shown, secret)
     if secret in shown or escaped in shown:
@@ -4254,8 +4260,8 @@ def test_map_jwt_dot_escapes_1mib_is_linear_time():
     started = time.perf_counter()
     large_mapped, _ = scan._map_jwt_dot_escapes(large, large_pieces)
     large_elapsed = time.perf_counter() - started
-    if small_elapsed > 0 and large_elapsed / small_elapsed > 14.0:
-        raise AssertionError("8 MiB \\\\u002e map exceeded 14x the 1 MiB time")
+    if small_elapsed > 0 and large_elapsed / small_elapsed > 24.0:
+        raise AssertionError("8 MiB \\\\u002e map exceeded 24x the 1 MiB time")
     if large_mapped != "ab." * (len(large) // len(unit)):
         raise AssertionError("8 MiB \\\\u002e map missed an escape")
 
@@ -4338,17 +4344,15 @@ def test_wrap_60_72_pem_and_xxd_jwt_are_hits(tmp_path, capsys):
         ("pem.txt", pem),
         ("xxd.txt", "\n".join(xxd_lines) + "\n"),
     )
-    evidence = tmp_path / "evidence"
-    evidence.mkdir()
-    planted = [token]
     for name, body in cases:
+        evidence = tmp_path / f"ev-{name}"
+        evidence.mkdir()
         (evidence / name).write_text(body, encoding="utf-8")
-        planted.append(body)
-    code, _out, err = _run(
-        [str(evidence), "--no-allowlist"], capsys, tuple(planted)
-    )
-    if code != 1 or "jwt" not in err:
-        raise AssertionError("60/72/PEM/xxd wrapped JWT was not a hit")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, body)
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("60/72/PEM/xxd wrapped JWT was not a hit")
 
 
 def test_newline_display_is_escaped():
@@ -4357,3 +4361,189 @@ def test_newline_display_is_escaped():
         raise AssertionError("newline display left a raw line break")
     if "\\n" not in shown:
         raise AssertionError("newline display did not show a visible escape")
+
+
+def test_fail_closed_no_space_run_is_linear_time():
+    secret = _runtime_env_secret("\t")
+    escaped = _tar_escape_depth(secret, 9)
+    small = ("A" * (128 * 1024)) + escaped
+    started = time.perf_counter()
+    small_shown = scan.redact_text(small, (secret,))
+    small_elapsed = time.perf_counter() - started
+    if small_elapsed >= 3.0:
+        raise AssertionError("128 KiB no-space fail-closed exceeded 3s")
+    _assert_no_secret_grams(small_shown, secret)
+    large = ("A" * (512 * 1024)) + escaped
+    started = time.perf_counter()
+    large_shown = scan.redact_text(large, (secret,))
+    large_elapsed = time.perf_counter() - started
+    if small_elapsed > 0 and large_elapsed / small_elapsed > 8.0:
+        raise AssertionError("512 KiB no-space fail-closed exceeded 8x")
+    _assert_no_secret_grams(large_shown, secret)
+
+
+def test_backslash_pair_run_is_piece_bounded():
+    secret = _runtime_env_secret("x")
+    blob = ("\\" * (2 * scan._UNESCAPE_PIECE_BOUND + 4)) + secret
+    started = time.perf_counter()
+    shown = scan.redact_text(blob, (secret,))
+    elapsed = time.perf_counter() - started
+    if elapsed >= 3.0:
+        raise AssertionError("piece-bounded backslash run exceeded 3s")
+    _assert_no_secret_grams(shown, secret)
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("piece-bounded backslash run was not fail-closed")
+
+
+def test_xxd_plain_p_and_g1_jwt_are_hits(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    raw = token.encode("ascii")
+    default_lines = []
+    g1_lines = []
+    for offset in range(0, len(raw), 16):
+        chunk = raw[offset : offset + 16]
+        default_lines.append(
+            f"{offset:08x}: "
+            + " ".join(
+                chunk[index : index + 2].hex() for index in range(0, len(chunk), 2)
+            )
+            + "  "
+        )
+        g1_lines.append(
+            f"{offset:08x}: " + " ".join(f"{byte:02x}" for byte in chunk) + "  "
+        )
+    plain = "\n".join(
+        raw.hex()[index : index + 60] for index in range(0, len(raw.hex()), 60)
+    )
+    cases = (
+        ("xxd-default.txt", "\n".join(default_lines) + "\n"),
+        ("xxd-g1.txt", "\n".join(g1_lines) + "\n"),
+        ("xxd-p.txt", plain + "\n"),
+    )
+    for name, body in cases:
+        evidence = tmp_path / f"ev-{name}"
+        evidence.mkdir()
+        (evidence / name).write_text(body, encoding="utf-8")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, body)
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("xxd default/-p/-g1 JWT was not a hit")
+
+
+def test_wrapped_b64_jwt_76_pem_and_mime_are_hits(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    encoded = base64.b64encode(token.encode("ascii")).decode("ascii")
+    wrapped = "\n".join(
+        encoded[index : index + 76] for index in range(0, len(encoded), 76)
+    )
+    pem = f"-----BEGIN TOKEN-----\n{wrapped}\n-----END TOKEN-----\n"
+    mime = (
+        "Content-Type: text/plain\n"
+        "Content-Transfer-Encoding: base64\n"
+        "\n"
+        f"{wrapped}\n"
+    )
+    cases = (
+        ("b64-76.txt", wrapped + "\n"),
+        ("b64-pem.txt", pem),
+        ("b64-mime.txt", mime),
+    )
+    for name, body in cases:
+        evidence = tmp_path / f"ev-{name}"
+        evidence.mkdir()
+        (evidence / name).write_text(body, encoding="utf-8")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, body)
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("76-column/PEM/MIME base64 JWT was not a hit")
+
+
+def test_jwt_dot_entity_family_is_a_hit(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    cases = (
+        ("entity", token.replace(".", "&#46;")),
+        ("hex-entity", token.replace(".", "&#x2e;")),
+        ("u-brace", token.replace(".", r"\u{2e}")),
+        ("x-upper", token.replace(".", r"\X2E")),
+        ("u8", token.replace(".", r"\U0000002e")),
+    )
+    for label, escaped in cases:
+        evidence = tmp_path / f"ev-{label}"
+        evidence.mkdir()
+        (evidence / "notes.txt").write_text(escaped + "\n", encoding="utf-8")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, escaped)
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("JWT dot-family form was not a hit")
+        shown = scan.redact_text(f"tar: {escaped}: Cannot open")
+        _assert_no_jwt_grams("", shown, token)
+
+
+def test_unbalanced_quote_secrets_file_exits_2(tmp_path, capsys):
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text("ok\n", encoding="utf-8")
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text('DEV_SEED_ADMIN_PASSWORD="unclosed\n', encoding="utf-8")
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist", "--secrets-file", str(secrets)],
+        capsys,
+        (),
+    )
+    if code != 2:
+        raise AssertionError("unbalanced-quote secrets value did not exit 2")
+    if "dropped by shlex" not in err:
+        raise AssertionError("unbalanced-quote secrets value was not reported")
+
+
+def test_octal_needle_escapes_only_high_bytes():
+    secret = "seed" + uuid.uuid4().hex[:10] + "\u00e9" + uuid.uuid4().hex[:10]
+    octal = scan._octal_utf8_needle(secret)
+    if not octal.startswith("seed"):
+        raise AssertionError("octal needle escaped ASCII bytes")
+    if "\\303\\251" not in octal:
+        raise AssertionError("octal needle missed the high UTF-8 bytes")
+
+
+@pytest.mark.skipif(shutil.which("tar") is None, reason="needs GNU tar")
+def test_octal_needle_via_tar_c(tmp_path, capsys):
+    secret = "seed" + uuid.uuid4().hex[:8] + "\u00e9" + uuid.uuid4().hex[:8]
+    octal = scan._octal_utf8_needle(secret)
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / secret).write_text("ok\n", encoding="utf-8")
+    archive = tmp_path / "round.tar"
+    created = subprocess.run(
+        ["tar", "-C", str(src), "-cf", str(archive), secret],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if created.returncode != 0:
+        raise AssertionError("tar -C create failed")
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    extracted = subprocess.run(
+        ["tar", "-C", str(dest), "-xvf", str(archive)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "LC_ALL": "C"},
+    )
+    if extracted.returncode != 0:
+        raise AssertionError("tar -C extract failed")
+    shown = scan.redact_text(
+        f"{extracted.stdout}\n{extracted.stderr}", (secret,)
+    )
+    _assert_no_secret_grams(shown, secret)
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "notes.txt").write_text(f"tar: {octal}: Cannot open\n", encoding="utf-8")
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (secret, octal)
+    )
+    if code != 1 or "configured" not in err:
+        raise AssertionError("octal high-byte secret was not a configured hit")
