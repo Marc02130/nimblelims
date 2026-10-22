@@ -120,6 +120,8 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        with migrated_engine.connect() as conn:
+            head_counts = _counts(conn)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             targets = _stamp_sample(conn)
@@ -143,7 +145,8 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
 
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
-            assert _counts(conn) == before_counts
+            # 0106 adds tables and catalog rows after 0102. Compare head to head.
+            assert _counts(conn) == _with_stamped_run(head_counts, before_counts)
             assert _names(conn, _trigger_sql(), "samples") == before_triggers
             assert _names(conn, _index_sql(), "samples") == before_indexes
             assert _names(conn, _policy_sql(), "samples") == before_policies
@@ -160,7 +163,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
 
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
-            assert _counts(conn) == before_counts
+            assert _counts(conn) == _with_stamped_run(head_counts, before_counts)
             _assert_catalog(conn, instants_are_aware=True)
             _assert_upgraded_values(conn, targets)
     finally:
@@ -274,18 +277,52 @@ def _expect_date(conn, table: str, column: str, row_id) -> None:
         raise AssertionError(f"{table}.{column} is {value!r}, expected {LAB_DAY}")
 
 
+def _instant_names(conn, names: set[str]) -> set[str]:
+    """0106 renames instrument_types; 0102's frozen list still uses the old name."""
+    tables = {
+        row[0]
+        for row in conn.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
+        )
+    }
+    out = set()
+    for qualified in names:
+        table, column = qualified.split(".", 1)
+        if (
+            table == "instrument_types"
+            and "instrument_types" not in tables
+            and "instrument_types_legacy" in tables
+        ):
+            out.add(f"instrument_types_legacy.{column}")
+        else:
+            out.add(qualified)
+    return out
+
+
+def _with_stamped_run(head_counts: dict, before_counts: dict) -> dict:
+    """The 0101 stamp may insert a lims_run the original head snapshot lacked."""
+    expected = dict(head_counts)
+    if before_counts.get("lims_runs", 0) > expected.get("lims_runs", 0):
+        expected["lims_runs"] = before_counts["lims_runs"]
+    return expected
+
+
 def _assert_catalog(conn, instants_are_aware: bool) -> None:
     naive = _typed(conn, "timestamp without time zone")
     aware = _typed(conn, "timestamp with time zone")
     dates = _typed(conn, "date")
+    instants = _instant_names(conn, set(INSTANT_TIMESTAMP_COLUMNS))
     assert set(SQL_DATE_COLUMNS) <= dates
     assert set(CALENDAR_TIMESTAMP_COLUMNS) <= naive
     if instants_are_aware:
-        assert set(INSTANT_TIMESTAMP_COLUMNS) <= aware
-        assert set(INSTANT_TIMESTAMP_COLUMNS).isdisjoint(naive)
+        assert instants <= aware
+        assert instants.isdisjoint(naive)
     else:
-        assert set(INSTANT_TIMESTAMP_COLUMNS) <= naive
-        assert naive == set(INSTANT_TIMESTAMP_COLUMNS) | set(CALENDAR_TIMESTAMP_COLUMNS)
+        assert instants <= naive
+        assert naive == instants | set(CALENDAR_TIMESTAMP_COLUMNS)
 
 
 def _typed(conn, data_type: str) -> set[str]:

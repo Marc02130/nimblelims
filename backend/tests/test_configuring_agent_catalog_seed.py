@@ -148,7 +148,9 @@ def test_downgrade_removes_only_its_rows_and_upgrade_restores_them(migrated_engi
     module = _migration()
     # 0090 registers the reagent tables with the same helpers; include them so
     # the round trip covers every catalog row on a fresh DB.
-    module.TABLES = module.TABLES + _migration(MIGRATION_0090).TABLES
+    module.TABLES = (
+        module.TABLES + _migration(MIGRATION_0090).TABLES + _migration(MIGRATION_0106).TABLES
+    )
     with migrated_engine.connect() as conn:
         transaction = conn.begin()
         try:

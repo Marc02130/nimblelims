@@ -307,6 +307,10 @@ def migrated_engine(migrated_pg_container):
         conn.execute(text(
             "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO app_test_role"
         ))
+        conn.execute(text(
+            "ALTER DEFAULT PRIVILEGES FOR ROLE lims_migrate IN SCHEMA public "
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_test_role"
+        ))
         conn.commit()
 
     yield engine

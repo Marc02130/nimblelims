@@ -62,6 +62,7 @@ TABLES = (
     ("instrument_uses", "core", "Instrument uses"),
 )
 REMOVED = ("instrument_types",)
+NEW_INSTRUMENT_COLUMNS = ("vendor_id", "model", "asset_tag", "location_id", "status")
 
 _CONFIG_EDIT = """EXISTS (
     SELECT 1 FROM users u
@@ -407,7 +408,12 @@ def upgrade() -> None:
         ),
         sa.Column("instrument_id", uuid_t, sa.ForeignKey("instruments.id"), nullable=False),
         sa.Column("performed_on", sa.Date(), nullable=False),
-        sa.Column("performed_by_user_id", uuid_t, sa.ForeignKey("users.id"), nullable=True),
+        sa.Column(
+            "performed_by_user_id",
+            uuid_t,
+            sa.ForeignKey("users.id", ondelete="RESTRICT"),
+            nullable=True,
+        ),
         sa.Column("performed_by_vendor_id", uuid_t, sa.ForeignKey("vendors.id"), nullable=True),
         sa.Column("passed", sa.Boolean(), nullable=False),
         sa.Column("certificate_url", sa.String(1024), nullable=True),
@@ -502,6 +508,7 @@ def upgrade() -> None:
     _secure("instrument_uses", _USE_POLICY)
 
     _unregister_instrument_types(conn)
+    _sync_instrument_columns(conn)
     _register(conn)
 
 
@@ -531,14 +538,276 @@ def _unregister_instrument_types(conn) -> None:
     )
 
 
-def _register(conn) -> None:
+def _sync_instrument_columns(conn) -> None:
+    """0089 skipped instruments (already registered). Add the new columns."""
     m = _m0089()
-    original = m.TABLES
-    try:
-        m.TABLES = TABLES
-        m.upgrade()
-    finally:
-        m.TABLES = original
+    admin = m._bind_admin(conn)
+    reflected = m._reflect(conn, ["instruments"]).get("instruments", [])
+    table_rows = conn.execute(
+        sa.text(
+            "SELECT client_id, id FROM schema_tables WHERE physical_name = 'instruments'"
+        )
+    ).all()
+    for client, table_id in table_rows:
+        existing = {
+            r[0]
+            for r in conn.execute(
+                sa.text("SELECT physical_name FROM schema_columns WHERE table_id = :t"),
+                {"t": table_id},
+            ).all()
+        }
+        for col in reflected:
+            if col["name"] == "instrument_type_id":
+                conn.execute(
+                    sa.text(
+                        """
+                        UPDATE schema_columns
+                        SET is_fk = :fk, fk_table = :fkt, pg_type = :pg,
+                            data_type = :dt, modified_at = NOW()
+                        WHERE table_id = :t AND physical_name = :p
+                        """
+                    ),
+                    {
+                        "fk": col["is_fk"],
+                        "fkt": col["fk_table"],
+                        "pg": col["udt"],
+                        "dt": m._map_type(col["udt"], col["is_fk"], col["fk_table"]),
+                        "t": table_id,
+                        "p": col["name"],
+                    },
+                )
+            if col["name"] in existing:
+                continue
+            conn.execute(
+                sa.text(
+                    """
+                    INSERT INTO schema_columns (
+                        id, client_id, table_id, display_name, physical_name, data_type,
+                        nullable, sort_order, status, is_platform, is_identity, is_fk,
+                        fk_table, is_unique, pg_type, origin, active,
+                        created_at, created_by, modified_at, modified_by
+                    )
+                    VALUES (
+                        :id, :c, :t, :d, :p, :dt, :n, :o, 'active', :plat, false, :fk,
+                        :fkt, :uq, :pg, 'reflected', true, NOW(), :u, NOW(), :u
+                    )
+                    """
+                ),
+                {
+                    "id": m._id(client, "instruments", "col", col["name"]),
+                    "c": client,
+                    "t": table_id,
+                    "d": m._column_display(col["name"], col["is_fk"]),
+                    "p": col["name"],
+                    "dt": m._map_type(col["udt"], col["is_fk"], col["fk_table"]),
+                    "n": col["nullable"],
+                    "o": col["ordinal"],
+                    "plat": col["name"] in m.PLATFORM_COLUMNS,
+                    "fk": col["is_fk"],
+                    "fkt": col["fk_table"],
+                    "uq": col["is_unique"],
+                    "pg": col["udt"],
+                    "u": admin,
+                },
+            )
+    conn.execute(
+        sa.text(
+            "SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000000', false)"
+        )
+    )
+
+
+def _unsync_instrument_columns(conn) -> None:
+    conn.execute(
+        sa.text(
+            """
+            DELETE FROM schema_columns
+            WHERE physical_name = ANY(:cols)
+              AND table_id IN (
+                  SELECT id FROM schema_tables WHERE physical_name = 'instruments'
+              )
+            """
+        ),
+        {"cols": list(NEW_INSTRUMENT_COLUMNS)},
+    )
+    conn.execute(
+        sa.text(
+            """
+            UPDATE schema_columns
+            SET fk_table = 'instrument_types', data_type = 'uuid', modified_at = NOW()
+            WHERE physical_name = 'instrument_type_id'
+              AND table_id IN (
+                  SELECT id FROM schema_tables WHERE physical_name = 'instruments'
+              )
+            """
+        )
+    )
+
+
+def _register(conn) -> None:
+    """Register the new tables only for clients that already have a catalog.
+
+    0089.upgrade walks every client. A later alembic re-run (tests that
+    downgrade past 0106 then upgrade to head) must not attach rows to
+    ephemeral orgs created after the first migrate.
+    """
+    m = _m0089()
+    cataloged = [
+        r[0]
+        for r in conn.execute(
+            sa.text("SELECT DISTINCT client_id FROM schema_tables ORDER BY 1")
+        ).all()
+    ]
+    if not cataloged:
+        return
+    admin = m._bind_admin(conn)
+    present = {
+        r[0]
+        for r in conn.execute(
+            sa.text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' "
+                "AND table_name = ANY(:n)"
+            ),
+            {"n": [t[0] for t in TABLES]},
+        ).all()
+    }
+    tables = [t for t in TABLES if t[0] in present]
+    reflected = m._reflect(conn, [t[0] for t in tables])
+    roles = {r[1]: r[0] for r in conn.execute(sa.text("SELECT id, name FROM roles")).all()}
+    for client in cataloged:
+        registered = {
+            r[0]
+            for r in conn.execute(
+                sa.text("SELECT physical_name FROM schema_tables WHERE client_id = :c"),
+                {"c": client},
+            ).all()
+        }
+        for physical, kind, display in tables:
+            if physical in registered:
+                continue
+            table_id = m._id(client, physical)
+            conn.execute(
+                sa.text(
+                    """
+                    INSERT INTO schema_tables (
+                        id, client_id, display_name, physical_name, kind, status, active,
+                        created_at, created_by, modified_at, modified_by
+                    )
+                    VALUES (:id, :c, :d, :p, :k, 'active', true, NOW(), :u, NOW(), :u)
+                    """
+                ),
+                {
+                    "id": table_id,
+                    "c": client,
+                    "d": display,
+                    "p": physical,
+                    "k": kind,
+                    "u": admin,
+                },
+            )
+            for role_name, access in m.DEFAULT_PRIVILEGES:
+                role_id = roles.get(role_name)
+                if role_id is None:
+                    continue
+                conn.execute(
+                    sa.text(
+                        """
+                        INSERT INTO schema_privileges (
+                            id, client_id, role_id, table_id, column_id, access,
+                            created_at, created_by, modified_at, modified_by
+                        )
+                        VALUES (:id, :c, :r, :t, NULL, :a, NOW(), :u, NOW(), :u)
+                        """
+                    ),
+                    {
+                        "id": m._id(client, physical, "priv", role_id),
+                        "c": client,
+                        "r": role_id,
+                        "t": table_id,
+                        "a": access,
+                        "u": admin,
+                    },
+                )
+            for col in reflected.get(physical, []):
+                conn.execute(
+                    sa.text(
+                        """
+                        INSERT INTO schema_columns (
+                            id, client_id, table_id, display_name, physical_name, data_type,
+                            nullable, sort_order, status, is_platform, is_identity, is_fk,
+                            fk_table, is_unique, pg_type, origin, active,
+                            created_at, created_by, modified_at, modified_by
+                        )
+                        VALUES (
+                            :id, :c, :t, :d, :p, :dt, :n, :o, 'active', :plat, :ident, :fk,
+                            :fkt, :uq, :pg, 'reflected', true, NOW(), :u, NOW(), :u
+                        )
+                        """
+                    ),
+                    {
+                        "id": m._id(client, physical, "col", col["name"]),
+                        "c": client,
+                        "t": table_id,
+                        "d": m._column_display(col["name"], col["is_fk"]),
+                        "p": col["name"],
+                        "dt": m._map_type(col["udt"], col["is_fk"], col["fk_table"]),
+                        "n": col["nullable"],
+                        "o": col["ordinal"],
+                        "plat": col["name"] in m.PLATFORM_COLUMNS,
+                        "ident": False,
+                        "fk": col["is_fk"],
+                        "fkt": col["fk_table"],
+                        "uq": col["is_unique"],
+                        "pg": col["udt"],
+                        "u": admin,
+                    },
+                )
+    conn.execute(
+        sa.text(
+            "SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000000', false)"
+        )
+    )
+
+
+def _purge_registered_tables(conn) -> None:
+    names = [t[0] for t in TABLES]
+    conn.execute(
+        sa.text(
+            "DELETE FROM schema_layout_fields WHERE column_id IN ("
+            "SELECT c.id FROM schema_columns c JOIN schema_tables t ON t.id = c.table_id "
+            "WHERE t.physical_name = ANY(:n))"
+        ),
+        {"n": names},
+    )
+    conn.execute(
+        sa.text(
+            "DELETE FROM schema_relations WHERE "
+            "from_table_id IN (SELECT id FROM schema_tables WHERE physical_name = ANY(:n)) "
+            "OR to_table_id IN (SELECT id FROM schema_tables WHERE physical_name = ANY(:n))"
+        ),
+        {"n": names},
+    )
+    conn.execute(
+        sa.text(
+            "DELETE FROM schema_privileges WHERE table_id IN ("
+            "SELECT id FROM schema_tables WHERE physical_name = ANY(:n)) "
+            "OR column_id IN (SELECT c.id FROM schema_columns c "
+            "JOIN schema_tables t ON t.id = c.table_id WHERE t.physical_name = ANY(:n))"
+        ),
+        {"n": names},
+    )
+    conn.execute(
+        sa.text(
+            "DELETE FROM schema_columns WHERE table_id IN ("
+            "SELECT id FROM schema_tables WHERE physical_name = ANY(:n))"
+        ),
+        {"n": names},
+    )
+    conn.execute(
+        sa.text("DELETE FROM schema_tables WHERE physical_name = ANY(:n)"),
+        {"n": names},
+    )
 
 
 def downgrade() -> None:
@@ -550,6 +819,14 @@ def downgrade() -> None:
         m.downgrade()
     finally:
         m.TABLES = original
+    m._bind_admin(conn)
+    _purge_registered_tables(conn)
+    _unsync_instrument_columns(conn)
+    conn.execute(
+        sa.text(
+            "SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000000', false)"
+        )
+    )
 
     op.drop_index("ix_data_parsers_instrument_type_id", table_name="data_parsers")
     op.drop_constraint("ck_data_parsers_source_xor", "data_parsers", type_="check")

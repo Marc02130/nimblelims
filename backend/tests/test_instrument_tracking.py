@@ -162,6 +162,12 @@ def test_rls_instrument_uses_are_tenant_scoped(migrated_engine):
             ),
             {"id": use, "i": inst, "run": run, "u": ua},
         )
+        conn.execute(
+            text(
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON "
+                "instrument_uses, instruments, lims_runs TO app_test_role"
+            )
+        )
         conn.execute(text("SET LOCAL ROLE app_test_role"))
 
         def sees(user, sql, params):

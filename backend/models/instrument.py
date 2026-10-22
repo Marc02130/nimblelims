@@ -162,7 +162,7 @@ class InstrumentMaintenanceEvent(Base):
     )
     performed_on = Column(Date, nullable=False)
     performed_by_user_id = Column(
-        PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
     )
     performed_by_vendor_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("vendors.id"), nullable=True

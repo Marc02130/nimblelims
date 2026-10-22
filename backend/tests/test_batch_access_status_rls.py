@@ -288,6 +288,46 @@ def _cleanup(conn, rows: list) -> None:
     project_ids = [row["project_id"] for row in rows]
     user_ids = [row["user_id"] for row in rows]
     client_ids = [row["client_id"] for row in rows]
+    conn.execute(
+        text(
+            "DELETE FROM schema_privileges WHERE client_id = ANY(:ids) "
+            "OR table_id IN (SELECT id FROM schema_tables WHERE client_id = ANY(:ids)) "
+            "OR column_id IN (SELECT id FROM schema_columns WHERE client_id = ANY(:ids))"
+        ),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_layout_fields WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_layouts WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM ui_schema_ddl_log WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_changes WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text(
+            "DELETE FROM schema_relations WHERE client_id = ANY(:ids) "
+            "OR from_table_id IN (SELECT id FROM schema_tables WHERE client_id = ANY(:ids)) "
+            "OR to_table_id IN (SELECT id FROM schema_tables WHERE client_id = ANY(:ids))"
+        ),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_columns WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_tables WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
     conn.execute(text("DELETE FROM tests WHERE id = ANY(:ids)"), {"ids": test_ids})
     conn.execute(text("DELETE FROM analyses WHERE id = ANY(:ids)"), {"ids": analysis_ids})
     conn.execute(
