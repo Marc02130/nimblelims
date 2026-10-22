@@ -208,6 +208,13 @@ def receive_sample(
             )
 
     received_at = datetime.now(timezone.utc)
+    collected = None
+    if req.date_sampled is not None:
+        collected = (
+            req.date_sampled.date()
+            if isinstance(req.date_sampled, datetime)
+            else req.date_sampled
+        )
     import uuid as _uuid
 
     # Name generation may CREATE SEQUENCE; lims_app often lacks CREATE privilege.
@@ -235,8 +242,12 @@ def receive_sample(
             status=available_status.id,
             project_id=project.id,
             received_date=received_at,
+            date_sampled=collected,
             temperature=req.temperature,
             client_sample_id=req.client_sample_id,
+            volume_ul=req.volume_ul,
+            receipt_condition=req.receipt_condition,
+            thaw_count=req.thaw_count,
             created_by=current_user.id,
             modified_by=current_user.id,
         )
@@ -256,6 +267,11 @@ def receive_sample(
             db.flush()
             db.add(Contents(container_id=container.id, sample_id=sample.id))
             created_containers.append(container)
+
+        if req.extra_fields:
+            from app.services.ui_schema_service import UiSchemaService
+
+            UiSchemaService(db, current_user).write_extra_fields(sample, req.extra_fields)
 
         db.commit()
     except HTTPException:
@@ -284,6 +300,10 @@ def receive_sample(
         sample_id=sample.id,
         sample_name=sample.name,
         status=sample.status,
+        date_sampled=sample.date_sampled,
+        volume_ul=float(sample.volume_ul) if sample.volume_ul is not None else None,
+        receipt_condition=sample.receipt_condition,
+        thaw_count=sample.thaw_count,
         project_id=sample.project_id,
         received_date=sample.received_date,
         containers=[

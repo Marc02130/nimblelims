@@ -118,6 +118,9 @@ class LimsRunRead(BaseModel):
     completed_at: Optional[datetime]
     published_at: Optional[datetime]
     canceled_at: Optional[datetime]
+    status_reason: Optional[str] = None
+    rejected_at: Optional[datetime] = None
+    replaces_run_id: Optional[uuid.UUID] = None
     created_at: datetime
     created_by: Optional[uuid.UUID]
     modified_at: datetime
@@ -144,6 +147,7 @@ class LimsRunDataRow(BaseModel):
     container_id: Optional[uuid.UUID] = None
     well_position: Optional[str] = Field(None, max_length=10)
     sample_id: Optional[uuid.UUID] = None
+    sample_key: Optional[str] = None
     row_data: Dict[str, Any]
 
 
@@ -153,10 +157,56 @@ class LimsRunDataRead(BaseModel):
     container_id: Optional[uuid.UUID]
     well_position: Optional[str]
     sample_id: Optional[uuid.UUID]
+    sample_key: Optional[str] = None
+    link_note: Optional[str] = None
     row_data: Dict[str, Any]
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class RejectRunRequest(BaseModel):
+    """Reject a plate or run. Status becomes failed. Rows stay."""
+
+    reason: str = Field(..., min_length=1, max_length=4000)
+
+
+class RerunCreateRequest(BaseModel):
+    """New draft run that replaces this one. Cohort samples are copied."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+
+
+class ValueChoiceOption(BaseModel):
+    lims_run_id: uuid.UUID
+    run_name: str
+    run_status: str
+    status_reason: Optional[str] = None
+    raw_result: str
+    source: str
+
+
+class ValueChoiceRead(BaseModel):
+    sample_id: uuid.UUID
+    sample_name: Optional[str] = None
+    client_sample_id: Optional[str] = None
+    analyte_id: uuid.UUID
+    analyte_name: str
+    replicate: int
+    options: List[ValueChoiceOption]
+    accepted_lims_run_id: Optional[uuid.UUID] = None
+    accepted_value: Optional[str] = None
+    acceptance_reason: Optional[str] = None
+
+
+class AcceptValueRequest(BaseModel):
+    """Reviewer pick. Both values stay; the result row shows the accepted one."""
+
+    sample_id: uuid.UUID
+    analyte_id: uuid.UUID
+    replicate: int = Field(default=1, ge=1)
+    accepted_lims_run_id: uuid.UUID
+    reason: str = Field(..., min_length=1, max_length=4000)
 
 
 class LimsRunDataListResponse(BaseModel):
@@ -210,7 +260,11 @@ class ParserConfig(BaseModel):
     )
     sample_col: Optional[str] = Field(
         None,
-        description="Optional. Source column that holds a sample label (metadata hint only).",
+        description=(
+            "Optional. Source column that holds the sample identifier. "
+            "On import, each value is matched to client_sample_id, then sample name. "
+            "Rows that do not match are kept and reported."
+        ),
     )
 
 

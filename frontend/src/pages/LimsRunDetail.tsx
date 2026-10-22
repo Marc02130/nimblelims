@@ -35,6 +35,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, PromotionPreview } from '../services/apiService';
 import { formatInstant } from '../utils/localDate';
 import PublishPromotionDialog from '../components/runs/PublishPromotionDialog';
+import RunImportDialog, {
+  ImportFileResult,
+  ParserOption,
+} from '../components/runs/RunImportDialog';
+import RejectPlateDialog from '../components/runs/RejectPlateDialog';
+import ValueChoicesPanel from '../components/runs/ValueChoicesPanel';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 import StartCohortPanel from '../components/experiments/StartCohortPanel';
 import ReagentUsePanel from '../components/reagents/ReagentUsePanel';
@@ -82,6 +88,9 @@ interface RunDetail {
   completed_at?: string;
   published_at?: string;
   canceled_at?: string;
+  status_reason?: string | null;
+  rejected_at?: string | null;
+  replaces_run_id?: string | null;
   created_at: string;
   modified_at?: string;
 }
@@ -125,6 +134,15 @@ const LimsRunDetail: React.FC = () => {
   const [publishPreviewError, setPublishPreviewError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [parsers, setParsers] = useState<ParserOption[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<ImportFileResult | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
+  const [rerunning, setRerunning] = useState(false);
 
   useEffect(() => {
     if (!runId) return;
@@ -274,6 +292,89 @@ const LimsRunDetail: React.FC = () => {
       setError(apiErrorMsg(err, 'Failed to publish run'));
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const openImport = async () => {
+    if (!run) return;
+    setImportOpen(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const list: any = await apiService.getDataParsers({
+        active_only: true,
+        analysis_id: run.analysis_id || undefined,
+      });
+      const arr = Array.isArray(list) ? list : [];
+      setParsers(
+        arr.map((p: any) => ({
+          id: String(p.id),
+          name: String(p.name),
+          version: p.version,
+          instrument_id: p.instrument_id || null,
+          cro_source_id: p.cro_source_id || null,
+          instrument_type_id: p.instrument_type_id || null,
+        })),
+      );
+    } catch (err: any) {
+      setParsers([]);
+      setImportError(apiErrorMsg(err, 'Failed to load parsers'));
+    }
+  };
+
+  const submitImport = async (parser: ParserOption, file: File) => {
+    if (!runId) return;
+    if (!parser.instrument_id && !parser.cro_source_id && !parser.instrument_type_id) {
+      setImportError('This parser has no instrument, instrument type, or CRO source');
+      return;
+    }
+    setImporting(true);
+    setImportError(null);
+    try {
+      const result = await apiService.importLimsRunFile(runId, file, {
+        parser_id: parser.id,
+        instrument_id: parser.instrument_id || undefined,
+        cro_source_id: parser.cro_source_id || undefined,
+      });
+      setImportResult(result);
+      setActiveTab(1);
+      await loadData();
+    } catch (err: any) {
+      setImportError(apiErrorMsg(err, 'Import failed'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const confirmReject = async (reason: string) => {
+    if (!runId) return;
+    setRejecting(true);
+    setRejectError(null);
+    try {
+      await apiService.rejectLimsRun(runId, reason);
+      setRejectOpen(false);
+      setSuccessMsg(
+        'Plate rejected. Imported rows were kept. Rerun every sample on this plate.',
+      );
+      await loadRun();
+    } catch (err: any) {
+      setRejectError(apiErrorMsg(err, 'Failed to reject plate'));
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleRerun = async () => {
+    if (!runId) return;
+    setRerunning(true);
+    setError(null);
+    try {
+      const created = await apiService.createLimsRunRerun(runId);
+      navigate(`/runs/${created.id}`);
+    } catch (err: any) {
+      setError(apiErrorMsg(err, 'Failed to create rerun'));
+    } finally {
+      setRerunning(false);
     }
   };
 
@@ -448,6 +549,45 @@ const LimsRunDetail: React.FC = () => {
             Cancel Run
           </Button>
         )}
+        {(run.status === 'running' || run.status === 'results_received') && (
+          <Button
+            variant="contained"
+            size="small"
+            disabled={transitioning || !run.analysis_id}
+            data-testid="run-import-button"
+            onClick={() => void openImport()}
+          >
+            Import
+          </Button>
+        )}
+        {(run.status === 'running' ||
+          run.status === 'results_received' ||
+          run.status === 'complete') && (
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            disabled={transitioning}
+            data-testid="reject-plate-button"
+            onClick={() => {
+              setRejectError(null);
+              setRejectOpen(true);
+            }}
+          >
+            Reject plate
+          </Button>
+        )}
+        {run.status !== 'draft' && (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={rerunning || transitioning}
+            data-testid="create-rerun-button"
+            onClick={() => void handleRerun()}
+          >
+            Create rerun
+          </Button>
+        )}
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -535,6 +675,23 @@ const LimsRunDetail: React.FC = () => {
                 {run.cohort.locked_at ? ' (locked)' : ''}
               </Alert>
             )}
+            {run.replaces_run_id && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                This run replaces{' '}
+                <Button
+                  size="small"
+                  onClick={() => navigate(`/runs/${run.replaces_run_id}`)}
+                >
+                  {run.replaces_run_id}
+                </Button>
+              </Alert>
+            )}
+            {run.status_reason && (
+              <Alert severity={run.status === 'failed' ? 'error' : 'info'} sx={{ mb: 2 }}>
+                {run.status_reason}
+                {run.rejected_at ? ` (${formatInstant(run.rejected_at)})` : ''}
+              </Alert>
+            )}
 
             <List dense>
               <ListItem>
@@ -567,7 +724,16 @@ const LimsRunDetail: React.FC = () => {
                   secondary={formatInstant(run.created_at)}
                 />
               </ListItem>
+              {run.rejected_at && (
+                <ListItem>
+                  <ListItemText
+                    primary="Rejected"
+                    secondary={formatInstant(run.rejected_at)}
+                  />
+                </ListItem>
+              )}
             </List>
+            {run.replaces_run_id && runId && <ValueChoicesPanel runId={runId} />}
           </CardContent>
         </Card>
       )}
@@ -578,6 +744,13 @@ const LimsRunDetail: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 2 }}>
               Imported Data ({dataRows.length} rows)
             </Typography>
+            {dataRows.some((row: any) => row.link_note) && (
+              <Alert severity="warning" sx={{ mb: 2 }} data-testid="unmatched-summary">
+                {dataRows.filter((row: any) => row.link_note).length} row
+                {dataRows.filter((row: any) => row.link_note).length === 1 ? '' : 's'} did
+                not match a sample. Those rows are kept.
+              </Alert>
+            )}
             {dataLoading ? (
               <Box display="flex" justifyContent="center" py={3}>
                 <CircularProgress />
@@ -590,7 +763,7 @@ const LimsRunDetail: React.FC = () => {
                   <TableHead>
                     <TableRow>
                       <TableCell>Well</TableCell>
-                      <TableCell>Sample ID</TableCell>
+                      <TableCell>Sample</TableCell>
                       <TableCell>Row Data</TableCell>
                     </TableRow>
                   </TableHead>
@@ -598,8 +771,15 @@ const LimsRunDetail: React.FC = () => {
                     {dataRows.map((row: any) => (
                       <TableRow key={row.id}>
                         <TableCell>{row.well_position ?? '—'}</TableCell>
-                        <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
-                          {row.sample_id ?? '—'}
+                        <TableCell>
+                          <Typography variant="body2">
+                            {row.sample_key || row.sample_id || '—'}
+                          </Typography>
+                          {row.link_note && (
+                            <Typography variant="caption" color="warning.main" display="block">
+                              {row.link_note}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Box
@@ -625,6 +805,28 @@ const LimsRunDetail: React.FC = () => {
 
       {runId && <ReagentUsePanel limsRunId={runId} analysisId={run.analysis_id} />}
       {runId && <InstrumentUsePanel limsRunId={runId} />}
+
+      <RunImportDialog
+        open={importOpen}
+        parsers={parsers}
+        submitting={importing}
+        error={importError}
+        result={importResult}
+        onClose={() => {
+          if (!importing) setImportOpen(false);
+        }}
+        onSubmit={(parser, file) => void submitImport(parser, file)}
+      />
+      <RejectPlateDialog
+        open={rejectOpen}
+        submitting={rejecting}
+        error={rejectError}
+        sampleCount={run.cohort?.sample_ids?.length || 0}
+        onClose={() => {
+          if (!rejecting) setRejectOpen(false);
+        }}
+        onConfirm={(reason) => void confirmReject(reason)}
+      />
 
       <PublishPromotionDialog
         open={publishDialogOpen}

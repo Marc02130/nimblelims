@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -47,6 +48,11 @@ class Sample(BaseModel):
         PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True
     )
     client_sample_id = Column(String(255), nullable=True, unique=True)
+    # Receipt facts from the manifest (SOP sample receipt). Collection day is
+    # date_sampled. These stay on the sample; nothing is deleted.
+    volume_ul = Column(Numeric(12, 2), nullable=True)
+    receipt_condition = Column(String(255), nullable=True)
+    thaw_count = Column(Integer, nullable=True)
     custom_attributes = Column(
         JSONB, nullable=True, server_default="{}"
     )  # legacy - phased out for modeled fields via hard cutover
@@ -111,6 +117,17 @@ class Sample(BaseModel):
     )
     modifier = relationship(
         "User", foreign_keys="Sample.modified_by", back_populates="modified_samples"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "volume_ul IS NULL OR volume_ul >= 0",
+            name="ck_samples_volume_ul_nonneg",
+        ),
+        CheckConstraint(
+            "thaw_count IS NULL OR thaw_count >= 0",
+            name="ck_samples_thaw_count_nonneg",
+        ),
     )
 
 

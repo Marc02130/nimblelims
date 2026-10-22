@@ -108,6 +108,14 @@ const AtomicReceive: React.FC = () => {
   const [extraDraft, setExtraDraft] = useState('');
   const [temperature, setTemperature] = useState<string>('');
   const [clientSampleId, setClientSampleId] = useState('');
+  const [collectionDate, setCollectionDate] = useState('');
+  const [volumeUl, setVolumeUl] = useState('');
+  const [condition, setCondition] = useState('');
+  const [thawCount, setThawCount] = useState('');
+  const [extraColumns, setExtraColumns] = useState<
+    { physical_name: string; display_name: string; data_type: string }[]
+  >([]);
+  const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -159,6 +167,46 @@ const AtomicReceive: React.FC = () => {
           columns: Number(ct.columns) || 1,
         }));
       setContainerTypes(singlePos);
+
+      const builtin = new Set([
+        'date_sampled',
+        'volume_ul',
+        'receipt_condition',
+        'thaw_count',
+        'client_sample_id',
+        'temperature',
+        'sample_type',
+        'project_id',
+        'name',
+        'status',
+        'matrix',
+        'description',
+      ]);
+      try {
+        const runtimeRaw = await apiService.getSchemaRuntime('receive');
+        const runtime = Array.isArray(runtimeRaw) ? runtimeRaw : [];
+        const layoutExists = runtime.some((col: any) => col && col.on_layout === false);
+        const extras = layoutExists
+          ? runtime.filter(
+              (col: any) =>
+                col &&
+                col.on_layout &&
+                col.can_write &&
+                col.physical_name &&
+                !builtin.has(String(col.physical_name)),
+            )
+          : [];
+        setExtraColumns(
+          extras.map((col: any) => ({
+            physical_name: String(col.physical_name),
+            display_name: String(col.display_name || col.physical_name),
+            data_type: String(col.data_type || 'text'),
+          })),
+        );
+      } catch {
+        setExtraColumns([]);
+      }
+
       // Prefer sticky if still valid; else Cryovial / first 1×1
       setContainerTypeId((prev) => {
         if (prev && singlePos.some((c) => c.id === prev)) return prev;
@@ -212,6 +260,11 @@ const AtomicReceive: React.FC = () => {
     setExtraDraft('');
     setClientSampleId('');
     setTemperature('');
+    setCollectionDate('');
+    setVolumeUl('');
+    setCondition('');
+    setThawCount('');
+    setExtraValues({});
     // Keep sticky type/project/container type.
     setTimeout(() => primaryRef.current?.focus(), 0);
   };
@@ -248,6 +301,36 @@ const AtomicReceive: React.FC = () => {
       temp = parsed;
     }
 
+    let volume: number | undefined;
+    if (volumeUl.trim() !== '') {
+      const parsed = Number(volumeUl);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        setFormError('Volume must be zero or greater');
+        return;
+      }
+      volume = parsed;
+    }
+    let thaw: number | undefined;
+    if (thawCount.trim() !== '') {
+      const parsed = Number(thawCount);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        setFormError('Thaw count must be a whole number, zero or greater');
+        return;
+      }
+      thaw = parsed;
+    }
+    const extraFields: Record<string, unknown> = {};
+    extraColumns.forEach((col) => {
+      const raw = (extraValues[col.physical_name] || '').trim();
+      if (!raw) return;
+      if (col.data_type === 'number' || col.data_type === 'integer') {
+        const parsed = Number(raw);
+        if (!Number.isNaN(parsed)) extraFields[col.physical_name] = parsed;
+        return;
+      }
+      extraFields[col.physical_name] = raw;
+    });
+
     setSubmitting(true);
     try {
       const result = await apiService.receiveSample({
@@ -258,6 +341,11 @@ const AtomicReceive: React.FC = () => {
         container_type_id: containerTypeId,
         temperature: temp,
         client_sample_id: clientSampleId.trim() || null,
+        ...(collectionDate ? { date_sampled: collectionDate } : {}),
+        ...(volume !== undefined ? { volume_ul: volume } : {}),
+        ...(condition.trim() ? { receipt_condition: condition.trim() } : {}),
+        ...(thaw !== undefined ? { thaw_count: thaw } : {}),
+        ...(Object.keys(extraFields).length ? { extra_fields: extraFields } : {}),
       });
 
       const vesselCount = result?.containers?.length ?? 1 + extras.length;
@@ -444,6 +532,55 @@ const AtomicReceive: React.FC = () => {
               inputProps={{ 'data-testid': 'client-sample-id' }}
             />
           </Stack>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Collection date"
+              type="date"
+              value={collectionDate}
+              onChange={(e) => setCollectionDate(e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ 'data-testid': 'collection-date' }}
+            />
+            <TextField
+              label="Volume (µL)"
+              value={volumeUl}
+              onChange={(e) => setVolumeUl(e.target.value)}
+              fullWidth
+              inputProps={{ 'data-testid': 'volume-ul', inputMode: 'decimal' }}
+            />
+          </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label="Condition"
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              fullWidth
+              inputProps={{ 'data-testid': 'receipt-condition' }}
+            />
+            <TextField
+              label="Thaw count"
+              value={thawCount}
+              onChange={(e) => setThawCount(e.target.value)}
+              fullWidth
+              inputProps={{ 'data-testid': 'thaw-count', inputMode: 'numeric' }}
+            />
+          </Stack>
+          {extraColumns.map((col) => (
+            <TextField
+              key={col.physical_name}
+              label={col.display_name}
+              type={col.data_type === 'date' ? 'date' : 'text'}
+              value={extraValues[col.physical_name] || ''}
+              onChange={(e) =>
+                setExtraValues((prev) => ({ ...prev, [col.physical_name]: e.target.value }))
+              }
+              fullWidth
+              InputLabelProps={col.data_type === 'date' ? { shrink: true } : undefined}
+              inputProps={{ 'data-testid': `extra-field-${col.physical_name}` }}
+            />
+          ))}
 
           <Box display="flex" gap={2} justifyContent="flex-end">
             <Button

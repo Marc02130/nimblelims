@@ -8,6 +8,7 @@ const mockReceiveSample = jest.fn();
 const mockGetListEntries = jest.fn();
 const mockGetProjects = jest.fn();
 const mockGetContainerTypes = jest.fn();
+const mockGetSchemaRuntime = jest.fn();
 
 jest.mock('../services/apiService', () => ({
   // Real helpers (ApiService.formatError, addClientFilterIfNeeded, types); only the client is mocked.
@@ -17,6 +18,7 @@ jest.mock('../services/apiService', () => ({
     getProjects: (...args: any[]) => mockGetProjects(...args),
     getContainerTypes: (...args: any[]) => mockGetContainerTypes(...args),
     receiveSample: (...args: any[]) => mockReceiveSample(...args),
+    getSchemaRuntime: (...args: any[]) => mockGetSchemaRuntime(...args),
     getCurrentUser: jest.fn().mockResolvedValue({
       id: '1',
       username: 'tech',
@@ -82,6 +84,7 @@ describe('AtomicReceive', () => {
       { id: 'ct-plate', name: '96-Well Plate', rows: 8, columns: 12 },
       { id: 'ct-conical', name: '15mL Conical Tube', rows: 1, columns: 1 },
     ]);
+    mockGetSchemaRuntime.mockResolvedValue([]);
     mockReceiveSample.mockResolvedValue({
       sample_id: 's1',
       sample_name: 'S-100',
@@ -144,5 +147,103 @@ describe('AtomicReceive', () => {
       expect((screen.getByTestId('primary-barcode') as HTMLInputElement).value).toBe('');
     });
     expect(await screen.findByText(/Received S-100/i)).toBeInTheDocument();
+  });
+
+  test('submits collection date, volume, condition, and thaw count, then clears them', async () => {
+    renderPage();
+    await screen.findByTestId('primary-barcode');
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /sample type/i }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Blood' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /^project$/i }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Study A' }));
+
+    fireEvent.change(screen.getByTestId('primary-barcode'), { target: { value: 'NBIO-2' } });
+    fireEvent.change(screen.getByTestId('collection-date'), { target: { value: '2026-10-20' } });
+    fireEvent.change(screen.getByTestId('volume-ul'), { target: { value: '500' } });
+    fireEvent.change(screen.getByTestId('receipt-condition'), { target: { value: 'Frozen' } });
+    fireEvent.change(screen.getByTestId('thaw-count'), { target: { value: '1' } });
+    fireEvent.click(screen.getByTestId('receive-submit'));
+
+    await waitFor(() => {
+      expect(mockReceiveSample).toHaveBeenCalledWith(
+        expect.objectContaining({
+          container_barcode: 'NBIO-2',
+          date_sampled: '2026-10-20',
+          volume_ul: 500,
+          receipt_condition: 'Frozen',
+          thaw_count: 1,
+        })
+      );
+    });
+    await waitFor(() => {
+      expect((screen.getByTestId('volume-ul') as HTMLInputElement).value).toBe('');
+      expect((screen.getByTestId('receipt-condition') as HTMLInputElement).value).toBe('');
+      expect((screen.getByTestId('thaw-count') as HTMLInputElement).value).toBe('');
+      expect((screen.getByTestId('collection-date') as HTMLInputElement).value).toBe('');
+    });
+  });
+
+  test('keeps receipt fields when receive fails', async () => {
+    mockReceiveSample.mockRejectedValue({
+      response: { data: { detail: 'Duplicate barcode' } },
+    });
+    renderPage();
+    await screen.findByTestId('primary-barcode');
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /sample type/i }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Blood' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /^project$/i }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Study A' }));
+    fireEvent.change(screen.getByTestId('primary-barcode'), { target: { value: 'NBIO-3' } });
+    fireEvent.change(screen.getByTestId('volume-ul'), { target: { value: '250' } });
+    fireEvent.click(screen.getByTestId('receive-submit'));
+    expect((await screen.findAllByText('Duplicate barcode')).length).toBeGreaterThan(0);
+    expect((screen.getByTestId('volume-ul') as HTMLInputElement).value).toBe('250');
+    expect((screen.getByTestId('primary-barcode') as HTMLInputElement).value).toBe('NBIO-3');
+  });
+
+  test('submits a layout extra field and hides fields that are not on the layout', async () => {
+    mockGetSchemaRuntime.mockResolvedValue([
+      {
+        physical_name: 'study_visit',
+        display_name: 'Study visit',
+        data_type: 'text',
+        on_layout: true,
+        can_write: true,
+      },
+      {
+        physical_name: 'hidden_note',
+        display_name: 'Hidden note',
+        data_type: 'text',
+        on_layout: false,
+        can_write: true,
+      },
+      {
+        physical_name: 'volume_ul',
+        display_name: 'Volume',
+        data_type: 'number',
+        on_layout: true,
+        can_write: true,
+      },
+    ]);
+    renderPage();
+    expect(await screen.findByTestId('extra-field-study_visit')).toBeInTheDocument();
+    expect(screen.queryByTestId('extra-field-hidden_note')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('extra-field-volume_ul')).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /sample type/i }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Blood' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: /^project$/i }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Study A' }));
+    fireEvent.change(screen.getByTestId('primary-barcode'), { target: { value: 'NBIO-4' } });
+    fireEvent.change(screen.getByTestId('extra-field-study_visit'), { target: { value: 'V2' } });
+    fireEvent.click(screen.getByTestId('receive-submit'));
+
+    await waitFor(() => {
+      expect(mockReceiveSample).toHaveBeenCalledWith(
+        expect.objectContaining({
+          extra_fields: { study_visit: 'V2' },
+        })
+      );
+    });
   });
 });

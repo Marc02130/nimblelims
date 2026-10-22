@@ -40,7 +40,8 @@ from app.schemas.flexible_experiment import (
     ImportDataResponse,
     LimsRunDataRead,
 )
-from app.schemas.data_parser import ImportFileResponse, LimsRunImportRead
+from app.schemas.data_parser import ImportFileResponse, LimsRunImportRead, UnmatchedImportRow
+from app.services.import_sample_link import link_rows
 from app.services.data_parser_service import DataParserService
 from app.services.instrument_data_service import InstrumentDataService
 from models.flexible_experiment import (
@@ -637,6 +638,99 @@ class LimsRunService:
         run = self.get_run(run_id)
         return self._transition(run, LimsRunStatus.canceled)
 
+    def reject_run(self, run_id: uuid.UUID, reason: str) -> LimsRun:
+        """Mark the plate failed and keep every imported row.
+
+        SOP §13: one failed acceptance criterion rejects the whole plate.
+        Every cohort sample is rerun on a new plate. Nothing is deleted.
+        """
+        text = (reason or "").strip()
+        if not text:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A reject reason is required",
+            )
+        run = self.get_run(run_id)
+        from datetime import datetime, timezone
+
+        run.status_reason = text
+        run.rejected_at = datetime.now(timezone.utc)
+        run.modified_by = self._user_id()
+        return self._transition(run, LimsRunStatus.failed)
+
+    def create_rerun(self, run_id: uuid.UUID, name: Optional[str] = None) -> LimsRun:
+        """Draft run that replaces this one, with the same cohort samples.
+
+        A failed plate's rerun includes every sample that was on it.
+        """
+        run = self.get_run(run_id)
+        if run.status == LimsRunStatus.draft:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Start the run before creating a rerun",
+            )
+        if not run.analysis_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="analysis_id is required on every LIMS run",
+            )
+        self._assert_no_replace_cycle(run)
+        cohort = dict(run.cohort or {})
+        sample_ids = [str(sid) for sid in (cohort.get("sample_ids") or [])]
+        rerun_name = (name or "").strip() or f"{run.name} rerun"
+        rerun_name = self._unique_run_name(rerun_name)
+        reason = (run.status_reason or "").strip()
+        description = f"Rerun of {run.name}."
+        if reason:
+            description = f"{description} Replaced run: {reason}"
+        created = self.run_repo.create(
+            name=rerun_name,
+            experiment_template_id=run.experiment_template_id,
+            description=description[:4000],
+            created_by=self._user_id(),
+            analysis_id=run.analysis_id,
+        )
+        created.replaces_run_id = run.id
+        created.cohort = {"sample_ids": sample_ids}
+        created.modified_by = self._user_id()
+        self._commit_refresh(created)
+        return created
+
+    def _unique_run_name(self, base: str) -> str:
+        candidate = base[:255]
+        if not self.run_repo.get_by_name(candidate):
+            return candidate
+        n = 2
+        while n < 1000:
+            suffix = f" {n}"
+            candidate = f"{base[: 255 - len(suffix)]}{suffix}"
+            if not self.run_repo.get_by_name(candidate):
+                return candidate
+            n += 1
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"LIMS run '{base}' already exists",
+        )
+
+    def _assert_no_replace_cycle(self, run: LimsRun) -> None:
+        seen = {run.id}
+        current = run.replaces_run_id
+        while current is not None:
+            if current in seen:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Rerun link would cycle",
+                )
+            seen.add(current)
+            if len(seen) > 20:
+                break
+            parent = (
+                self.db.query(LimsRun.replaces_run_id)
+                .filter(LimsRun.id == current)
+                .scalar()
+            )
+            current = parent
+
     # ---------- Data import ----------
 
     def import_data(
@@ -701,11 +795,18 @@ class LimsRunService:
                 "container_id": row.container_id,
                 "well_position": row.well_position,
                 "sample_id": row.sample_id,
+                "sample_key": row.sample_key,
                 "row_data": row.row_data,
                 "import_id": import_id,
             }
             for row in rows
         ]
+        parser_config = None
+        if import_id is not None:
+            parser_config = parser.parser_config
+        elif rows and any(r.sample_key for r in rows):
+            parser_config = {"sample_col": "__explicit__", "columns": []}
+        link_rows(self.db, row_dicts, parser_config=parser_config)
         created_rows = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
         self.db.flush()
         self.db.commit()
@@ -765,17 +866,23 @@ class LimsRunService:
                 "container_id": row.container_id,
                 "well_position": row.well_position,
                 "sample_id": row.sample_id,
+                "sample_key": row.sample_key,
                 "row_data": row.row_data,
                 "import_id": imp.id,
             }
             for row in rows
         ]
+        unmatched = link_rows(self.db, row_dicts, parser_config=parser.parser_config)
         created = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
         self.db.flush()
         self.db.commit()
+        linked = sum(1 for row in row_dicts if row.get("sample_id"))
         return ImportFileResponse(
             imported=len(created),
             skipped=0,
+            linked=linked,
+            unmatched_count=len(unmatched),
+            unmatched=[UnmatchedImportRow.model_validate(item) for item in unmatched],
             warnings=warnings,
             import_id=imp.id,
             parser_id=parser.id,

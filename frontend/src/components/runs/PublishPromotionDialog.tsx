@@ -193,12 +193,26 @@ const PublishPromotionDialog: React.FC<PublishPromotionDialogProps> = ({
                   {preview.skip_count > 0 && (
                     <Chip size="small" variant="outlined" label={`Skipped ${preview.skip_count}`} />
                   )}
+                  {(preview.held_count ?? 0) > 0 && (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={`Held for review ${preview.held_count}`}
+                    />
+                  )}
                 </Stack>
 
                 {hasConflicts && (
                   <Alert severity="error" sx={{ mb: 2 }}>
                     Publish is blocked: some results already exist from another run or manual entry.
                     Resolve conflicts (or clear the conflicting results) before publishing.
+                  </Alert>
+                )}
+
+                {(preview.held_count ?? 0) > 0 && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Some values are already reported by the run this one replaces. Publish keeps
+                    those results. After publish, pick which value is accepted. Nothing is deleted.
                   </Alert>
                 )}
 

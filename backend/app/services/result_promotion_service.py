@@ -73,6 +73,7 @@ class PromotePlan:
     create_count: int = 0
     update_count: int = 0
     conflict_count: int = 0
+    held_count: int = 0
     skip_count: int = 0
     unresolved_columns: List[str] = field(default_factory=list)
     missing_sample_rows: int = 0
@@ -86,6 +87,7 @@ class PromotePlan:
             "create_count": self.create_count,
             "update_count": self.update_count,
             "conflict_count": self.conflict_count,
+            "held_count": self.held_count,
             "skip_count": self.skip_count,
             "unresolved_columns": self.unresolved_columns,
             "missing_sample_rows": self.missing_sample_rows,
@@ -109,6 +111,19 @@ class ResultPromotionService:
 
     def _user_id(self) -> Optional[uuid.UUID]:
         return self.current_user.id if self.current_user else None
+
+    def _replaced_run_ids(self, run: LimsRun) -> set:
+        """Runs this one replaces, walking replaces_run_id. Empty when it replaces nothing."""
+        found: set = set()
+        current = run.replaces_run_id
+        while current is not None and current not in found and len(found) < 20:
+            found.add(current)
+            current = (
+                self.db.query(LimsRun.replaces_run_id)
+                .filter(LimsRun.id == current)
+                .scalar()
+            )
+        return found
 
     def build_analyte_lookup(
         self, analysis_id: uuid.UUID
@@ -240,6 +255,7 @@ class ResultPromotionService:
         seen_unresolved: set = set()
         test_cache: Dict[uuid.UUID, Test] = {}
         dry_test_cache: Dict[uuid.UUID, Optional[Test]] = {}
+        replaced_ids = self._replaced_run_ids(run)
 
         for row in data_rows:
             if not row.sample_id:
@@ -335,6 +351,9 @@ class ResultPromotionService:
                     if existing.lims_run_id == run.id:
                         action = "update"
                         plan.update_count += 1
+                    elif existing.lims_run_id in replaced_ids:
+                        action = "held"
+                        plan.held_count += 1
                     else:
                         action = "conflict"
                         plan.conflict_count += 1
@@ -365,9 +384,13 @@ class ResultPromotionService:
                                 "Blocked: result owned by another run or manual entry"
                                 if action == "conflict"
                                 else (
-                                    "Would create test + result"
-                                    if test is None
-                                    else None
+                                    "Held for review: the replaced run already reported this value"
+                                    if action == "held"
+                                    else (
+                                        "Would create test + result"
+                                        if test is None
+                                        else None
+                                    )
                                 )
                             )
                         ),

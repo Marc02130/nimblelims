@@ -15,7 +15,7 @@ Routes:
     GET    /lims-runs/{id}/data                — list imported data rows
     GET    /lims-runs/{id}/worklist            — download robot worklist CSV
 """
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
@@ -27,6 +27,7 @@ from app.core.security import get_current_user, require_permission
 from app.core.rbac import require_experiment_manage
 from app.services.lims_run_service import LimsRunService
 from app.schemas.flexible_experiment import (
+    AcceptValueRequest,
     LimsRunCreate,
     LimsRunUpdate,
     LimsRunStartRequest,
@@ -36,7 +37,11 @@ from app.schemas.flexible_experiment import (
     ImportDataResponse,
     LimsRunDataRead,
     LimsRunDataListResponse,
+    RejectRunRequest,
+    RerunCreateRequest,
+    ValueChoiceRead,
 )
+from app.services.result_acceptance_service import ResultAcceptanceService
 from models.flexible_experiment import LimsRunStatus, LimsRun
 from models.user import User
 
@@ -216,6 +221,51 @@ def cancel_run(
     """Transition: any non-terminal state → canceled."""
     run = service.cancel_run(run_id)
     return _run_read(run)
+
+
+@router.post("/{run_id}/reject", response_model=LimsRunRead)
+def reject_run(
+    run_id: UUID,
+    body: RejectRunRequest,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Reject the plate. Status becomes failed, the reason is kept, rows stay.
+
+    SOP §13: when the plate fails, every sample on it is rerun. Nothing is deleted.
+    """
+    run = service.reject_run(run_id, body.reason)
+    return _run_read(run)
+
+
+@router.post("/{run_id}/rerun", response_model=LimsRunRead, status_code=201)
+def create_rerun(
+    run_id: UUID,
+    body: Optional[RerunCreateRequest] = None,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Create a draft run that replaces this one and copies its cohort."""
+    run = service.create_rerun(run_id, body.name if body else None)
+    return _run_read(run)
+
+
+@router.get("/{run_id}/value-choices", response_model=List[ValueChoiceRead])
+def list_value_choices(
+    run_id: UUID,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Values from this rerun and the run it replaces. Nothing is removed."""
+    return ResultAcceptanceService(service.db, current_user=service.current_user).list_for_run(run_id)
+
+
+@router.post("/{run_id}/value-choices", response_model=ValueChoiceRead)
+def accept_value(
+    run_id: UUID,
+    body: AcceptValueRequest,
+    db: Session = Depends(get_db),
+    reviewer: User = Depends(require_permission("experiment:publish")),
+):
+    """Record which value is accepted. The other value stays on its run."""
+    return ResultAcceptanceService(db, current_user=reviewer).accept(run_id, body)
 
 
 @router.post("/{run_id}/import", response_model=ImportDataResponse)

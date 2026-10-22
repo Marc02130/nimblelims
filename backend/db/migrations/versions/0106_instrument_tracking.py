@@ -1,7 +1,7 @@
 """Instrument tracking: list types, maintenance, downtime, uses.
 
 Revision ID: 0106_instrument_tracking
-Revises: 0105_lab_timezone_required
+Revises: 0107_elisa_run_gaps
 
 Marc (2026-10-22): replace instrument_types with the instrument_types list,
 move vendor/model onto instruments, retire (never drop) the old table, add
@@ -21,7 +21,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0106_instrument_tracking"
-down_revision = "0105_lab_timezone_required"
+down_revision = "0107_elisa_run_gaps"
 branch_labels = None
 depends_on = None
 

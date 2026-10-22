@@ -145,6 +145,7 @@ export interface PromotionPreview {
   create_count: number;
   update_count: number;
   conflict_count: number;
+  held_count?: number;
   skip_count: number;
   unresolved_columns: string[];
   missing_sample_rows: number;
@@ -353,6 +354,11 @@ export class ApiService {
     analysis_ids?: string[];
     temperature?: number | null;
     client_sample_id?: string | null;
+    date_sampled?: string | null;
+    volume_ul?: number | null;
+    receipt_condition?: string | null;
+    thaw_count?: number | null;
+    extra_fields?: Record<string, unknown> | null;
   }) {
     const response: AxiosResponse = await this.api.post('/samples/receive', receiveData);
     return response.data;
@@ -2528,6 +2534,35 @@ export class ApiService {
 
   async cancelLimsRun(id: string) {
     const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/cancel`);
+    return response.data;
+  }
+
+  async rejectLimsRun(id: string, reason: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${id}/reject`, { reason });
+    return response.data;
+  }
+
+  async createLimsRunRerun(id: string, name?: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${id}/rerun`, name ? { name } : {});
+    return response.data;
+  }
+
+  async getLimsRunValueChoices(id: string) {
+    const response: AxiosResponse = await this.api.get(`/v1/lims-runs/${id}/value-choices`);
+    return response.data;
+  }
+
+  async acceptLimsRunValue(
+    id: string,
+    body: {
+      sample_id: string;
+      analyte_id: string;
+      replicate: number;
+      accepted_lims_run_id: string;
+      reason: string;
+    }
+  ) {
+    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${id}/value-choices`, body);
     return response.data;
   }
 

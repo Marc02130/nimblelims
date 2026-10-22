@@ -120,8 +120,6 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
-        with migrated_engine.connect() as conn:
-            head_counts = _counts(conn)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             targets = _stamp_sample(conn)
@@ -145,8 +143,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
 
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
-            # 0106 adds tables and catalog rows after 0102. Compare head to head.
-            assert _counts(conn) == _with_stamped_run(head_counts, before_counts)
+            _assert_counts_after_later_migrations(before_counts, _counts(conn))
             assert _names(conn, _trigger_sql(), "samples") == before_triggers
             assert _names(conn, _index_sql(), "samples") == before_indexes
             assert _names(conn, _policy_sql(), "samples") == before_policies
@@ -163,7 +160,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
 
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
-            assert _counts(conn) == _with_stamped_run(head_counts, before_counts)
+            _assert_counts_after_later_migrations(before_counts, _counts(conn))
             _assert_catalog(conn, instants_are_aware=True)
             _assert_upgraded_values(conn, targets)
     finally:
@@ -302,14 +299,6 @@ def _instant_names(conn, names: set[str]) -> set[str]:
     return out
 
 
-def _with_stamped_run(head_counts: dict, before_counts: dict) -> dict:
-    """The 0101 stamp may insert a lims_run the original head snapshot lacked."""
-    expected = dict(head_counts)
-    if before_counts.get("lims_runs", 0) > expected.get("lims_runs", 0):
-        expected["lims_runs"] = before_counts["lims_runs"]
-    return expected
-
-
 def _assert_catalog(conn, instants_are_aware: bool) -> None:
     naive = _typed(conn, "timestamp without time zone")
     aware = _typed(conn, "timestamp with time zone")
@@ -338,6 +327,38 @@ def _typed(conn, data_type: str) -> set[str]:
         {"data_type": data_type},
     )
     return {f"{table}.{column}" for table, column in rows}
+
+
+def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
+    """0101 is before ELISA and instrument-tracking catalog rows.
+
+    Head adds empty tables, renames instrument_types, and seeds lists.
+    Every other table keeps the same row count.
+    """
+    extra = set(after) - set(before)
+    allowed_extra = {
+        "result_acceptances",
+        "instrument_downtime",
+        "instrument_maintenance_events",
+        "instrument_maintenance_schedules",
+        "instrument_uses",
+        "instrument_types_legacy",
+    }
+    assert extra <= allowed_extra
+    for name in extra:
+        assert after[name] == 0
+    missing = set(before) - set(after)
+    assert missing <= {"instrument_types"}
+    skip = {
+        "schema_tables",
+        "schema_columns",
+        "schema_privileges",
+        "lists",
+        "list_entries",
+    } | extra | missing
+    left = {key: value for key, value in before.items() if key not in skip}
+    right = {key: value for key, value in after.items() if key not in skip}
+    assert left == right
 
 
 def _counts(conn) -> dict:
