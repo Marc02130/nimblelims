@@ -37,6 +37,7 @@ interface CatalogInstrument {
   name: string;
   active?: boolean;
   status?: string;
+  maintenance_tracked?: boolean;
 }
 
 interface Props {
@@ -97,7 +98,8 @@ const InstrumentUsePanel: React.FC<Props> = ({
     try {
       const elig = await apiService.getInstrumentEligibility(instrumentId);
       if (elig && elig.allowed === false) {
-        setStop(elig.message || 'This instrument cannot be used.');
+        const tracked = elig.maintenance_tracked ? 'Maintenance is tracked. ' : '';
+        setStop(`${tracked}${elig.message || 'This instrument cannot be used.'}`);
         return;
       }
       const saved = await apiService.addExperimentInstrument(experimentId, instrumentId);
@@ -116,7 +118,8 @@ const InstrumentUsePanel: React.FC<Props> = ({
     try {
       const elig = await apiService.getInstrumentEligibility(instrumentId);
       if (elig && elig.allowed === false) {
-        setStop(elig.message || 'This instrument cannot be used.');
+        const tracked = elig.maintenance_tracked ? 'Maintenance is tracked. ' : '';
+        setStop(`${tracked}${elig.message || 'This instrument cannot be used.'}`);
         return;
       }
       await apiService.recordInstrumentUse({
@@ -203,10 +206,14 @@ const InstrumentUsePanel: React.FC<Props> = ({
         </Box>
       )}
       {chosenIds.map((instrumentId) => {
-        const name = catalog.find((row) => row.id === instrumentId)?.name || instrumentId;
+        const row = catalog.find((item) => item.id === instrumentId);
+        const name = row?.name || instrumentId;
         return (
           <Box key={instrumentId} display="flex" gap={1} alignItems="center" sx={{ mb: 1 }}>
-            <Typography>{name}</Typography>
+            <Typography>
+              {name}
+              {row?.maintenance_tracked ? ' (maintenance tracked)' : ''}
+            </Typography>
             {canRecord && (
               <Button size="small" variant="outlined" onClick={() => recordUse(instrumentId)}>
                 Record use
