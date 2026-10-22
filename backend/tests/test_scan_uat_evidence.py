@@ -3470,8 +3470,9 @@ def test_png_trns_longer_than_palette(tmp_path, capsys):
 
 
 def test_png_iccp_valid_and_invalid(tmp_path, capsys):
+    """Well-formed iCCP and iCCP mutants stay blocked (Marc: no iCCP yet)."""
     valid = _png_file(2, _png_chunk(b"iCCP", _iccp_payload()))
-    _assert_png_scan(tmp_path, capsys, valid, ok=True)
+    _assert_png_scan(tmp_path, capsys, valid, ok=False)
     bad_name = _png_file(
         2, _png_chunk(b"iCCP", _iccp_payload(name=b" leading"))
     )
@@ -4700,3 +4701,219 @@ def test_octal_needle_via_tar_c(tmp_path, capsys):
     )
     if code != 1 or "configured" not in err:
         raise AssertionError("octal high-byte secret was not a configured hit")
+
+
+def test_png_iccp_name_80_double_space_is_unsuppressible(tmp_path, capsys):
+    name = b"A" * 38 + b"  " + b"B" * 40
+    if len(name) != 80:
+        raise AssertionError("iCCP-style name fixture is not 80 bytes")
+    payload = _png_file(2, _png_chunk(b"iCCP", _iccp_payload(name=name)))
+    _assert_png_scan(tmp_path, capsys, payload, ok=False)
+
+
+def test_png_duplicate_ancillary_chunks_are_blocked(tmp_path, capsys):
+    phys = (2835).to_bytes(4, "big") + (2835).to_bytes(4, "big") + b"\x01"
+    cases = (
+        (_png_chunk(b"sRGB", b"\x00"), _png_chunk(b"sRGB", b"\x01")),
+        (_png_chunk(b"gAMA", (45455).to_bytes(4, "big")),) * 2,
+        (_png_chunk(b"cHRM", b"\x00" * 32),) * 2,
+        (_png_chunk(b"pHYs", phys),) * 2,
+        (
+            _png_chunk(b"tRNS", b"\x00" * 6),
+            _png_chunk(b"tRNS", b"\x00" * 6),
+        ),
+    )
+    for chunks in cases:
+        _assert_png_scan(tmp_path, capsys, _png_file(2, *chunks), ok=False)
+
+
+def test_png_srgb_intent_and_phys_unit_bounds(tmp_path, capsys):
+    _assert_png_scan(
+        tmp_path, capsys, _png_file(2, _png_chunk(b"sRGB", b"\x03")), ok=True
+    )
+    _assert_png_scan(
+        tmp_path, capsys, _png_file(2, _png_chunk(b"sRGB", b"\x04")), ok=False
+    )
+    good_phys = (2835).to_bytes(4, "big") + (2835).to_bytes(4, "big") + b"\x00"
+    bad_phys = (2835).to_bytes(4, "big") + (2835).to_bytes(4, "big") + b"\x02"
+    _assert_png_scan(
+        tmp_path, capsys, _png_file(2, _png_chunk(b"pHYs", good_phys)), ok=True
+    )
+    _assert_png_scan(
+        tmp_path, capsys, _png_file(2, _png_chunk(b"pHYs", bad_phys)), ok=False
+    )
+
+
+def test_piece_bound_fail_closed_without_secrets():
+    """R63-F1 / R52-F1 / P1: over-piece-bound fail-closes with no secrets."""
+    blob = "\\" * (2 * scan._UNESCAPE_PIECE_BOUND + 4)
+    started = time.perf_counter()
+    shown = scan.redact_text(blob, ())
+    elapsed = time.perf_counter() - started
+    if elapsed >= 3.0:
+        raise AssertionError("no-secret piece-bound fail-closed exceeded 3s")
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("no-secret piece-bound run was not fail-closed")
+    spans = scan._secret_orig_spans(blob, ())
+    if not spans:
+        raise AssertionError("P4: empty secrets early-returned past the piece bound")
+
+
+def test_unescape_piece_bound_keeps_remainder():
+    """P2: stop_after_bound keeps the leftover original tail."""
+    pairs = scan._UNESCAPE_PIECE_BOUND
+    text = ("\\" * (2 * pairs)) + "TAIL"
+    prepared, pieces = scan._map_unescape_once(text)
+    if len(pieces) < scan._UNESCAPE_PIECE_BOUND:
+        raise AssertionError("piece bound was not reached")
+    if pieces[-1][3] != len(text):
+        raise AssertionError("remainder did not cover the original tail")
+    if "TAIL" not in prepared:
+        raise AssertionError("remainder dropped the tail")
+
+
+def test_over_layer_fail_closed_without_secrets():
+    escaped = _tar_escape_depth("\t", 9)
+    shown = scan.redact_text(escaped, ())
+    if "<redacted name hmac:" not in shown:
+        raise AssertionError("over-layer fail-closed skipped with no secrets")
+    spans = scan._secret_orig_spans(escaped, ())
+    if not spans:
+        raise AssertionError("over-layer leftover did not fail-closed")
+
+
+def test_json_and_tar_escape_needles_hit_in_scan_text():
+    cases = (
+        ("\t", "\\t", "\\t"),
+        ("\x01", "\\u0001", "\\001"),
+        ("\\", "\\\\", "\\\\"),
+    )
+    for marker, json_form, tar_form in cases:
+        secret = _runtime_env_secret(marker)
+        needles = scan._secret_needles(secret)
+        json_needle = scan._json_escape_needle(secret)
+        tar_needle = scan._tar_simple_escape_needle(secret)
+        if json_needle not in needles or tar_needle not in needles:
+            raise AssertionError("JSON/tar escape needle was not registered")
+        if json_form not in json_needle or tar_form not in tar_needle:
+            raise AssertionError("JSON/tar escape needle missed the marker")
+        if not scan.configured_secret_on_line(json_needle, (secret,)):
+            raise AssertionError("JSON-escaped secret was not a configured hit")
+        if not scan.configured_secret_on_line(tar_needle, (secret,)):
+            raise AssertionError("tar-escaped secret was not a configured hit")
+        hits = scan.scan_text(("notes.txt",), json_needle + "\n", (secret,))
+        if not any(hit.kind == scan.KIND_CONFIGURED for hit in hits):
+            raise AssertionError("scan_text missed a JSON-escaped secret")
+
+
+def test_overlapping_configured_secret_spans_extend():
+    left = "seed" + uuid.uuid4().hex[:8]
+    right = left[-6:] + uuid.uuid4().hex[:8]
+    blob = left + right[6:]
+    if left not in blob or right not in blob:
+        raise AssertionError("overlap fixture did not share a span")
+    shown = scan.redact_text(blob, (left, right))
+    _assert_no_secret_grams(shown, left)
+    _assert_no_secret_grams(shown, right)
+    merged = scan._merge_sorted_spans(
+        [(0, len(left), "a"), (len(left) - 6, len(blob), "b")]
+    )
+    if merged != [(0, len(blob), "a")]:
+        raise AssertionError("overlapping secret spans were dropped")
+
+
+def test_hexdump_c_and_50_col_b64_jwt_are_hits(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    raw = token.encode("ascii")
+    dump_lines = []
+    for offset in range(0, len(raw), 16):
+        chunk = raw[offset : offset + 16]
+        hex_bytes = " ".join(f"{byte:02x}" for byte in chunk)
+        if len(chunk) > 8:
+            hex_bytes = (
+                " ".join(f"{byte:02x}" for byte in chunk[:8])
+                + "  "
+                + " ".join(f"{byte:02x}" for byte in chunk[8:])
+            )
+        ascii_col = "".join(
+            chr(byte) if 32 <= byte <= 126 else "." for byte in chunk
+        )
+        dump_lines.append(f"{offset:08x}  {hex_bytes:<48}  |{ascii_col}|")
+    encoded = base64.b64encode(token.encode("ascii")).decode("ascii")
+    wrapped50 = "\n".join(
+        encoded[index : index + 50] for index in range(0, len(encoded), 50)
+    )
+    cases = (
+        ("hexdump-c.txt", "\n".join(dump_lines) + "\n"),
+        ("b64-50.txt", wrapped50 + "\n"),
+    )
+    for name, body in cases:
+        evidence = tmp_path / f"ev-{name}"
+        evidence.mkdir()
+        (evidence / name).write_text(body, encoding="utf-8")
+        code, _out, err = _run(
+            [str(evidence), "--no-allowlist"], capsys, (token, body)
+        )
+        if code != 1 or "jwt" not in err:
+            raise AssertionError("hexdump -C / 50-column JWT was not a hit")
+
+
+def test_xxd_ascii_column_is_stripped(tmp_path, capsys):
+    token = _pyjwt_access_token()
+    raw = token.encode("ascii")
+    lines = []
+    for offset in range(0, len(raw), 16):
+        chunk = raw[offset : offset + 16]
+        hex_part = " ".join(
+            chunk[index : index + 2].hex() for index in range(0, len(chunk), 2)
+        )
+        ascii_col = "".join(
+            chr(byte) if 32 <= byte <= 126 else "." for byte in chunk
+        )
+        lines.append(f"{offset:08x}: {hex_part}  {ascii_col}")
+    body = "\n".join(lines) + "\n"
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "xxd-ascii.txt").write_text(body, encoding="utf-8")
+    code, _out, err = _run(
+        [str(evidence), "--no-allowlist"], capsys, (token, body)
+    )
+    if code != 1 or "jwt" not in err:
+        raise AssertionError("xxd ASCII-column dump was not a jwt hit")
+    joined = scan._unwrap_wrapped_encodings(body)
+    if token not in joined:
+        raise AssertionError("xxd ASCII-column strip did not recover the JWT")
+
+
+def test_hexdump_c_unwrap_is_linear_time():
+    token = _pyjwt_access_token()
+    raw = token.encode("ascii")
+
+    def dump(repeat: int) -> str:
+        lines = []
+        offset = 0
+        for _ in range(repeat):
+            for index in range(0, len(raw), 16):
+                chunk = raw[index : index + 16]
+                hex_bytes = " ".join(f"{byte:02x}" for byte in chunk)
+                ascii_col = "".join(
+                    chr(byte) if 32 <= byte <= 126 else "." for byte in chunk
+                )
+                lines.append(f"{offset:08x}  {hex_bytes:<48}  |{ascii_col}|")
+                offset += len(chunk)
+        return "\n".join(lines) + "\n"
+
+    small = dump(256)
+    large = dump(1024)
+    started = time.perf_counter()
+    small_out = scan._unwrap_wrapped_encodings(small)
+    small_elapsed = time.perf_counter() - started
+    if token not in small_out:
+        raise AssertionError("hexdump -C unwrap missed the JWT")
+    started = time.perf_counter()
+    large_out = scan._unwrap_wrapped_encodings(large)
+    large_elapsed = time.perf_counter() - started
+    if token not in large_out:
+        raise AssertionError("large hexdump -C unwrap missed the JWT")
+    if small_elapsed > 0 and large_elapsed / small_elapsed > 8.0:
+        raise AssertionError("hexdump -C unwrap exceeded 8x from 256 to 1024 copies")
