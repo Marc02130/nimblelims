@@ -147,7 +147,7 @@ class LimsRunDataRow(BaseModel):
     container_id: Optional[uuid.UUID] = None
     well_position: Optional[str] = Field(None, max_length=10)
     sample_id: Optional[uuid.UUID] = None
-    sample_key: Optional[str] = None
+    sample_key: Optional[str] = Field(None, max_length=255)
     row_data: Dict[str, Any]
 
 
@@ -207,6 +207,7 @@ class AcceptValueRequest(BaseModel):
     replicate: int = Field(default=1, ge=1)
     accepted_lims_run_id: uuid.UUID
     reason: str = Field(..., min_length=1, max_length=4000)
+    override_failed: bool = False
 
 
 class LimsRunDataListResponse(BaseModel):
@@ -265,8 +266,10 @@ class ParserConfig(BaseModel):
         None,
         description=(
             "Optional. Source column that holds the sample identifier. "
-            "On import, each value is matched to client_sample_id, then sample name. "
-            "Rows that do not match are kept and reported."
+            "On import, each value is matched to client_sample_id, then sample name, "
+            "and only a sample on this run is linked. A sample that exists but is not "
+            "on the run is kept with the reason 'Not on this run'. A key that matches "
+            "both a client sample ID and a different sample's name is kept and not linked."
         ),
     )
 

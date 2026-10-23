@@ -1,12 +1,33 @@
 """
 Pydantic schemas for samples
 """
+import math
+
 from app.schemas._dates import is_future, store_calendar_day
 from pydantic import ConfigDict, Field, validator, model_validator
 from app.schemas._instants import APIModel as BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 from uuid import UUID
+
+# Receipt volume ceiling: 10 L. Matches ck_samples_volume_ul_max.
+MAX_RECEIPT_VOLUME_UL = 10_000_000
+
+
+def _receipt_volume(value):
+    """Finite, non-negative volume in µL, at most MAX_RECEIPT_VOLUME_UL."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("Volume must be a finite number of microlitres")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("Volume must be a finite number of microlitres")
+    if number < 0:
+        raise ValueError("Volume must be zero or greater")
+    if number > MAX_RECEIPT_VOLUME_UL:
+        raise ValueError(f"Volume must be at most {MAX_RECEIPT_VOLUME_UL} µL")
+    return number
 
 
 class SampleBase(BaseModel):
@@ -27,9 +48,11 @@ class SampleBase(BaseModel):
     project_id: Optional[UUID] = Field(None, description="ID of project (optional, auto-created if not provided)")
     qc_type: Optional[UUID] = Field(None, description="ID of QC type from list_entries")
     client_sample_id: Optional[str] = Field(None, max_length=255, description="Client-provided sample ID")
-    volume_ul: Optional[float] = Field(None, description="Volume received, in µL")
+    volume_ul: Optional[float] = Field(
+        None, description="Volume received, in µL. Zero to 10000000."
+    )
     receipt_condition: Optional[str] = Field(None, max_length=255, description="Condition at receipt")
-    thaw_count: Optional[int] = Field(None, description="Freeze-thaw count recorded at receipt")
+    thaw_count: Optional[int] = Field(None, ge=0, description="Freeze-thaw count recorded at receipt")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
 
 
@@ -133,6 +156,10 @@ class SampleCreate(SampleBase):
         if v is not None and (v < -273.15 or v > 1000):
             raise ValueError('Temperature must be between -273.15°C and 1000°C')
         return v
+
+    @validator("volume_ul")
+    def validate_create_volume(cls, v):
+        return _receipt_volume(v)
 
 
 class SampleUpdate(BaseModel):
@@ -491,7 +518,9 @@ class SampleReceiveRequest(BaseModel):
     date_sampled: Optional[datetime] = Field(
         None, description="Collection date (calendar day). Not a future day."
     )
-    volume_ul: Optional[float] = Field(None, description="Volume received, in µL")
+    volume_ul: Optional[float] = Field(
+        None, description="Volume received, in µL. Zero to 10000000."
+    )
     receipt_condition: Optional[str] = Field(None, max_length=255)
     thaw_count: Optional[int] = Field(None, ge=0)
     extra_fields: Optional[Dict[str, Any]] = Field(
@@ -527,9 +556,7 @@ class SampleReceiveRequest(BaseModel):
 
     @validator("volume_ul")
     def validate_volume(cls, v):
-        if v is not None and v < 0:
-            raise ValueError("Volume must be zero or greater")
-        return v
+        return _receipt_volume(v)
 
     @validator("receipt_condition")
     def strip_condition(cls, v):
