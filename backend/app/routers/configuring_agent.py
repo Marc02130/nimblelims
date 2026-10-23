@@ -174,7 +174,10 @@ def post_document(
     user: User = Depends(require_configuring_agent),
     db: Session = Depends(get_db),
 ):
-    data = file.file.read()
+    from app.core.uploads import read_upload_capped
+    from app.services.configuring_agent_service import MAX_FILE_BYTES
+
+    data = read_upload_capped(file, max_bytes=MAX_FILE_BYTES, field_name=file.filename or "upload")
     doc = add_document(db, user, configuration_id, file.filename or "upload", data)
     return _json(
         {
