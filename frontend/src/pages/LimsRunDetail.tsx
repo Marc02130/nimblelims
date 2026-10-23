@@ -744,11 +744,22 @@ const LimsRunDetail: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 2 }}>
               Imported Data ({dataRows.length} rows)
             </Typography>
-            {dataRows.some((row: any) => row.link_note) && (
+            {dataRows.some((row: any) => row.link_note && !row.sample_id) && (
               <Alert severity="warning" sx={{ mb: 2 }} data-testid="unmatched-summary">
-                {dataRows.filter((row: any) => row.link_note).length} row
-                {dataRows.filter((row: any) => row.link_note).length === 1 ? '' : 's'} did
-                not match a sample. Those rows are kept.
+                {dataRows.filter((row: any) => row.link_note && !row.sample_id).length} row
+                {dataRows.filter((row: any) => row.link_note && !row.sample_id).length === 1
+                  ? ''
+                  : 's'}{' '}
+                did not match a sample on this run. Those rows are kept.
+              </Alert>
+            )}
+            {dataRows.some((row: any) => row.link_note && row.sample_id) && (
+              <Alert severity="info" sx={{ mb: 2 }} data-testid="link-flag-summary">
+                {dataRows.filter((row: any) => row.link_note && row.sample_id).length} row
+                {dataRows.filter((row: any) => row.link_note && row.sample_id).length === 1
+                  ? ''
+                  : 's'}{' '}
+                matched both a client sample ID and a sample name.
               </Alert>
             )}
             {dataLoading ? (

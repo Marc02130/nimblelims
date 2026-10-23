@@ -512,7 +512,7 @@ def test_no_delete_routes_left_on_instrument_ops(client, admin_h):
 
 
 BACKEND = Path(__file__).resolve().parents[1]
-BEFORE = "0107_elisa_run_gaps"
+BEFORE = "0108_elisa_followups"
 
 
 def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):

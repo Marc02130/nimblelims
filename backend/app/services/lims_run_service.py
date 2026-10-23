@@ -44,7 +44,7 @@ from app.schemas.flexible_experiment import (
     LimsRunDataRead,
 )
 from app.schemas.data_parser import ImportFileResponse, LimsRunImportRead, UnmatchedImportRow
-from app.services.import_sample_link import link_rows
+from app.services.import_sample_link import cohort_sample_ids, link_rows
 from app.services.data_parser_service import DataParserService
 from app.services.instrument_data_service import InstrumentDataService
 from models.flexible_experiment import (
@@ -824,7 +824,12 @@ class LimsRunService:
             parser_config = parser.parser_config
         elif rows and any(r.sample_key for r in rows):
             parser_config = {"sample_col": "__explicit__", "columns": []}
-        link_rows(self.db, row_dicts, parser_config=parser_config)
+        link_rows(
+            self.db,
+            row_dicts,
+            parser_config=parser_config,
+            on_run=cohort_sample_ids(run),
+        )
         created_rows = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
         self.db.flush()
         self.db.commit()
@@ -890,7 +895,16 @@ class LimsRunService:
             }
             for row in rows
         ]
-        unmatched = link_rows(self.db, row_dicts, parser_config=parser.parser_config)
+        unmatched = link_rows(
+            self.db,
+            row_dicts,
+            parser_config=parser.parser_config,
+            on_run=cohort_sample_ids(run),
+        )
+        for row in row_dicts:
+            if row.get("sample_id") and row.get("link_note"):
+                label = row.get("well_position") or row.get("sample_key") or "row"
+                warnings.append(f"{label}: {row['link_note']}")
         created = self.data_repo.bulk_create(run_id, row_dicts, self._user_id())
         self.db.flush()
         self.db.commit()

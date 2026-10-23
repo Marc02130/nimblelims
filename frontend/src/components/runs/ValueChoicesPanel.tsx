@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  Checkbox,
   FormControlLabel,
   Radio,
   RadioGroup,
@@ -53,6 +54,7 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
   const [error, setError] = useState<string | null>(null);
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const load = async () => {
@@ -83,8 +85,14 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
     const key = rowKey(row);
     const accepted = picks[key];
     const reason = (reasons[key] || '').trim();
-    if (!accepted || !reason) {
-      setError('Pick a value and enter a reason');
+    const selected = row.options.find((opt) => opt.lims_run_id === accepted);
+    const fromFailed = selected?.run_status === 'failed';
+    if (!accepted || !reason || (fromFailed && !overrides[key])) {
+      setError(
+        fromFailed
+          ? 'Pick a value, confirm the rejected plate, and enter a reason'
+          : 'Pick a value and enter a reason'
+      );
       return;
     }
     setSavingKey(key);
@@ -96,6 +104,7 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
         replicate: row.replicate,
         accepted_lims_run_id: accepted,
         reason,
+        override_failed: fromFailed,
       });
       await load();
     } catch (err: any) {
@@ -147,6 +156,8 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
           <TableBody>
             {rows.map((row) => {
               const key = rowKey(row);
+              const selected = row.options.find((opt) => opt.lims_run_id === picks[key]);
+              const fromFailed = selected?.run_status === 'failed';
               return (
                 <TableRow key={key}>
                   <TableCell>
@@ -168,6 +179,21 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
                         />
                       ))}
                     </RadioGroup>
+                    {fromFailed && (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={Boolean(overrides[key])}
+                            onChange={(e) =>
+                              setOverrides((prev) => ({ ...prev, [key]: e.target.checked }))
+                            }
+                            inputProps={{ 'aria-label': `Override rejected plate for ${row.client_sample_id || row.sample_name}` }}
+                          />
+                        }
+                        label="Accept this value from a rejected plate"
+                      />
+                    )}
                     {row.accepted_value && (
                       <Typography variant="caption" color="text.secondary">
                         Accepted: {row.accepted_value}
@@ -190,7 +216,12 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
                     <Button
                       size="small"
                       variant="contained"
-                      disabled={savingKey === key || !picks[key] || !(reasons[key] || '').trim()}
+                      disabled={
+                        savingKey === key ||
+                        !picks[key] ||
+                        !(reasons[key] || '').trim() ||
+                        (fromFailed && !overrides[key])
+                      }
                       onClick={() => void accept(row)}
                     >
                       Accept
