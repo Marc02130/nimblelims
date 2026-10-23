@@ -12,7 +12,8 @@ value from a failed run. The catalog column is added only for clients that
 already have the table registered.
 
 ``samples.volume_ul`` gains an upper bound of 10000000 µL (10 L). The
-existing non-negative check stays.
+existing non-negative check stays. Rows above the cap are counted first; if
+any exist the upgrade stops with that count and changes nothing.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ down_revision = "0107_elisa_run_gaps"
 branch_labels = None
 depends_on = None
 
+VOLUME_CAP_UL = 10_000_000
 _COLUMN = "override_failed"
 _TABLE = "result_acceptances"
 
@@ -49,13 +51,33 @@ def upgrade() -> None:
             server_default=sa.text("false"),
         ),
     )
+    _assert_volumes_within_cap(op.get_bind())
     op.create_check_constraint(
         "ck_samples_volume_ul_max",
         "samples",
-        "volume_ul IS NULL OR volume_ul <= 10000000",
+        f"volume_ul IS NULL OR volume_ul <= {VOLUME_CAP_UL}",
     )
     op.execute("REVOKE DELETE ON TABLE result_acceptances FROM lims_app")
     _sync_override_column(op.get_bind())
+
+
+def _assert_volumes_within_cap(conn) -> None:
+    """Stop before adding the check when stored volumes would violate it.
+
+    Rows are never changed or deleted here. Fix them by hand, then upgrade again.
+    """
+    over = conn.execute(
+        sa.text("SELECT count(*) FROM samples WHERE volume_ul > :cap"),
+        {"cap": VOLUME_CAP_UL},
+    ).scalar()
+    if over:
+        raise RuntimeError(
+            f"0108_elisa_followups: {over} sample row(s) have volume_ul above "
+            f"{VOLUME_CAP_UL} µL. ck_samples_volume_ul_max was not added. "
+            "Correct those volumes (SELECT id, volume_ul FROM samples "
+            f"WHERE volume_ul > {VOLUME_CAP_UL}), then run the upgrade again. "
+            "No rows were changed or deleted."
+        )
 
 
 def _sync_override_column(conn) -> None:
