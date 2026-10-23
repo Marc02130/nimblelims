@@ -13,6 +13,9 @@ already have the table registered.
 
 ``samples.volume_ul`` gains an upper bound of 10000000 µL (10 L). The
 existing non-negative check stays.
+
+0109_instrument_tracking revises this revision so the product chain stays
+a single head.
 """
 from __future__ import annotations
 

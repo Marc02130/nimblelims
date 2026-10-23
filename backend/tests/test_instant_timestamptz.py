@@ -351,7 +351,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         assert after[name] == 0
     missing = set(before) - set(after)
     assert missing <= {"instrument_types"}
-    # 0108 seeds instrument_types / maintenance_types / downtime_reasons and
+    # 0109 seeds instrument_types / maintenance_types / downtime_reasons and
     # their entries. The 0102 frozen counts cannot include lists/list_entries
     # after that, or the round-trip would treat those seed rows as drift.
     skip = {
