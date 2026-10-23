@@ -27,6 +27,7 @@ interface ChoiceOption {
   status_reason?: string | null;
   raw_result: string;
   source: string;
+  counts_as_failed?: boolean;
 }
 
 interface ValueChoice {
@@ -47,6 +48,14 @@ interface ValueChoicesPanelProps {
 }
 
 const rowKey = (row: ValueChoice) => `${row.sample_id}:${row.analyte_id}:${row.replicate}`;
+
+const isFailedOption = (opt?: ChoiceOption) =>
+  Boolean(opt && (opt.counts_as_failed || opt.run_status === 'failed'));
+
+const optionStatus = (opt: ChoiceOption) =>
+  opt.run_status !== 'failed' && opt.counts_as_failed
+    ? `${opt.run_status}, counts as failed`
+    : opt.run_status;
 
 const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
   const [rows, setRows] = useState<ValueChoice[]>([]);
@@ -86,11 +95,11 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
     const accepted = picks[key];
     const reason = (reasons[key] || '').trim();
     const selected = row.options.find((opt) => opt.lims_run_id === accepted);
-    const fromFailed = selected?.run_status === 'failed';
+    const fromFailed = isFailedOption(selected);
     if (!accepted || !reason || (fromFailed && !overrides[key])) {
       setError(
         fromFailed
-          ? 'Pick a value, confirm the rejected plate, and enter a reason'
+          ? 'Pick a value, confirm the failed run, and enter a reason'
           : 'Pick a value and enter a reason'
       );
       return;
@@ -157,7 +166,7 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
             {rows.map((row) => {
               const key = rowKey(row);
               const selected = row.options.find((opt) => opt.lims_run_id === picks[key]);
-              const fromFailed = selected?.run_status === 'failed';
+              const fromFailed = isFailedOption(selected);
               return (
                 <TableRow key={key}>
                   <TableCell>
@@ -175,7 +184,7 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
                           key={opt.lims_run_id}
                           value={opt.lims_run_id}
                           control={<Radio size="small" />}
-                          label={`${opt.run_name} (${opt.run_status}): ${opt.raw_result}`}
+                          label={`${opt.run_name} (${optionStatus(opt)}): ${opt.raw_result}`}
                         />
                       ))}
                     </RadioGroup>
@@ -188,10 +197,10 @@ const ValueChoicesPanel: React.FC<ValueChoicesPanelProps> = ({ runId }) => {
                             onChange={(e) =>
                               setOverrides((prev) => ({ ...prev, [key]: e.target.checked }))
                             }
-                            inputProps={{ 'aria-label': `Override rejected plate for ${row.client_sample_id || row.sample_name}` }}
+                            inputProps={{ 'aria-label': `Override failed run for ${row.client_sample_id || row.sample_name}` }}
                           />
                         }
-                        label="Accept this value from a rejected plate"
+                        label="Accept this value from a failed run"
                       />
                     )}
                     {row.accepted_value && (

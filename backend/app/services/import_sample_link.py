@@ -1,9 +1,11 @@
 """Bind imported rows to samples using the parser sample-identifier column.
 
-A row links only when the sample is on this run. Unmatched rows are kept.
-The note says why they did not link, including a sample that exists but is
-not on the run, and a key that matches a client sample ID and a sample name
-pointing at different samples.
+A row links only when the sample is on this run. Matches are narrowed to
+samples on the run before the duplicate and different-sample checks.
+Unmatched rows are kept. The note says why they did not link, including a
+sample that exists but is not on the run, and a key that matches a client
+sample ID and a sample name pointing at different samples on the run. A
+linked row keeps a note when another sample off the run has the same key.
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ SAMPLE_KEY_MAX = 255
 NOT_ON_RUN = "Not on this run"
 DIFFERENT_SAMPLES = "Client sample ID and sample name match different samples"
 MATCHED_BOTH = "Matched by client sample ID and sample name"
+ALSO_OFF_RUN = "Linked to the sample on this run; another sample not on this run has the same identifier"
 
 
 def sample_key_from_config(row_data: Dict[str, Any], parser_config: Optional[dict]) -> Optional[str]:
@@ -159,27 +162,27 @@ def _resolve(
 ) -> tuple[Optional[uuid.UUID], Optional[str]]:
     if not key:
         return None, "Blank sample identifier"
-    clients = by_client.get(key) or []
-    names = by_name.get(key) or []
+    all_clients = by_client.get(key) or []
+    all_names = by_name.get(key) or []
+    if not all_clients and not all_names:
+        return None, f"No sample matches {key}"
+    clients = [sample for sample in all_clients if sample.id in on_run]
+    names = [sample for sample in all_names if sample.id in on_run]
+    if not clients and not names:
+        return None, NOT_ON_RUN
     client_ids = {sample.id for sample in clients}
     name_ids = {sample.id for sample in names}
     if client_ids and name_ids and client_ids != name_ids:
         return None, DIFFERENT_SAMPLES
     if len(clients) > 1:
-        return None, f"More than one sample has client sample ID {key}"
+        return None, f"More than one sample on this run has client sample ID {key}"
     if len(names) > 1 and not clients:
-        return None, f"More than one sample is named {key}"
-    sample: Optional[Sample] = None
-    flag: Optional[str] = None
-    if len(clients) == 1 and name_ids == client_ids:
-        sample = clients[0]
-        flag = MATCHED_BOTH
-    elif len(clients) == 1:
-        sample = clients[0]
-    elif len(names) == 1:
-        sample = names[0]
-    else:
-        return None, f"No sample matches {key}"
-    if sample.id not in on_run:
-        return None, NOT_ON_RUN
-    return sample.id, flag
+        return None, f"More than one sample on this run is named {key}"
+    sample = clients[0] if clients else names[0]
+    off_run = {s.id for s in all_clients} | {s.id for s in all_names}
+    off_run.discard(sample.id)
+    if off_run:
+        return sample.id, ALSO_OFF_RUN
+    if client_ids and name_ids:
+        return sample.id, MATCHED_BOTH
+    return sample.id, None

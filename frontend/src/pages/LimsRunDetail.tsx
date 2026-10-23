@@ -39,7 +39,7 @@ import RunImportDialog, {
   ImportFileResult,
   ParserOption,
 } from '../components/runs/RunImportDialog';
-import RejectPlateDialog from '../components/runs/RejectPlateDialog';
+import FailRunDialog from '../components/runs/FailRunDialog';
 import ValueChoicesPanel from '../components/runs/ValueChoicesPanel';
 import DoseResponseTab from './DoseResponse/DoseResponseTab';
 import StartCohortPanel from '../components/experiments/StartCohortPanel';
@@ -90,6 +90,7 @@ interface RunDetail {
   status_reason?: string | null;
   rejected_at?: string | null;
   replaces_run_id?: string | null;
+  has_imported_data?: boolean;
   created_at: string;
   modified_at?: string;
 }
@@ -138,9 +139,9 @@ const LimsRunDetail: React.FC = () => {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportFileResult | null>(null);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [rejectError, setRejectError] = useState<string | null>(null);
+  const [failOpen, setFailOpen] = useState(false);
+  const [failing, setFailing] = useState(false);
+  const [failError, setFailError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
 
   useEffect(() => {
@@ -337,6 +338,7 @@ const LimsRunDetail: React.FC = () => {
       setImportResult(result);
       setActiveTab(1);
       await loadData();
+      await loadRun();
     } catch (err: any) {
       setImportError(apiErrorMsg(err, 'Import failed'));
     } finally {
@@ -344,21 +346,21 @@ const LimsRunDetail: React.FC = () => {
     }
   };
 
-  const confirmReject = async (reason: string) => {
+  const confirmFail = async (reason: string) => {
     if (!runId) return;
-    setRejecting(true);
-    setRejectError(null);
+    setFailing(true);
+    setFailError(null);
     try {
-      await apiService.rejectLimsRun(runId, reason);
-      setRejectOpen(false);
+      await apiService.failLimsRun(runId, reason);
+      setFailOpen(false);
       setSuccessMsg(
-        'Plate rejected. Imported rows were kept. Rerun every sample on this plate.',
+        'Run failed. Imported rows were kept. Rerun every sample on this plate.',
       );
       await loadRun();
     } catch (err: any) {
-      setRejectError(apiErrorMsg(err, 'Failed to reject plate'));
+      setFailError(apiErrorMsg(err, 'Could not fail the run'));
     } finally {
-      setRejecting(false);
+      setFailing(false);
     }
   };
 
@@ -536,12 +538,13 @@ const LimsRunDetail: React.FC = () => {
             Publish
           </Button>
         )}
-        {!TERMINAL_STATUSES.has(run.status) && (
+        {!TERMINAL_STATUSES.has(run.status) && !run.has_imported_data && (
           <Button
             variant="outlined"
             color="error"
             size="small"
             disabled={transitioning}
+            data-testid="cancel-run-button"
             onClick={() => handleTransition('cancel')}
           >
             Cancel Run
@@ -566,13 +569,13 @@ const LimsRunDetail: React.FC = () => {
             color="error"
             size="small"
             disabled={transitioning}
-            data-testid="reject-plate-button"
+            data-testid="fail-run-button"
             onClick={() => {
-              setRejectError(null);
-              setRejectOpen(true);
+              setFailError(null);
+              setFailOpen(true);
             }}
           >
-            Reject plate
+            Fail run
           </Button>
         )}
         {run.status !== 'draft' && (
@@ -725,7 +728,7 @@ const LimsRunDetail: React.FC = () => {
               {run.rejected_at && (
                 <ListItem>
                   <ListItemText
-                    primary="Rejected"
+                    primary="Failed"
                     secondary={formatInstant(run.rejected_at)}
                   />
                 </ListItem>
@@ -757,7 +760,7 @@ const LimsRunDetail: React.FC = () => {
                 {dataRows.filter((row: any) => row.link_note && row.sample_id).length === 1
                   ? ''
                   : 's'}{' '}
-                matched both a client sample ID and a sample name.
+                linked with a note. Check the note on each row.
               </Alert>
             )}
             {dataLoading ? (
@@ -825,15 +828,15 @@ const LimsRunDetail: React.FC = () => {
         }}
         onSubmit={(parser, file) => void submitImport(parser, file)}
       />
-      <RejectPlateDialog
-        open={rejectOpen}
-        submitting={rejecting}
-        error={rejectError}
+      <FailRunDialog
+        open={failOpen}
+        submitting={failing}
+        error={failError}
         sampleCount={run.cohort?.sample_ids?.length || 0}
         onClose={() => {
-          if (!rejecting) setRejectOpen(false);
+          if (!failing) setFailOpen(false);
         }}
-        onConfirm={(reason) => void confirmReject(reason)}
+        onConfirm={(reason) => void confirmFail(reason)}
       />
 
       <PublishPromotionDialog

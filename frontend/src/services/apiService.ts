@@ -2481,8 +2481,8 @@ export class ApiService {
     return response.data;
   }
 
-  async rejectLimsRun(id: string, reason: string) {
-    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${id}/reject`, { reason });
+  async failLimsRun(id: string, reason: string) {
+    const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${id}/fail`, { reason });
     return response.data;
   }
 

@@ -19,6 +19,9 @@ from tests.test_elisa_run_gaps import _analysis, _publish, _run, _sample, _templ
 NOT_ON_RUN = "Not on this run"
 DIFFERENT = "Client sample ID and sample name match different samples"
 BOTH = "Matched by client sample ID and sample name"
+ALSO_OFF_RUN = (
+    "Linked to the sample on this run; another sample not on this run has the same identifier"
+)
 
 
 @pytest.fixture
@@ -123,8 +126,9 @@ def test_import_binds_only_samples_on_the_run(
     assert by_well["D4"]["link_note"] == BOTH
     assert by_well["E1"]["sample_id"] is None
     assert by_well["E1"]["link_note"] == NOT_ON_RUN
-    assert by_well["E2"]["sample_id"] is None
-    assert by_well["E2"]["link_note"] == DIFFERENT
+    # The name match is off the run, so it is narrowed away; the row links and keeps a note.
+    assert by_well["E2"]["sample_id"] == str(clash_client.id)
+    assert by_well["E2"]["link_note"] == ALSO_OFF_RUN
 
     listed = client.get(f"/v1/lims-runs/{run_id}/data", headers=auth_headers, params={"size": 20})
     assert listed.status_code == 200, listed.text

@@ -18,17 +18,13 @@ from app.schemas.flexible_experiment import (
     ValueChoiceRead,
 )
 from app.services.result_promotion_service import ResultPromotionService, _norm, _stringify
+from app.services.run_failure import counts_as_failed
 from models.flexible_experiment import LimsRun, LimsRunData
 from models.result import Result
 from models.result_acceptance import ResultAcceptance
 from models.sample import Sample
 from models.test import Test
 from models.user import User
-
-
-def _is_failed(run: LimsRun) -> bool:
-    status_value = run.status.value if hasattr(run.status, "value") else str(run.status)
-    return status_value == "failed"
 
 
 def _explicit_replicate(row_data: Dict[str, Any]) -> int:
@@ -107,11 +103,11 @@ class ResultAcceptanceService:
                 detail="A reason is required",
             )
         chosen_run = run if body.accepted_lims_run_id == run.id else other
-        if _is_failed(chosen_run) and not body.override_failed:
+        if counts_as_failed(self.db, chosen_run) and not body.override_failed:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
-                    "Accepting a value from a failed or rejected run requires "
+                    "Accepting a value from a failed run requires "
                     "override_failed and a reason"
                 ),
             )
@@ -230,6 +226,7 @@ class ResultAcceptanceService:
             for s in self.db.query(Sample).filter(Sample.id.in_(list(sample_ids))).all()
         }
         runs = {run.id: run, other.id: other}
+        failed = {rid: counts_as_failed(self.db, owner) for rid, owner in runs.items()}
         values: Dict[Tuple[uuid.UUID, uuid.UUID, int, uuid.UUID], Tuple[str, str]] = {}
 
         data_rows = (
@@ -318,6 +315,7 @@ class ResultAcceptanceService:
                     status_reason=owner.status_reason,
                     raw_result=raw,
                     source=source,
+                    counts_as_failed=failed[lims_run_id],
                 )
             )
 

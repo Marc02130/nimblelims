@@ -10,7 +10,9 @@ Routes:
     PATCH  /lims-runs/{id}/results-received    — running → results_received (CRO only)
     PATCH  /lims-runs/{id}/review              — running|results_received → complete
     PATCH  /lims-runs/{id}/complete            — complete → published (requires experiment:publish)
-    PATCH  /lims-runs/{id}/cancel              — any non-terminal → canceled
+    PATCH  /lims-runs/{id}/cancel              — non-terminal → canceled, only before any import row
+    POST   /lims-runs/{id}/fail                — non-terminal → failed, reason required
+    POST   /lims-runs/{id}/reject              — same as /fail (kept for existing clients)
     POST   /lims-runs/{id}/import              — import instrument data (running or results_received)
     GET    /lims-runs/{id}/data                — list imported data rows
     GET    /lims-runs/{id}/worklist            — download robot worklist CSV
@@ -20,7 +22,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.database import get_db
 from app.core.security import get_current_user, require_permission
@@ -37,11 +39,12 @@ from app.schemas.flexible_experiment import (
     ImportDataResponse,
     LimsRunDataRead,
     LimsRunDataListResponse,
-    RejectRunRequest,
+    FailRunRequest,
     RerunCreateRequest,
     ValueChoiceRead,
 )
 from app.services.result_acceptance_service import ResultAcceptanceService
+from app.services.run_failure import has_imported_data
 from models.flexible_experiment import LimsRunStatus, LimsRun
 from models.user import User
 
@@ -61,7 +64,9 @@ def _run_read(run: LimsRun) -> LimsRunRead:
     lt = None
     if run.experiment_template is not None:
         lt = getattr(run.experiment_template, "lifecycle_type", None) or "standard"
-    return data.model_copy(update={"lifecycle_type": lt})
+    session = object_session(run)
+    has_data = has_imported_data(session, run.id) if session is not None else False
+    return data.model_copy(update={"lifecycle_type": lt, "has_imported_data": has_data})
 
 
 @router.get("", response_model=LimsRunListResponse)
@@ -218,22 +223,37 @@ def cancel_run(
     run_id: UUID,
     service: LimsRunService = Depends(_run_service),
 ):
-    """Transition: any non-terminal state → canceled."""
+    """Non-terminal → canceled, only while the run has no imported data.
+
+    A run with imported data has already run: 422 ``run_has_imported_data``.
+    Fail it instead.
+    """
     run = service.cancel_run(run_id)
+    return _run_read(run)
+
+
+@router.post("/{run_id}/fail", response_model=LimsRunRead)
+def fail_run(
+    run_id: UUID,
+    body: FailRunRequest,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Fail the run. Status becomes failed, the reason is kept, rows stay.
+
+    SOP §13: when the plate fails, every sample on it is rerun. Nothing is deleted.
+    """
+    run = service.fail_run(run_id, body.reason)
     return _run_read(run)
 
 
 @router.post("/{run_id}/reject", response_model=LimsRunRead)
 def reject_run(
     run_id: UUID,
-    body: RejectRunRequest,
+    body: FailRunRequest,
     service: LimsRunService = Depends(_run_service),
 ):
-    """Reject the plate. Status becomes failed, the reason is kept, rows stay.
-
-    SOP §13: when the plate fails, every sample on it is rerun. Nothing is deleted.
-    """
-    run = service.reject_run(run_id, body.reason)
+    """Same as POST /fail. Kept so existing clients keep working."""
+    run = service.fail_run(run_id, body.reason)
     return _run_read(run)
 
 
