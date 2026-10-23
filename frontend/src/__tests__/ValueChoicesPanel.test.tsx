@@ -70,7 +70,7 @@ describe('ValueChoicesPanel', () => {
     });
   });
 
-  test('a rejected plate needs the override before accept', async () => {
+  test('a failed run needs the override before accept', async () => {
     render(
       <ThemeProvider theme={theme}>
         <ValueChoicesPanel runId="run-new" />
@@ -82,7 +82,7 @@ describe('ValueChoicesPanel', () => {
       target: { value: 'Original plate stands' },
     });
     expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
-    fireEvent.click(screen.getByLabelText('Override rejected plate for IL6-SER-0001'));
+    fireEvent.click(screen.getByLabelText('Override failed run for IL6-SER-0001'));
     fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
     await waitFor(() => {
       expect(mockAccept).toHaveBeenCalledWith('run-new', {
@@ -93,6 +93,37 @@ describe('ValueChoicesPanel', () => {
         reason: 'Original plate stands',
         override_failed: true,
       });
+    });
+  });
+
+  test('a run canceled after import counts as failed', async () => {
+    mockGet.mockResolvedValue([
+      {
+        ...row,
+        options: [
+          { ...row.options[0], run_status: 'canceled', counts_as_failed: true },
+          row.options[1],
+        ],
+      },
+    ]);
+    render(
+      <ThemeProvider theme={theme}>
+        <ValueChoicesPanel runId="run-new" />
+      </ThemeProvider>
+    );
+    expect(await screen.findByText('IL6-SER-0001')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/Plate 1 \(canceled, counts as failed\)/));
+    fireEvent.change(screen.getByLabelText('Reason for IL6-SER-0001'), {
+      target: { value: 'Legacy plate value' },
+    });
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Override failed run for IL6-SER-0001'));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    await waitFor(() => {
+      expect(mockAccept).toHaveBeenCalledWith(
+        'run-new',
+        expect.objectContaining({ accepted_lims_run_id: 'run-old', override_failed: true })
+      );
     });
   });
 });

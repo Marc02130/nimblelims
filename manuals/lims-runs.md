@@ -39,7 +39,8 @@ Operator SoT: [HOWTO.md](HOWTO.md) § Later execution. **X-1** (2026-09-11).
 - Table: `lims_runs`
 - Status is a strict enum (`LimsRunStatus`) with two lifecycles controlled by the template's `lifecycle_type`.
 - Key timestamps: `started_at`, `completed_at`, `published_at`, `canceled_at`, `rejected_at`, plus `created_at` and `modified_at`. Those columns are `timestamptz`. The API sends each of them as UTC with `Z`. The run page shows them in the browser's local time, so a run created at 7:23 PM US Eastern is `2026-10-18T23:23:00Z`, not 11:23 PM.
-- `status_reason` and `rejected_at` record a plate reject. Status becomes `failed`. Imported rows stay.
+- `status_reason` and `rejected_at` record a **Fail** (the column keeps its original name). Status becomes `failed`. Imported rows stay.
+- `has_imported_data` on the run response is true once any import stored a row, linked or not. Cancel is refused from then on.
 - `replaces_run_id` on a rerun points at the run it replaces. The replaced run is not removed.
 - Special field: `fit_in_progress` (mutex for curve fitting).
 - **`analysis_id`** (required FK → `analyses`): assay this run is for. Set on create/edit; required to start, import, and publish. On publish, instrument data is promoted to Tests/Results for that analysis.
@@ -64,8 +65,9 @@ draft → ordered → running → results_received → complete → published
 - `results_received`: Data returned by CRO (import allowed here).
 - Import of data is only permitted in `running` or `results_received`.
 - `complete → published` requires the `experiment:publish` permission.
-- Cancel is allowed from any non-terminal state.
-- **Reject plate** (`POST /v1/lims-runs/{id}/reject`, body `{reason}`) is allowed from any state that can transition to `failed` (running, results received, complete, and the earlier non-terminal states). Published is terminal. The reason is required. Status becomes `failed`. Rows stay.
+- Cancel (`PATCH /v1/lims-runs/{id}/cancel`) is allowed from a non-terminal state only while the run has no imported data. A run with imported data has already run: cancel returns **422** `run_has_imported_data` with a message that points to Fail. The UI hides **Cancel Run** once data is imported.
+- **Fail run** (`POST /v1/lims-runs/{id}/fail`, body `{reason}`) is allowed from any state that can transition to `failed` (running, results received, complete, and the earlier non-terminal states). Published is terminal. The reason is required. Status becomes `failed`. Rows stay. `POST /v1/lims-runs/{id}/reject` is the same action, kept for existing clients.
+- A run that was canceled after data was imported (before this rule) keeps status `canceled`. It counts as failed when a value is accepted, and value choices show `counts_as_failed`. No row is rewritten.
 - **Create rerun** (`POST /v1/lims-runs/{id}/rerun`) is allowed once the run has left draft. The new run is a draft with the same template, analysis, and cohort sample ids (not locked, so Start locks them and reuses Tests). `replaces_run_id` is the original run.
 
 ### Promote-on-publish (structured Tests / Results)
@@ -81,7 +83,7 @@ Shipped v1 — see `.docs/internal/ideas/run-results.md`.
 | **First-start freeze** | **Not closed. Freeze skip unsigned.** First start **wrote** `{}` onto new Test `99b692d3` (not SQL NULL, not a skipped classic row). That `{}` is **ambiguous** — first start cannot tell a classic default `{}` from a frozen `{}` (same JSON). Do **not** teach skip-on-frozen-`{}` or later-start no-overwrite of `{}` as a verified freeze skip. Classic `/tests` must leave `asked_for_params` **NULL**, or we need a **freeze marker**. `if test: continue` is **not** a freeze. **OQ-WO-6:** an earlier LimsRun must not share the asked-for `analysis_id` (extract is not a special assay) |
 | **Results** | Write `raw_result`, `replicate` (from JSONB or row order), `lims_run_id` lineage |
 | **Conflicts** | Same run → update; a result owned by a run in this run's `replaces_run_id` chain → **held** (publish continues and does not overwrite that result); any other run or manual result → **409**, publish blocked |
-| **Accepted value** | On the rerun, `GET/POST /v1/lims-runs/{id}/value-choices`. Both use `experiment:publish`. The reviewer picks this run or the run it replaces. The result row shows the pick and keeps the previous result's `entered_by`. `result_acceptances` keeps both values, the reason, and `override_failed` when the picked run is `failed`. A failed or rejected run is refused with **422** unless `override_failed` is true and the reason is non-empty. The previous active choice becomes inactive. Nothing is deleted. `lims_app` has no DELETE on `result_acceptances`. |
+| **Accepted value** | On the rerun, `GET/POST /v1/lims-runs/{id}/value-choices`. Both use `experiment:publish`. The reviewer picks this run or the run it replaces. The result row shows the pick and keeps the previous result's `entered_by`. `result_acceptances` keeps both values, the reason, and `override_failed` when the picked run counts as failed. A failed run, or a run canceled after import, is refused with **422** unless `override_failed` is true and the reason is non-empty. The previous active choice becomes inactive. Nothing is deleted. `lims_app` has no DELETE on `result_acceptances`. |
 | **Preview** | `GET /v1/lims-runs/{id}/promotion/preview` — dry-run; UI shows counts on Publish confirm, including `held_count` |
 | **Permissions** | **Publish** may create/update Results on this path, but may not create the WO-7 Test |
 | **Batch size** | Env `LIMS_PROMOTE_BATCH_SIZE` (default **200**) |

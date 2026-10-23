@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.rbac import require_config_edit
 from app.core.security import get_current_user
+from app.core.uploads import read_upload_capped
 from app.database import get_db
 from app.schemas.data_parser import (
     DataParserCreate,
@@ -114,9 +115,9 @@ def test_parser_config(
         raise HTTPException(400, f"Max {MAX_SETUP_FILES} files")
     payloads: list[tuple[str, bytes]] = []
     for f in files:
-        content = f.file.read()
-        if len(content) > MAX_SETUP_FILE_BYTES:
-            raise HTTPException(400, f"{f.filename} exceeds size limit")
+        content = read_upload_capped(
+            f, max_bytes=MAX_SETUP_FILE_BYTES, field_name=f.filename or "file"
+        )
         payloads.append((f.filename or "file", content))
     return DataParserService(db, current_user=user).test_config(cfg, payloads)
 
@@ -147,7 +148,9 @@ def upload_setup_file(
     user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
-    content = file.file.read()
+    content = read_upload_capped(
+        file, max_bytes=MAX_SETUP_FILE_BYTES, field_name=file.filename or "upload"
+    )
     return DataParserService(db, current_user=user).add_setup_file(
         parser_id=parser_id,
         role=role,

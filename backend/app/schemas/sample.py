@@ -14,6 +14,13 @@ from uuid import UUID
 MAX_RECEIPT_VOLUME_UL = 10_000_000
 
 
+def _no_bool_volume(value):
+    """Run before coercion, which would turn true into 1.0."""
+    if isinstance(value, bool):
+        raise ValueError("Volume must be a finite number of microlitres")
+    return value
+
+
 def _receipt_volume(value):
     """Finite, non-negative volume in µL, at most MAX_RECEIPT_VOLUME_UL."""
     if value is None:
@@ -156,6 +163,10 @@ class SampleCreate(SampleBase):
         if v is not None and (v < -273.15 or v > 1000):
             raise ValueError('Temperature must be between -273.15°C and 1000°C')
         return v
+
+    @validator("volume_ul", pre=True)
+    def reject_bool_create_volume(cls, v):
+        return _no_bool_volume(v)
 
     @validator("volume_ul")
     def validate_create_volume(cls, v):
@@ -553,6 +564,10 @@ class SampleReceiveRequest(BaseModel):
         if v is not None and is_future(v):
             raise ValueError("Collection date cannot be in the future")
         return store_calendar_day(v)
+
+    @validator("volume_ul", pre=True)
+    def reject_bool_volume(cls, v):
+        return _no_bool_volume(v)
 
     @validator("volume_ul")
     def validate_volume(cls, v):
