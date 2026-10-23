@@ -1,7 +1,7 @@
 """Instrument tracking: list types, maintenance, downtime, uses.
 
-Revision ID: 0109_instrument_tracking
-Revises: 0108_elisa_followups
+Revision ID: 0110_instrument_tracking
+Revises: 0109_revoke_reagent_delete
 
 Marc (2026-10-22): replace instrument_types with the instrument_types list,
 move vendor/model onto instruments, retire (never drop) the old table, add
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0109_instrument_tracking"
-down_revision = "0108_elisa_followups"
+revision = "0110_instrument_tracking"
+down_revision = "0109_revoke_reagent_delete"
 branch_labels = None
 depends_on = None
 
@@ -81,7 +81,7 @@ _USE_POLICY = """is_admin() OR (
 
 def _m0089():
     path = os.path.join(os.path.dirname(__file__), "0089_register_schema_catalog.py")
-    spec = importlib.util.spec_from_file_location("_m0089_for_0109", path)
+    spec = importlib.util.spec_from_file_location("_m0089_for_0110", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -687,7 +687,7 @@ def _register(conn) -> None:
     """Register the new tables only for clients that already have a catalog.
 
     0089.upgrade walks every client. A later alembic re-run (tests that
-    downgrade past 0109 then upgrade to head) must not attach rows to
+    downgrade past 0110 then upgrade to head) must not attach rows to
     ephemeral orgs created after the first migrate.
     """
     m = _m0089()

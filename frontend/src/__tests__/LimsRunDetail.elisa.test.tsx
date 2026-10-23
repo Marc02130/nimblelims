@@ -9,7 +9,7 @@ const mockGetAnalyses = jest.fn();
 const mockGetLimsRunData = jest.fn();
 const mockGetDataParsers = jest.fn();
 const mockImportLimsRunFile = jest.fn();
-const mockRejectLimsRun = jest.fn();
+const mockFailLimsRun = jest.fn();
 const mockCreateLimsRunRerun = jest.fn();
 const mockGetLimsRunValueChoices = jest.fn();
 
@@ -20,7 +20,7 @@ jest.mock('../services/apiService', () => ({
     getLimsRunData: (...args: any[]) => mockGetLimsRunData(...args),
     getDataParsers: (...args: any[]) => mockGetDataParsers(...args),
     importLimsRunFile: (...args: any[]) => mockImportLimsRunFile(...args),
-    rejectLimsRun: (...args: any[]) => mockRejectLimsRun(...args),
+    failLimsRun: (...args: any[]) => mockFailLimsRun(...args),
     createLimsRunRerun: (...args: any[]) => mockCreateLimsRunRerun(...args),
     getLimsRunValueChoices: (...args: any[]) => mockGetLimsRunValueChoices(...args),
     acceptLimsRunValue: jest.fn(),
@@ -98,7 +98,7 @@ describe('LimsRunDetail ELISA gaps', () => {
         },
       ],
     });
-    mockRejectLimsRun.mockResolvedValue({ ...runningRun, status: 'failed', status_reason: 'QC-H out of range' });
+    mockFailLimsRun.mockResolvedValue({ ...runningRun, status: 'failed', status_reason: 'QC-H out of range' });
     mockCreateLimsRunRerun.mockResolvedValue({
       ...runningRun,
       id: 'run-2',
@@ -152,16 +152,18 @@ describe('LimsRunDetail ELISA gaps', () => {
     expect(screen.getByText('IL6-SER-0001')).toBeInTheDocument();
   });
 
-  test('reject requires a reason and create rerun opens the new run', async () => {
+  test('fail requires a reason and create rerun opens the new run', async () => {
     renderRun();
-    fireEvent.click(await screen.findByTestId('reject-plate-button'));
-    expect(screen.getByTestId('reject-confirm')).toBeDisabled();
-    fireEvent.change(screen.getByTestId('reject-reason'), {
+    const failButton = await screen.findByTestId('fail-run-button');
+    expect(failButton).toHaveTextContent('Fail run');
+    fireEvent.click(failButton);
+    expect(screen.getByTestId('fail-run-confirm')).toBeDisabled();
+    fireEvent.change(screen.getByTestId('fail-run-reason'), {
       target: { value: 'QC-H out of range' },
     });
-    fireEvent.click(screen.getByTestId('reject-confirm'));
+    fireEvent.click(screen.getByTestId('fail-run-confirm'));
     await waitFor(() => {
-      expect(mockRejectLimsRun).toHaveBeenCalledWith('run-1', 'QC-H out of range');
+      expect(mockFailLimsRun).toHaveBeenCalledWith('run-1', 'QC-H out of range');
     });
 
     fireEvent.click(screen.getByTestId('create-rerun-button'));
@@ -195,8 +197,9 @@ describe('LimsRunDetail ELISA gaps', () => {
     renderRun();
     fireEvent.click(await screen.findByRole('tab', { name: 'Data' }));
     expect(await screen.findByTestId('link-flag-summary')).toHaveTextContent(
-      '1 row matched both a client sample ID and a sample name'
+      '1 row linked with a note'
     );
+    expect(screen.getByText('Matched by client sample ID and sample name')).toBeInTheDocument();
     expect(screen.getByTestId('unmatched-summary')).toHaveTextContent('1 row did not match');
     expect(screen.getByText('Not on this run')).toBeInTheDocument();
   });
@@ -206,7 +209,22 @@ describe('LimsRunDetail ELISA gaps', () => {
     renderRun();
     expect(await screen.findByRole('heading', { name: 'IL6 plate' })).toBeInTheDocument();
     expect(screen.queryByTestId('run-import-button')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('reject-plate-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fail-run-button')).not.toBeInTheDocument();
     expect(screen.queryByTestId('create-rerun-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cancel-run-button')).toBeInTheDocument();
+  });
+
+  test('cancel is offered before import and hidden once data is imported', async () => {
+    renderRun();
+    expect(await screen.findByTestId('cancel-run-button')).toHaveTextContent('Cancel Run');
+    expect(screen.getByTestId('fail-run-button')).toBeInTheDocument();
+  });
+
+  test('a run with imported data offers Fail and no Cancel', async () => {
+    mockGetLimsRun.mockResolvedValue({ ...runningRun, has_imported_data: true });
+    renderRun();
+    expect(await screen.findByTestId('fail-run-button')).toHaveTextContent('Fail run');
+    expect(screen.queryByTestId('cancel-run-button')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cancel Run')).not.toBeInTheDocument();
   });
 });

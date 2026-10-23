@@ -7,6 +7,7 @@ Rules (open-questions/run-results.md):
 - Column → analyte via name or analyte_aliases (casefold)
 - raw_result only; lims_run_id lineage; replicate from JSONB or row order
 - Same lims_run_id → update; other lims_run_id → conflict fail
+- Rows whose sample is not on the run cohort are skipped
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from app.core.lab_time import current_lab_day
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.services.import_sample_link import NOT_ON_RUN, cohort_sample_ids
 from models.analysis import Analysis, Analyte, AnalysisAnalyte
 from models.flexible_experiment import LimsRun, LimsRunData
 from models.list import List as ListModel, ListEntry
@@ -256,6 +258,7 @@ class ResultPromotionService:
         test_cache: Dict[uuid.UUID, Test] = {}
         dry_test_cache: Dict[uuid.UUID, Optional[Test]] = {}
         replaced_ids = self._replaced_run_ids(run)
+        on_run = cohort_sample_ids(run)
 
         for row in data_rows:
             if not row.sample_id:
@@ -265,6 +268,17 @@ class ResultPromotionService:
                         action="skip",
                         lims_run_data_id=str(row.id),
                         message="Row has no sample_id",
+                    )
+                )
+                plan.skip_count += 1
+                continue
+            if row.sample_id not in on_run:
+                plan.items.append(
+                    PromoteItem(
+                        action="skip",
+                        sample_id=str(row.sample_id),
+                        lims_run_data_id=str(row.id),
+                        message=NOT_ON_RUN,
                     )
                 )
                 plan.skip_count += 1

@@ -1,7 +1,7 @@
 """Lock leftover instrument_types_legacy: revoke writes and FORCE RLS.
 
-Revision ID: 0110_instrument_legacy_lock
-Revises: 0109_instrument_tracking
+Revision ID: 0111_instrument_legacy_lock
+Revises: 0110_instrument_tracking
 
 The leftover table stays. 0103 default privileges granted DELETE/INSERT/UPDATE.
 Revoke those. Do not grant anything new. FORCE RLS so lims_app cannot use the
@@ -10,8 +10,8 @@ row even with leftover SELECT.
 
 from alembic import op
 
-revision = "0110_instrument_legacy_lock"
-down_revision = "0109_instrument_tracking"
+revision = "0111_instrument_legacy_lock"
+down_revision = "0110_instrument_tracking"
 branch_labels = None
 depends_on = None
 
