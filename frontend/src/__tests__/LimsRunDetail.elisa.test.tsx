@@ -171,6 +171,36 @@ describe('LimsRunDetail ELISA gaps', () => {
     expect(await screen.findByRole('heading', { name: 'IL6 plate rerun' })).toBeInTheDocument();
   });
 
+  test('a dual match stays linked and a miss stays on the data tab', async () => {
+    mockGetLimsRunData.mockResolvedValue({
+      rows: [
+        {
+          id: 'row-both',
+          well_position: 'D4',
+          sample_key: 'BOTH-1',
+          sample_id: 's-both',
+          link_note: 'Matched by client sample ID and sample name',
+          row_data: { corr: 0.1 },
+        },
+        {
+          id: 'row-off',
+          well_position: 'E1',
+          sample_key: 'OFF-1',
+          sample_id: null,
+          link_note: 'Not on this run',
+          row_data: { corr: 0.2 },
+        },
+      ],
+    });
+    renderRun();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Data' }));
+    expect(await screen.findByTestId('link-flag-summary')).toHaveTextContent(
+      '1 row matched both a client sample ID and a sample name'
+    );
+    expect(screen.getByTestId('unmatched-summary')).toHaveTextContent('1 row did not match');
+    expect(screen.getByText('Not on this run')).toBeInTheDocument();
+  });
+
   test('a draft run has no import button', async () => {
     mockGetLimsRun.mockResolvedValue({ ...runningRun, status: 'draft', cohort: { sample_ids: [] } });
     renderRun();
