@@ -89,6 +89,7 @@ interface RunDetail {
   canceled_at?: string;
   status_reason?: string | null;
   rejected_at?: string | null;
+  failed_by?: string | null;
   replaces_run_id?: string | null;
   has_imported_data?: boolean;
   created_at: string;

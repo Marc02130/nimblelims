@@ -127,6 +127,12 @@ class LimsRun(Base):
     # Plate reject (SOP §13): status stays `failed`, the reason is kept, rows stay.
     status_reason = Column(Text, nullable=True)
     rejected_at = Column(DateTime(timezone=True), nullable=True)
+    # Who failed the run. NULL on runs failed before 0110 recorded it.
+    failed_by = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('users.id', ondelete='RESTRICT'),
+        nullable=True,
+    )
     # Rerun points at the run it replaces. The replaced run is not deleted.
     replaces_run_id = Column(
         PostgresUUID(as_uuid=True),
