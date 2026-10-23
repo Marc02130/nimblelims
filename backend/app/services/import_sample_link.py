@@ -5,7 +5,9 @@ samples on the run before the duplicate and different-sample checks.
 Unmatched rows are kept. The note says why they did not link, including a
 sample that exists but is not on the run, and a key that matches a client
 sample ID and a sample name pointing at different samples on the run. A
-linked row keeps a note when another sample off the run has the same key.
+row whose key is the client sample ID of an off-run sample and the name of
+an on-run sample does not link. A linked row keeps a note when another
+sample off the run has the same key.
 """
 from __future__ import annotations
 
@@ -23,6 +25,12 @@ NOT_ON_RUN = "Not on this run"
 DIFFERENT_SAMPLES = "Client sample ID and sample name match different samples"
 MATCHED_BOTH = "Matched by client sample ID and sample name"
 ALSO_OFF_RUN = "Linked to the sample on this run; another sample not on this run has the same identifier"
+# The client sample ID is checked first and is the stronger identifier, so a
+# name match on the run is not trusted when that ID belongs to an off-run sample.
+CLIENT_ID_OFF_RUN = (
+    "Client sample ID matches a sample not on this run; "
+    "the sample name matches a different sample on this run"
+)
 
 
 def sample_key_from_config(row_data: Dict[str, Any], parser_config: Optional[dict]) -> Optional[str]:
@@ -178,6 +186,8 @@ def _resolve(
         return None, f"More than one sample on this run has client sample ID {key}"
     if len(names) > 1 and not clients:
         return None, f"More than one sample on this run is named {key}"
+    if not clients and all_clients:
+        return None, CLIENT_ID_OFF_RUN
     sample = clients[0] if clients else names[0]
     off_run = {s.id for s in all_clients} | {s.id for s in all_names}
     off_run.discard(sample.id)
