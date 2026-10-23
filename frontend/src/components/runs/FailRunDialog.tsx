@@ -10,7 +10,7 @@ import {
   TextField,
 } from '@mui/material';
 
-interface RejectPlateDialogProps {
+interface FailRunDialogProps {
   open: boolean;
   submitting: boolean;
   error: string | null;
@@ -19,7 +19,7 @@ interface RejectPlateDialogProps {
   onConfirm: (reason: string) => void;
 }
 
-const RejectPlateDialog: React.FC<RejectPlateDialogProps> = ({
+const FailRunDialog: React.FC<FailRunDialogProps> = ({
   open,
   submitting,
   error,
@@ -31,7 +31,7 @@ const RejectPlateDialog: React.FC<RejectPlateDialogProps> = ({
 
   return (
     <Dialog open={open} onClose={() => !submitting && onClose()} maxWidth="sm" fullWidth>
-      <DialogTitle>Reject plate</DialogTitle>
+      <DialogTitle>Fail run</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
           The run is marked failed and the reason is kept. Imported rows stay. Nothing is
@@ -51,7 +51,7 @@ const RejectPlateDialog: React.FC<RejectPlateDialogProps> = ({
           fullWidth
           multiline
           minRows={2}
-          inputProps={{ 'data-testid': 'reject-reason' }}
+          inputProps={{ 'data-testid': 'fail-run-reason' }}
           helperText="Required. For example: QC-H out of range."
         />
       </DialogContent>
@@ -62,15 +62,15 @@ const RejectPlateDialog: React.FC<RejectPlateDialogProps> = ({
         <Button
           color="error"
           variant="contained"
-          data-testid="reject-confirm"
+          data-testid="fail-run-confirm"
           disabled={submitting || !reason.trim()}
           onClick={() => onConfirm(reason.trim())}
         >
-          Reject plate
+          Fail run
         </Button>
       </DialogActions>
     </Dialog>
   );
 };
 
-export default RejectPlateDialog;
+export default FailRunDialog;

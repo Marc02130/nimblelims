@@ -5,7 +5,8 @@ Standard lifecycle (lifecycle_type='standard'):
     draft → running       (PATCH /start)
     running → complete    (PATCH /review)   [labeled "Ready for Review" in UI]
     complete → published  (PATCH /complete) [requires experiment:publish]
-    any non-terminal → canceled  (PATCH /cancel)
+    any non-terminal → canceled  (PATCH /cancel) [only before any import row]
+    any non-terminal → failed    (POST /fail, reason required)
 
 CRO lifecycle (lifecycle_type='cro'):
     draft → ordered              (PATCH /order)
@@ -13,7 +14,8 @@ CRO lifecycle (lifecycle_type='cro'):
     running → results_received   (PATCH /results-received)
     results_received → complete  (PATCH /review)
     complete → published         (PATCH /complete) [requires experiment:publish]
-    any non-terminal → canceled  (PATCH /cancel)
+    any non-terminal → canceled  (PATCH /cancel) [only before any import row]
+    any non-terminal → failed    (POST /fail, reason required)
 
 Data import is allowed when status is 'running' OR 'results_received'.
 Worklist export and data import are also handled here.
@@ -42,6 +44,7 @@ from app.schemas.flexible_experiment import (
 )
 from app.schemas.data_parser import ImportFileResponse, LimsRunImportRead, UnmatchedImportRow
 from app.services.import_sample_link import cohort_sample_ids, link_rows
+from app.services.run_failure import has_imported_data
 from app.services.data_parser_service import DataParserService
 from app.services.instrument_data_service import InstrumentDataService
 from models.flexible_experiment import (
@@ -634,21 +637,36 @@ class LimsRunService:
         return plan.to_dict()
 
     def cancel_run(self, run_id: uuid.UUID) -> LimsRun:
-        """Any non-terminal state → canceled."""
+        """Non-terminal → canceled, only while no import row is stored.
+
+        A run with imported data has already run. Fail it instead.
+        """
         run = self.get_run(run_id)
+        if has_imported_data(self.db, run.id):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "run_has_imported_data",
+                    "message": (
+                        "This run has imported data, so it has already run and "
+                        "cannot be canceled. Fail the run instead, with a reason "
+                        f"(POST /v1/lims-runs/{run.id}/fail)."
+                    ),
+                },
+            )
         return self._transition(run, LimsRunStatus.canceled)
 
-    def reject_run(self, run_id: uuid.UUID, reason: str) -> LimsRun:
-        """Mark the plate failed and keep every imported row.
+    def fail_run(self, run_id: uuid.UUID, reason: str) -> LimsRun:
+        """Mark the run failed and keep every imported row.
 
-        SOP §13: one failed acceptance criterion rejects the whole plate.
+        SOP §13: one failed acceptance criterion fails the whole plate.
         Every cohort sample is rerun on a new plate. Nothing is deleted.
         """
         text = (reason or "").strip()
         if not text:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A reject reason is required",
+                detail="A reason is required to fail the run",
             )
         run = self.get_run(run_id)
         from datetime import datetime, timezone

@@ -126,6 +126,8 @@ class LimsRunRead(BaseModel):
     modified_at: datetime
     # Convenience for UI lifecycle buttons
     lifecycle_type: Optional[str] = None
+    # Any stored import row. Cancel is refused once this is true; fail instead.
+    has_imported_data: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -165,10 +167,13 @@ class LimsRunDataRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class RejectRunRequest(BaseModel):
-    """Reject a plate or run. Status becomes failed. Rows stay."""
+class FailRunRequest(BaseModel):
+    """Fail a run (plate). Status becomes failed. Rows stay."""
 
     reason: str = Field(..., min_length=1, max_length=4000)
+
+
+RejectRunRequest = FailRunRequest
 
 
 class RerunCreateRequest(BaseModel):
@@ -184,6 +189,8 @@ class ValueChoiceOption(BaseModel):
     status_reason: Optional[str] = None
     raw_result: str
     source: str
+    # Failed, or canceled after import. Accepting needs override_failed and a reason.
+    counts_as_failed: bool = False
 
 
 class ValueChoiceRead(BaseModel):
