@@ -531,7 +531,7 @@ def test_alembic_has_one_head_and_short_revision_ids():
     cfg = Config(str(VERSIONS.parents[2] / "alembic.ini"))
     cfg.set_main_option("script_location", str(VERSIONS.parent))
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0109_revoke_reagent_delete"]
+    assert script.get_heads() == ["0112_maintenance_tracked"]
     for rev in script.walk_revisions():
         assert len(rev.revision) <= 32, rev.revision
 
