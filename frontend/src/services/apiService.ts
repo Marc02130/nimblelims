@@ -2504,6 +2504,7 @@ export class ApiService {
       replicate: number;
       accepted_lims_run_id: string;
       reason: string;
+      override_failed?: boolean;
     }
   ) {
     const response: AxiosResponse = await this.api.post(`/v1/lims-runs/${id}/value-choices`, body);

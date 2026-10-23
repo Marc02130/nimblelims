@@ -125,6 +125,10 @@ class Sample(BaseModel):
             name="ck_samples_volume_ul_nonneg",
         ),
         CheckConstraint(
+            "volume_ul IS NULL OR volume_ul <= 10000000",
+            name="ck_samples_volume_ul_max",
+        ),
+        CheckConstraint(
             "thaw_count IS NULL OR thaw_count >= 0",
             name="ck_samples_thaw_count_nonneg",
         ),
