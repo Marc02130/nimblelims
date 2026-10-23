@@ -2458,7 +2458,7 @@ Admin UI: `/admin/sample-type-transitions`. Template default dest sample type (E
 
 ## Reagent tracking
 
-No DELETE routes. Retire a catalog row with `active: false`; use a lot up with `quantity_remaining: 0`. Take a reagent off an experiment with `PATCH /v1/experiments/{id}/reagents` `{active: false}` (add it again to restore it). Every catalog row has `active`, `created_*`, `modified_*`.
+No DELETE routes, and `lims_app` has no DELETE privilege on `vendors`, `reagents`, `reagent_vendors`, `reagent_lots`, or `reagent_uses` (migration 0109). Retire a catalog row with `active: false`; use a lot up with `quantity_remaining: 0`. Take a reagent off an experiment with `PATCH /v1/experiments/{id}/reagents` `{active: false}` (add it again to restore it). Every catalog row has `active`, `created_*`, `modified_*`.
 
 | Method | Path | Permission | Notes |
 |--------|------|------------|-------|
