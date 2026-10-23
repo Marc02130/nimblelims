@@ -85,10 +85,62 @@ class Instrument(BaseModel):
         nullable=True,
     )
     status = Column(String(32), nullable=False, default="in_service")
+    maintenance_tracked = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     instrument_type = relationship("ListEntry", foreign_keys=[instrument_type_id])
     vendor = relationship("Vendor", foreign_keys=[vendor_id])
     location = relationship("Location", foreign_keys=[location_id])
+
+
+class InstrumentTypeDefault(Base):
+    """Per-type default for ``instruments.maintenance_tracked``.
+
+    Types are ``list_entries`` on ``instrument_types``. A side table keeps
+    the default off ``list_entries`` so other lists are untouched, and so
+    the configuring agent never adds a column on lists.
+    """
+
+    __tablename__ = "instrument_type_defaults"
+
+    instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        primary_key=True,
+    )
+    maintenance_tracked = Column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    modified_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+
+    instrument_type = relationship("ListEntry", foreign_keys=[instrument_type_id])
+
+
+class InstrumentMaintenanceAudit(Base):
+    """Previous ``maintenance_tracked`` kept when the flag changes."""
+
+    __tablename__ = "instrument_maintenance_audits"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    instrument_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("instruments.id"), nullable=False, index=True
+    )
+    previous_value = Column(Boolean, nullable=False)
+    new_value = Column(Boolean, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
 
 
 class CroSource(BaseModel):

@@ -347,7 +347,7 @@ class TestInstrumentImport:
         """No active data parser for the run's analysis + instrument → import is rejected.
 
         Parser validation only runs when a source is given, so this goes through
-        multipart /import-file (JSON /import takes no instrument/CRO source).
+        multipart /import-file (JSON /import requires a source unless admin).
         """
         run_id = running_run["id"]
         r = client.post(

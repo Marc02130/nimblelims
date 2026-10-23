@@ -37,6 +37,7 @@ interface InstrumentType {
   name: string;
   description?: string;
   active: boolean;
+  maintenance_tracked?: boolean;
 }
 
 interface VendorOption {
@@ -58,6 +59,7 @@ interface Instrument {
   location_id?: string | null;
   status: string;
   active: boolean;
+  maintenance_tracked?: boolean;
 }
 
 interface CroSource {
@@ -107,7 +109,7 @@ interface ListEntryOption {
 
 type TabKey = 'types' | 'instances' | 'cro' | 'maintenance' | 'downtime';
 
-const emptyTypeForm = { name: '', description: '', active: true };
+const emptyTypeForm = { name: '', description: '', active: true, maintenance_tracked: false };
 const emptyInstrumentForm = {
   name: '',
   description: '',
@@ -118,6 +120,7 @@ const emptyInstrumentForm = {
   asset_tag: '',
   status: 'in_service',
   active: true,
+  maintenance_tracked: false,
 };
 const emptyCroForm = {
   name: '',
@@ -129,8 +132,6 @@ const emptyScheduleForm = {
   instrument_id: '',
   kind_id: '',
   interval_days: '365',
-  last_done: '',
-  next_due: '',
   service_vendor_id: '',
   active: true,
 };
@@ -277,7 +278,12 @@ const InstrumentCatalogManagement: React.FC = () => {
     setEditingId(row.id);
     setStopReason(null);
     if (tab === 'types') {
-      setTypeForm({ name: row.name, description: row.description || '', active: row.active });
+      setTypeForm({
+        name: row.name,
+        description: row.description || '',
+        active: row.active,
+        maintenance_tracked: Boolean(row.maintenance_tracked),
+      });
     } else if (tab === 'instances') {
       setInstrumentForm({
         name: row.name,
@@ -289,6 +295,7 @@ const InstrumentCatalogManagement: React.FC = () => {
         asset_tag: row.asset_tag || '',
         status: row.status || 'in_service',
         active: row.active,
+        maintenance_tracked: Boolean(row.maintenance_tracked),
       });
     } else if (tab === 'cro') {
       setCroForm({
@@ -302,8 +309,6 @@ const InstrumentCatalogManagement: React.FC = () => {
         instrument_id: row.instrument_id,
         kind_id: row.kind_id,
         interval_days: String(row.interval_days),
-        last_done: row.last_done || '',
-        next_due: row.next_due || '',
         service_vendor_id: row.service_vendor_id || '',
         active: row.active,
       });
@@ -330,6 +335,7 @@ const InstrumentCatalogManagement: React.FC = () => {
           name: typeForm.name.trim(),
           description: typeForm.description.trim() || undefined,
           active: typeForm.active,
+          maintenance_tracked: typeForm.maintenance_tracked,
         };
         if (!payload.name) throw new Error('Name is required');
         if (editingId) await apiService.updateInstrumentType(editingId, payload);
@@ -346,6 +352,7 @@ const InstrumentCatalogManagement: React.FC = () => {
           asset_tag: instrumentForm.asset_tag.trim() || undefined,
           status: instrumentForm.status,
           active: instrumentForm.active,
+          maintenance_tracked: instrumentForm.maintenance_tracked,
         };
         if (!payload.name) throw new Error('Name is required');
         if (!payload.instrument_type_id) throw new Error('Instrument type is required');
@@ -368,8 +375,6 @@ const InstrumentCatalogManagement: React.FC = () => {
           instrument_id: scheduleForm.instrument_id,
           kind_id: scheduleForm.kind_id,
           interval_days: Number(scheduleForm.interval_days),
-          last_done: scheduleForm.last_done || undefined,
-          next_due: scheduleForm.next_due || undefined,
           service_vendor_id: scheduleForm.service_vendor_id || undefined,
           active: scheduleForm.active,
         };
@@ -447,6 +452,7 @@ const InstrumentCatalogManagement: React.FC = () => {
   const typeColumns: GridColDef[] = [
     { field: 'name', headerName: 'Name', flex: 1, minWidth: 140 },
     { field: 'description', headerName: 'Description', flex: 1, minWidth: 160 },
+    { field: 'maintenance_tracked', headerName: 'Track maintenance', width: 160 },
     activeCol,
     actionsCol((p) => openEdit(p.row)),
   ];
@@ -458,6 +464,7 @@ const InstrumentCatalogManagement: React.FC = () => {
     { field: 'model', headerName: 'Model', width: 120 },
     { field: 'serial_number', headerName: 'Serial', width: 120 },
     { field: 'status', headerName: 'Status', width: 140 },
+    { field: 'maintenance_tracked', headerName: 'Track maintenance', width: 160 },
     activeCol,
     actionsCol(
       (p) => openEdit(p.row),
@@ -624,6 +631,17 @@ const InstrumentCatalogManagement: React.FC = () => {
                 }
                 label="Active"
               />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={typeForm.maintenance_tracked}
+                    onChange={(e) =>
+                      setTypeForm({ ...typeForm, maintenance_tracked: e.target.checked })
+                    }
+                  />
+                }
+                label="Track maintenance by default"
+              />
             </>
           )}
           {tab === 'instances' && (
@@ -641,9 +659,17 @@ const InstrumentCatalogManagement: React.FC = () => {
                   labelId="instrument-type-label"
                   label="Type"
                   value={instrumentForm.instrument_type_id}
-                  onChange={(e) =>
-                    setInstrumentForm({ ...instrumentForm, instrument_type_id: String(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    const typeId = String(e.target.value);
+                    const selected = types.find((t) => t.id === typeId);
+                    setInstrumentForm({
+                      ...instrumentForm,
+                      instrument_type_id: typeId,
+                      maintenance_tracked: editingId
+                        ? instrumentForm.maintenance_tracked
+                        : Boolean(selected?.maintenance_tracked),
+                    });
+                  }}
                 >
                   {types.map((t) => (
                     <MenuItem key={t.id} value={t.id}>
@@ -703,6 +729,20 @@ const InstrumentCatalogManagement: React.FC = () => {
                   />
                 }
                 label="Active"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={instrumentForm.maintenance_tracked}
+                    onChange={(e) =>
+                      setInstrumentForm({
+                        ...instrumentForm,
+                        maintenance_tracked: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label="Track maintenance"
               />
             </>
           )}

@@ -45,6 +45,7 @@ class AppliedChange:
     target_id: Optional[UUID]
     # True when the object is already exactly as proposed: nothing was written.
     noop: bool = False
+    detail: Optional[str] = None
 
 
 class AtomicSession:
@@ -308,6 +309,8 @@ def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> 
         return _reagent_catalog(db, user, path, body)
     if path == "/v1/instruments" or path.startswith("/v1/instruments/"):
         return _instrument_catalog(db, user, method, path, body)
+    if path == "/v1/instrument-types" or path.startswith("/v1/instrument-types/"):
+        return _instrument_types(db, user, method, path, body)
     if path == "/v1/instrument-maintenance-schedules" or path.startswith(
         "/v1/instrument-maintenance-schedules/"
     ):
@@ -464,12 +467,39 @@ def _instrument_catalog(db, user, method: str, path: str, body: dict) -> list[Ap
     from app.routers.instrument_catalog import create_instrument, update_instrument
     from app.schemas.instrument_catalog import InstrumentCreate, InstrumentUpdate
 
+    blocked = {"status", "active"} & set(body or {})
+    if blocked:
+        raise CannotExpress(
+            "Instrument status and active are not set by this configuration run. "
+            "Send name, type, and vendor only."
+        )
     if method == "POST" and path == "/v1/instruments":
         created = create_instrument(InstrumentCreate.model_validate(body), user, db)
         return [AppliedChange("instrument", created.name, created.id)]
     instrument_id = _uuid_from_path(path)
+    previous = None
+    if method == "PATCH" and "maintenance_tracked" in (body or {}):
+        from models.instrument import Instrument
+
+        current = db.query(Instrument).filter(Instrument.id == instrument_id).first()
+        previous = None if current is None else current.maintenance_tracked
     updated = update_instrument(instrument_id, InstrumentUpdate.model_validate(body), user, db)
-    return [AppliedChange("instrument", updated.name, updated.id)]
+    detail = None
+    if previous is True and updated.maintenance_tracked is False:
+        detail = "maintenance_tracked previous=true new=false"
+    return [AppliedChange("instrument", updated.name, updated.id, detail=detail)]
+
+
+def _instrument_types(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+    from app.routers.instrument_catalog import create_instrument_type, update_instrument_type
+    from app.schemas.instrument_catalog import InstrumentTypeCreate, InstrumentTypeUpdate
+
+    if method == "POST" and path == "/v1/instrument-types":
+        created = create_instrument_type(InstrumentTypeCreate.model_validate(body), user, db)
+        return [AppliedChange("instrument_type", created.name, created.id)]
+    type_id = _uuid_from_path(path)
+    updated = update_instrument_type(type_id, InstrumentTypeUpdate.model_validate(body), user, db)
+    return [AppliedChange("instrument_type", updated.name, updated.id)]
 
 
 def _instrument_schedule(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
@@ -482,6 +512,11 @@ def _instrument_schedule(db, user, method: str, path: str, body: dict) -> list[A
             "A maintenance schedule's last_done and next_due come from events, "
             "and active is not set by this configuration run. "
             "Send interval, kind, and instrument only."
+        )
+    if method == "PATCH" and "interval_days" in (body or {}):
+        raise CannotExpress(
+            "A new interval applies from the next passing event. "
+            "Changing interval_days does not clear an overdue schedule."
         )
     if method == "POST" and path == "/v1/instrument-maintenance-schedules":
         created = create_schedule(MaintenanceScheduleCreate.model_validate(body), user, db)

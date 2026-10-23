@@ -275,7 +275,13 @@ def import_data(
     service: LimsRunService = Depends(_run_service),
 ):
     """Import pre-parsed rows (prefer multipart /import-file for CSV + parser)."""
-    return service.import_data(run_id, data.rows)
+    return service.import_data(
+        run_id,
+        data.rows,
+        instrument_id=data.instrument_id,
+        cro_source_id=data.cro_source_id,
+        parser_id=data.parser_id,
+    )
 
 
 @router.post("/{run_id}/import-file")

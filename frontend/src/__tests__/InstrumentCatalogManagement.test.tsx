@@ -92,5 +92,6 @@ describe('InstrumentCatalogManagement', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Instrument/i }));
     expect(await screen.findByLabelText('Vendor')).toBeInTheDocument();
     expect(screen.getByLabelText('Status')).toBeInTheDocument();
+    expect(screen.getByLabelText('Track maintenance')).toBeInTheDocument();
   });
 });
