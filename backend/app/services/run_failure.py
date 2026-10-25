@@ -8,6 +8,7 @@ reviewer accepts one of their values. Nothing is rewritten.
 from __future__ import annotations
 
 import uuid
+from typing import Iterable, Set
 
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
@@ -19,6 +20,20 @@ def has_imported_data(db: Session, run_id: uuid.UUID) -> bool:
     """True when any import attempt stored a row on this run, linked or not."""
     return bool(
         db.execute(select(exists().where(LimsRunData.lims_run_id == run_id))).scalar()
+    )
+
+
+def runs_with_imported_data(db: Session, run_ids: Iterable[uuid.UUID]) -> Set[uuid.UUID]:
+    """The subset of ``run_ids`` that have any stored import row, in one query."""
+    ids = list(run_ids)
+    if not ids:
+        return set()
+    return set(
+        db.execute(
+            select(LimsRunData.lims_run_id)
+            .where(LimsRunData.lims_run_id.in_(ids))
+            .distinct()
+        ).scalars()
     )
 
 

@@ -44,7 +44,7 @@ from app.schemas.flexible_experiment import (
     ValueChoiceRead,
 )
 from app.services.result_acceptance_service import ResultAcceptanceService
-from app.services.run_failure import has_imported_data
+from app.services.run_failure import has_imported_data, runs_with_imported_data
 from models.flexible_experiment import LimsRunStatus, LimsRun
 from models.user import User
 
@@ -58,14 +58,15 @@ def _run_service(
     return LimsRunService(db, current_user=current_user)
 
 
-def _run_read(run: LimsRun) -> LimsRunRead:
+def _run_read(run: LimsRun, has_data: Optional[bool] = None) -> LimsRunRead:
     data = LimsRunRead.model_validate(run)
     # Attach lifecycle_type from template for UI buttons
     lt = None
     if run.experiment_template is not None:
         lt = getattr(run.experiment_template, "lifecycle_type", None) or "standard"
-    session = object_session(run)
-    has_data = has_imported_data(session, run.id) if session is not None else False
+    if has_data is None:
+        session = object_session(run)
+        has_data = has_imported_data(session, run.id) if session is not None else False
     return data.model_copy(update={"lifecycle_type": lt, "has_imported_data": has_data})
 
 
@@ -86,8 +87,9 @@ def list_runs(
         size=size,
     )
     pages = (total + size - 1) // size if size else 0
+    with_data = runs_with_imported_data(service.db, [r.id for r in items])
     return LimsRunListResponse(
-        runs=[_run_read(r) for r in items],
+        runs=[_run_read(r, has_data=r.id in with_data) for r in items],
         total=total,
         page=page,
         size=size,
