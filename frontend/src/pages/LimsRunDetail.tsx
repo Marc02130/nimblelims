@@ -908,6 +908,7 @@ const LimsRunDetail: React.FC = () => {
             <InputLabel>Instrument type</InputLabel>
             <Select
               label="Instrument type"
+              inputProps={{ 'aria-label': 'New instrument type' }}
               value={substituteTypeId}
               onChange={(e) => setSubstituteTypeId(e.target.value as string)}
             >
@@ -924,6 +925,10 @@ const LimsRunDetail: React.FC = () => {
             fullWidth
             multiline
             minRows={2}
+            inputProps={{
+              'aria-label': 'Substitution reason',
+              'data-testid': 'substitute-instrument-type-reason',
+            }}
             value={substituteReason}
             onChange={(e) => setSubstituteReason(e.target.value)}
           />

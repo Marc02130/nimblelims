@@ -66,7 +66,7 @@ def _role_user(db_session, test_org, role_name, extra_perms=()):
         _grant(db_session, role, perms)
     username = f"{role_name.lower().replace(' ', '-')}-{uuid.uuid4().hex[:6]}"
     user = User(
-        name=role_name,
+        name=username,
         username=username,
         email=f"{username}@x.org",
         password_hash=get_password_hash("pass-word-1"),

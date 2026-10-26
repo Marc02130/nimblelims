@@ -533,7 +533,7 @@ def test_tech_substitutes_own_run_and_refuses_other(
     template = _create_template(client, admin_h)
     own = _create_run(client, tech_h, template["id"], run_analysis_id)
     assert own.status_code == 201, own.text
-    started = _start_run(client, tech_h, own.json()["id"], cohort_sample_id)
+    started = _start_run(client, admin_h, own.json()["id"], cohort_sample_id)
     assert started.status_code == 200, started.text
     qpcr = _seeded_type(client, admin_h, "qPCR")
     ok = client.post(

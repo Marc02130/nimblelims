@@ -245,10 +245,10 @@ describe('LimsRunDetail ELISA gaps', () => {
     expect(await screen.findByText('Instrument type')).toBeInTheDocument();
     expect(screen.getByText('Plate reader')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('substitute-instrument-type-button'));
-    expect(await screen.findByText('Substitute instrument type')).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByLabelText('Instrument type'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('New instrument type'));
     fireEvent.click(await screen.findByRole('option', { name: 'qPCR' }));
-    fireEvent.change(screen.getByLabelText('Reason'), {
+    fireEvent.change(screen.getByTestId('substitute-instrument-type-reason'), {
       target: { value: 'backup reader' },
     });
     fireEvent.click(screen.getByTestId('substitute-instrument-type-confirm'));

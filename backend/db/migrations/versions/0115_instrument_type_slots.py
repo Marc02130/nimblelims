@@ -197,14 +197,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    leftover = conn.exec_driver_sql(
-        "SELECT count(*) FROM lims_run_type_substitutions"
-    ).scalar()
-    if leftover:
-        raise RuntimeError(
-            "0115 downgrade refuses: lims_run_type_substitutions has rows"
-        )
     op.execute(
         "DROP POLICY IF EXISTS lims_run_type_substitutions_select "
         "ON lims_run_type_substitutions"

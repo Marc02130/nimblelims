@@ -1015,6 +1015,11 @@ class LimsRunService:
             )
             import_id = imp.id
         if instrument_id or cro_source_id or parser_id:
+            resolved_instrument = instrument_id
+            if resolved_instrument:
+                from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+                refuse_ineligible_instrument(self.db, resolved_instrument)
             parser = self.data_parser_svc.resolve_for_import(
                 analysis_id=run.analysis_id,
                 instrument_id=instrument_id,

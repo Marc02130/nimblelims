@@ -1477,6 +1477,7 @@ const ExperimentTemplatesManagement: React.FC = () => {
                               <Select
                                 labelId={`slot-type-${ei}-${si}`}
                                 label="Instrument type"
+                                inputProps={{ 'aria-label': 'Instrument type' }}
                                 value={slot.instrument_type_id || ''}
                                 onChange={(e) => {
                                   const slots = [...(entry.config?.slots || [])];
