@@ -23,12 +23,21 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.database import _engine_kwargs
-from app.schemas.flexible_experiment import LimsRunDataRow
+from app.repositories.flexible_experiment_repository import LimsRunRepository
+from app.schemas.flexible_experiment import LimsRunDataRow, LimsRunUpdate
 from app.services import lims_run_service as service_module
 from app.services.lims_run_service import LimsRunService
 from models.analysis import Analysis, AnalysisAnalyte, Analyte
 from models.client import Client
-from models.flexible_experiment import LimsRun, LimsRunData, LimsRunStatus
+from models.flexible_experiment import (
+    DataParser,
+    LimsRun,
+    LimsRunData,
+    LimsRunStatus,
+    ParserAnalysis,
+)
+from models.instrument import INSTRUMENT_TYPES_LIST_ID, CroSource, Instrument
+from models.list import ListEntry
 from models.user import Role, User
 from tests.test_elisa_run_gaps import GEN5, PARSER
 from tests.test_run_229_followups import (
@@ -68,12 +77,26 @@ def committed(db_engine):
             s.add_all([analysis, analyte])
             s.flush()
             s.add(AnalysisAnalyte(analysis_id=analysis.id, analyte_id=analyte.id))
+            cro = CroSource(name=f"R231 CRO {tag}")
+            s.add(cro)
+            s.flush()
+            parser = DataParser(
+                name=f"R231 parser {tag}",
+                parser_config={"columns": []},
+                cro_source_id=cro.id,
+                version_group_id=uuid.uuid4(),
+                version=1,
+                active=True,
+            )
+            s.add(parser)
+            s.flush()
+            s.add(ParserAnalysis(parser_id=parser.id, analysis_id=analysis.id, is_default=True))
             run = LimsRun(name=f"R231 run {tag}", analysis_id=analysis.id, status=run_status,
                           created_by=user.id, modified_by=user.id)
             s.add(run)
             s.commit()
             ids = dict(user=user.id, run=run.id, analysis=analysis.id, analyte=analyte.id,
-                       role=role.id, org=org.id)
+                       role=role.id, org=org.id, cro=cro.id, parser=parser.id)
         made.append(ids)
         return ids
 
@@ -83,6 +106,9 @@ def committed(db_engine):
             c.execute(text("DELETE FROM lims_run_data WHERE lims_run_id = :i"), {"i": ids["run"]})
             c.execute(text("DELETE FROM lims_run_imports WHERE lims_run_id = :i"), {"i": ids["run"]})
             c.execute(text("DELETE FROM lims_runs WHERE id = :i"), {"i": ids["run"]})
+            c.execute(text("DELETE FROM parser_analyses WHERE analysis_id = :i"), {"i": ids["analysis"]})
+            c.execute(text("DELETE FROM data_parsers WHERE id = :i"), {"i": ids["parser"]})
+            c.execute(text("DELETE FROM cro_sources WHERE id = :i"), {"i": ids["cro"]})
             c.execute(text("DELETE FROM analysis_analytes WHERE analysis_id = :i"), {"i": ids["analysis"]})
             c.execute(text("DELETE FROM analyses WHERE id = :i"), {"i": ids["analysis"]})
             c.execute(text("DELETE FROM analytes WHERE id = :i"), {"i": ids["analyte"]})
@@ -124,6 +150,11 @@ def lab_zone(committed):
 
 def _service(s, ids) -> LimsRunService:
     return LimsRunService(s, current_user=s.get(User, ids["user"]))
+
+
+def _import_data(svc, ids):
+    """Sourced JSON import. Non-admin roles need a CRO or instrument; the role stays Lab Technician."""
+    return svc.import_data(ids["run"], ROW, cro_source_id=ids["cro"])
 
 
 def _publisher(s, ids) -> LimsRunService:
@@ -230,6 +261,56 @@ def test_every_status_change_takes_the_run_lock():
     ):
         source = inspect.getsource(getattr(LimsRunService, name))
         assert "self._get_run_for_update(run_id)" in source, name
+
+
+def test_every_status_change_waits_on_a_held_run_lock(committed):
+    """Each status-changing path waits on the row lock. Proved by waiting, not by reading source."""
+    Session, make = committed
+
+    def actions_for(ids):
+        def do_import_file(svc):
+            svc.data_parser_svc.resolve_for_import = lambda **_kw: _fake_parser()
+            return svc.import_file(ids["run"], GEN5.read_bytes(), filename=GEN5.name)
+
+        return {
+            "update_run": lambda svc: svc.update_run(ids["run"], LimsRunUpdate(description="x")),
+            "order_run": lambda svc: svc.order_run(ids["run"]),
+            "start_run": lambda svc: svc.start_run(ids["run"]),
+            "set_cohort": lambda svc: svc.set_cohort(ids["run"], [uuid.uuid4()]),
+            "mark_results_received": lambda svc: svc.mark_results_received(ids["run"]),
+            "move_to_review": lambda svc: svc.move_to_review(ids["run"]),
+            "publish_run": lambda svc: svc.publish_run(ids["run"]),
+            "cancel_run": lambda svc: svc.cancel_run(ids["run"]),
+            "fail_run": lambda svc: svc.fail_run(ids["run"], "held lock"),
+            "import_data": lambda svc: _import_data(svc, ids),
+            "import_file": do_import_file,
+        }
+
+    # A fresh run per action so a waiter that commits after we release cannot
+    # change the next path's starting status.
+    names = (
+        "update_run", "order_run", "start_run", "set_cohort", "mark_results_received",
+        "move_to_review", "publish_run", "cancel_run", "fail_run", "import_data", "import_file",
+    )
+    for name in names:
+        ids = make(LimsRunStatus.running)
+        action = actions_for(ids)[name]
+        holder = _hold_row_lock(Session, ids)
+        waiter = Session()
+        thread = None
+        box: dict = {}
+        try:
+            thread, box = _in_thread(lambda a=action, w=waiter, i=ids: a(_service(w, i)))
+            assert _waits_on_run_lock(Session, ids["run"]), name
+            assert thread.is_alive(), name
+        finally:
+            holder.rollback()
+            holder.close()
+            if thread is not None:
+                thread.join(LOCK_WAIT_S * 2)
+            waiter.rollback()
+            waiter.close()
+        assert "unexpected" not in box, (name, box)
 
 
 # ---------- 2: lock timeout is 409 run_busy ----------
@@ -426,7 +507,7 @@ def test_fail_waits_for_an_import_in_flight_and_keeps_the_rows(committed):
     ids = make(LimsRunStatus.running)
     imported, failed = _contend(
         Session, ids,
-        holder=(_service, lambda svc: svc.import_data(ids["run"], ROW).imported),
+        holder=(_service, lambda svc: _import_data(svc, ids).imported),
         pause_on=("data_repo", "bulk_create"),
         waiter=(_service, lambda svc: svc.fail_run(ids["run"], "Wrong plate map")),
     )
@@ -445,7 +526,7 @@ def test_import_waits_for_a_fail_in_flight_then_refuses(committed):
         Session, ids,
         holder=(_service, lambda svc: svc.fail_run(ids["run"], "Wrong plate map").status),
         pause_on=("run_repo", "update_status"),
-        waiter=(_service, lambda svc: svc.import_data(ids["run"], ROW).imported),
+        waiter=(_service, lambda svc: _import_data(svc, ids).imported),
     )
     assert failed.get("value") == LimsRunStatus.failed, failed
     assert imported["error"].status_code == 400
@@ -460,6 +541,11 @@ _APP_PRIVILEGES = (
     ("lims_runs", "UPDATE"),
     ("lims_run_data", "SELECT"),
     ("lims_run_data", "INSERT"),
+    ("lims_run_imports", "SELECT"),
+    ("lims_run_imports", "INSERT"),
+    ("cro_sources", "SELECT"),
+    ("data_parsers", "SELECT"),
+    ("parser_analyses", "SELECT"),
     ("users", "SELECT"),
     ("roles", "SELECT"),
 )
@@ -487,7 +573,10 @@ def lims_app_world(migrated_engine):
         ]
         for table, privilege in granted:
             c.execute(text(f"GRANT {privilege} ON TABLE {table} TO lims_app"))
-        ids = {k: uuid.uuid4() for k in ("org", "user", "other_org", "other_user", "analysis", "run")}
+        ids = {
+            k: uuid.uuid4()
+            for k in ("org", "user", "other_org", "other_user", "analysis", "run", "cro", "parser")
+        }
         for org, user, label in (("org", "user", "a"), ("other_org", "other_user", "b")):
             c.execute(
                 text("INSERT INTO clients (id, name, active, billing_info) VALUES (:id, :n, true, '{}')"),
@@ -512,6 +601,31 @@ def lims_app_world(migrated_engine):
             ),
             {"id": ids["run"], "n": f"R231 run {tag}", "a": ids["analysis"], "u": ids["user"]},
         )
+        c.execute(
+            text("INSERT INTO cro_sources (id, name, active) VALUES (:id, :n, true)"),
+            {"id": ids["cro"], "n": f"R231-cro-{tag}"},
+        )
+        c.execute(
+            text(
+                "INSERT INTO data_parsers (id, name, parser_config, cro_source_id, "
+                "version_group_id, version, active) "
+                "VALUES (:id, :n, CAST(:cfg AS jsonb), :c, :g, 1, true)"
+            ),
+            {
+                "id": ids["parser"],
+                "n": f"R231 parser {tag}",
+                "cfg": '{"columns": []}',
+                "c": ids["cro"],
+                "g": uuid.uuid4(),
+            },
+        )
+        c.execute(
+            text(
+                "INSERT INTO parser_analyses (parser_id, analysis_id, is_default) "
+                "VALUES (:p, :a, true)"
+            ),
+            {"p": ids["parser"], "a": ids["analysis"]},
+        )
 
     app_engine = create_engine(url, poolclass=NullPool, connect_args=_engine_kwargs(url)["connect_args"])
     AppSession = sessionmaker(bind=app_engine, autoflush=False)
@@ -530,7 +644,11 @@ def lims_app_world(migrated_engine):
     app_engine.dispose()
     with admin.begin() as c:
         c.execute(text("DELETE FROM lims_run_data WHERE lims_run_id = :i"), {"i": ids["run"]})
+        c.execute(text("DELETE FROM lims_run_imports WHERE lims_run_id = :i"), {"i": ids["run"]})
         c.execute(text("DELETE FROM lims_runs WHERE id = :i"), {"i": ids["run"]})
+        c.execute(text("DELETE FROM parser_analyses WHERE parser_id = :i"), {"i": ids["parser"]})
+        c.execute(text("DELETE FROM data_parsers WHERE id = :i"), {"i": ids["parser"]})
+        c.execute(text("DELETE FROM cro_sources WHERE id = :i"), {"i": ids["cro"]})
         c.execute(text("DELETE FROM analyses WHERE id = :i"), {"i": ids["analysis"]})
         c.execute(text("DELETE FROM users WHERE id IN (:a, :b)"), {"a": ids["user"], "b": ids["other_user"]})
         c.execute(text("DELETE FROM clients WHERE id IN (:a, :b)"), {"a": ids["org"], "b": ids["other_org"]})
@@ -562,7 +680,7 @@ def test_cancel_and_import_serialize_as_lims_app_under_rls(lims_app_world):
         try:
             svc = service(s)
             _pause_after(svc.data_repo, "bulk_create", inside, release)
-            return svc.import_data(ids["run"], ROW).imported
+            return _import_data(svc, ids).imported
         finally:
             s.close()
 
@@ -597,3 +715,174 @@ def test_cancel_and_import_serialize_as_lims_app_under_rls(lims_app_world):
         check.close()
     assert status == "running"
     assert rows == 1
+
+
+def _add_instrument(Session, tag: str):
+    with Session() as s:
+        itype = (
+            s.query(ListEntry)
+            .filter(ListEntry.list_id == uuid.UUID(INSTRUMENT_TYPES_LIST_ID))
+            .first()
+        )
+        assert itype is not None
+        inst = Instrument(
+            name=f"R231 inst {tag}",
+            instrument_type_id=itype.id,
+            status="in_service",
+            maintenance_tracked=False,
+            active=True,
+        )
+        s.add(inst)
+        s.commit()
+        return inst.id
+
+
+def _retire_instrument(Session, instrument_id):
+    with Session() as s:
+        inst = s.get(Instrument, instrument_id)
+        inst.status = "retired"
+        inst.active = False
+        s.commit()
+
+
+def _drop_instrument(Session, instrument_id):
+    with Session() as s:
+        s.execute(text("DELETE FROM instruments WHERE id = :i"), {"i": instrument_id})
+        s.commit()
+
+
+def test_import_file_rechecks_explicit_instrument_after_the_run_lock(committed, monkeypatch):
+    Session, make = committed
+    ids = make(LimsRunStatus.running)
+    inst_id = _add_instrument(Session, uuid.uuid4().hex[:8])
+    parsing, release = threading.Event(), threading.Event()
+    real = service_module.InstrumentDataService
+
+    class PausedParse(real):
+        def parse(self, *args, **kwargs):
+            out = super().parse(*args, **kwargs)
+            parsing.set()
+            assert release.wait(LOCK_WAIT_S)
+            return out
+
+    monkeypatch.setattr(service_module, "InstrumentDataService", PausedParse)
+
+    def do_import():
+        with Session() as s:
+            svc = _service(s, ids)
+            svc.data_parser_svc.resolve_for_import = lambda **_kw: SimpleNamespace(
+                id=ids["parser"], parser_config=PARSER, instrument_id=inst_id, cro_source_id=None
+            )
+            return svc.import_file(
+                ids["run"], GEN5.read_bytes(), filename=GEN5.name, instrument_id=inst_id
+            )
+
+    importer, imported = _in_thread(do_import)
+    try:
+        assert parsing.wait(LOCK_WAIT_S), imported
+        _retire_instrument(Session, inst_id)
+    finally:
+        release.set()
+    importer.join(LOCK_WAIT_S * 2)
+    _drop_instrument(Session, inst_id)
+    error = imported.get("error")
+    assert error is not None, imported
+    assert error.status_code == 422
+    assert error.detail["code"] == "instrument_retired"
+    assert _status(Session, ids)[2] == 0
+
+
+def test_import_file_rechecks_resolved_instrument_after_the_run_lock(committed, monkeypatch):
+    Session, make = committed
+    ids = make(LimsRunStatus.running)
+    inst_id = _add_instrument(Session, uuid.uuid4().hex[:8])
+    parsing, release = threading.Event(), threading.Event()
+    real = service_module.InstrumentDataService
+
+    class PausedParse(real):
+        def parse(self, *args, **kwargs):
+            out = super().parse(*args, **kwargs)
+            parsing.set()
+            assert release.wait(LOCK_WAIT_S)
+            return out
+
+    monkeypatch.setattr(service_module, "InstrumentDataService", PausedParse)
+
+    def do_import():
+        with Session() as s:
+            svc = _service(s, ids)
+            svc.data_parser_svc.resolve_for_import = lambda **_kw: SimpleNamespace(
+                id=ids["parser"], parser_config=PARSER, instrument_id=inst_id, cro_source_id=None
+            )
+            return svc.import_file(ids["run"], GEN5.read_bytes(), filename=GEN5.name)
+
+    importer, imported = _in_thread(do_import)
+    try:
+        assert parsing.wait(LOCK_WAIT_S), imported
+        _retire_instrument(Session, inst_id)
+    finally:
+        release.set()
+    importer.join(LOCK_WAIT_S * 2)
+    _drop_instrument(Session, inst_id)
+    error = imported.get("error")
+    assert error is not None, imported
+    assert error.status_code == 422
+    assert error.detail["code"] == "instrument_retired"
+    assert _status(Session, ids)[2] == 0
+
+
+def test_update_status_refuses_an_illegal_transition(committed):
+    Session, make = committed
+    ids = make(LimsRunStatus.published)
+    with Session() as s:
+        run = s.get(LimsRun, ids["run"])
+        with pytest.raises(ValueError, match="from 'published' to 'failed'"):
+            LimsRunRepository(s).update_status(run, LimsRunStatus.failed, ids["user"])
+        s.rollback()
+    status, published_at, _rows = _status(Session, ids)
+    assert status == LimsRunStatus.published
+    assert published_at is None
+
+
+def test_update_status_waits_on_a_held_run_lock(committed):
+    Session, make = committed
+    ids = make(LimsRunStatus.running)
+    holder = _hold_row_lock(Session, ids)
+    waiter = Session()
+    thread = None
+    box: dict = {}
+    try:
+        def write():
+            run = waiter.get(LimsRun, ids["run"])
+            return LimsRunRepository(waiter).update_status(run, LimsRunStatus.failed, ids["user"])
+
+        thread, box = _in_thread(write)
+        assert _waits_on_run_lock(Session, ids["run"])
+        assert thread.is_alive()
+    finally:
+        holder.rollback()
+        holder.close()
+        if thread is not None:
+            thread.join(LOCK_WAIT_S * 2)
+        waiter.rollback()
+        waiter.close()
+    assert "unexpected" not in box, box
+    assert _status(Session, ids)[0] == LimsRunStatus.running
+
+
+def test_fail_run_validates_before_it_sets_any_fields(committed):
+    Session, make = committed
+    ids = make(LimsRunStatus.published)
+    with Session() as s:
+        with pytest.raises(HTTPException) as raised:
+            _service(s, ids).fail_run(ids["run"], "too late")
+        assert raised.value.status_code == 400
+        assert "from 'published' to 'failed'" in raised.value.detail
+        s.flush()
+        s.commit()
+    with Session() as s:
+        run = s.get(LimsRun, ids["run"])
+        assert run.status == LimsRunStatus.published
+        assert run.status_reason is None
+        assert run.rejected_at is None
+        assert run.failed_by is None
