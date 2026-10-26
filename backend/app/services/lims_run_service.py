@@ -221,7 +221,7 @@ class LimsRunService:
         lifecycle = getattr(run.experiment_template, "lifecycle_type", "standard") or "standard"
         return LIFECYCLE_TRANSITIONS.get(lifecycle, VALID_TRANSITIONS)
 
-    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+    def _assert_can_transition(self, run: LimsRun, new_status: LimsRunStatus) -> None:
         current = LimsRunStatus(run.status)
         transitions = self._lifecycle_transitions(run)
         if new_status not in transitions.get(current, set()):
@@ -229,7 +229,34 @@ class LimsRunService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot transition from '{current.value}' to '{new_status.value}'",
             )
-        self.run_repo.update_status(run, new_status, self._user_id())
+
+    def _write_status(self, run: LimsRun, new_status: LimsRunStatus) -> None:
+        """The only status write. update_status locks and checks the transition."""
+        try:
+            self.run_repo.update_status(run, new_status, self._user_id())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        except OperationalError as exc:
+            if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+                raise
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "run_busy",
+                    "message": (
+                        "Another change to this run is in progress. "
+                        "Wait for it to finish, then try again."
+                    ),
+                },
+            ) from exc
+
+    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+        self._assert_can_transition(run, new_status)
+        self._write_status(run, new_status)
         self._commit_refresh(run)
         return run
 
@@ -619,7 +646,7 @@ class LimsRunService:
             )
         promo.apply_plan(run, plan)
 
-        self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
+        self._write_status(run, LimsRunStatus.published)
         self._commit_refresh(run)
         return run
 
@@ -717,6 +744,7 @@ class LimsRunService:
                 detail="A reason is required to fail the run",
             )
         run = self._get_run_for_update(run_id)
+        self._assert_can_transition(run, LimsRunStatus.failed)
         from datetime import datetime, timezone
 
         run.status_reason = text
@@ -957,6 +985,16 @@ class LimsRunService:
                     "message": "The run's analysis changed while the file was parsed. Import again.",
                 },
             )
+        # The instrument may have gone down, retired, or overdue while the
+        # file was parsed or while this caller waited on the run lock.
+        if instrument_id:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, instrument_id)
+        if resolved_instrument:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, resolved_instrument)
 
         imp = self._create_import_event(
             run_id=run_id,
