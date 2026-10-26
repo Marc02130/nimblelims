@@ -218,7 +218,7 @@ describe('InstrumentCatalogManagement', () => {
     wrap(<InstrumentCatalogManagement eventsOnly />);
     expect(await screen.findByText('Maintenance events')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Log event' })).toBeInTheDocument();
-    expect(screen.getByText('PM done')).toBeInTheDocument();
+    expect(await screen.findByText('PM done')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Void' })).not.toBeInTheDocument();
   });
