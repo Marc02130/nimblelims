@@ -10,9 +10,12 @@ jest.mock('@mui/x-data-grid', () => ({
       ))}
       {rows.map((row) => (
         <div key={row.id}>
-          {Object.values(row).map((v, i) => (
-            <span key={i}>{String(v ?? '')}</span>
-          ))}
+          {columns.map((c) => {
+            if (c.renderCell) {
+              return <span key={c.field}>{c.renderCell({ value: row[c.field], row })}</span>;
+            }
+            return <span key={c.field}>{String(row[c.field] ?? '')}</span>;
+          })}
         </div>
       ))}
     </div>
@@ -36,12 +39,13 @@ jest.mock('../services/apiService', () => ({
     getListEntries: jest.fn(),
     createInstrument: jest.fn(),
     updateInstrument: jest.fn(),
+    setInstrumentScheduleFirstDue: jest.fn(),
   },
 }));
 
 jest.mock('../contexts/UserContext', () => ({
   useUser: () => ({
-    user: { id: '1', username: 'admin', permissions: ['config:edit'] },
+    user: { id: '1', username: 'admin', role: 'Administrator', permissions: ['config:edit'] },
     hasPermission: () => true,
     loading: false,
   }),
@@ -93,5 +97,28 @@ describe('InstrumentCatalogManagement', () => {
     expect(await screen.findByLabelText('Vendor')).toBeInTheDocument();
     expect(screen.getByLabelText('Status')).toBeInTheDocument();
     expect(screen.getByLabelText('Track maintenance')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Track maintenance by default')).not.toBeInTheDocument();
+  });
+
+  test('maintenance-only view hides catalog tabs and shows the first-due empty state', async () => {
+    api.getInstrumentMaintenanceSchedules.mockResolvedValue([
+      {
+        id: 's1',
+        instrument_id: 'i1',
+        instrument_name: 'PR-1',
+        kind_id: 'k1',
+        kind_name: 'PM',
+        interval_days: 365,
+        last_done: null,
+        next_due: null,
+        active: true,
+      },
+    ]);
+    wrap(<InstrumentCatalogManagement maintenanceOnly />);
+    expect(await screen.findByText('Instrument maintenance')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Types' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Instruments' })).not.toBeInTheDocument();
+    expect(await screen.findByText('PR-1')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting first due date')).toBeInTheDocument();
   });
 });

@@ -38,6 +38,7 @@ import {
   AccountTree as AccountTreeIcon,
   AssignmentOutlined as AssignmentOutlinedIcon,
   AssignmentTurnedIn as AssignmentTurnedInIcon,
+  PrecisionManufacturing as PrecisionManufacturingIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
@@ -295,6 +296,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
     return location.pathname.startsWith(path);
   };
 
+  const canManageInstrumentSchedules =
+    user?.role === 'Administrator' || user?.role === 'Lab Manager';
   const hasAdminAccess = hasPermission('config:edit');
   const hasLabMgmtAccess =
     hasPermission('project:manage') ||
@@ -417,6 +420,43 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
             );
           })}
         {/* Show message if no core items are visible */}
+        {canManageInstrumentSchedules && (() => {
+          const active = isActive('/instrument-maintenance');
+          const listItemButton = (
+            <ListItemButton
+              selected={active}
+              onClick={() => handleNavigation('/instrument-maintenance')}
+              aria-label="Navigate to Instrument maintenance"
+              aria-current={active ? 'page' : undefined}
+              sx={{
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                minHeight: 48,
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  color: active ? 'primary.main' : 'inherit',
+                  minWidth: collapsed ? 0 : 40,
+                  justifyContent: 'center',
+                }}
+              >
+                <PrecisionManufacturingIcon />
+              </ListItemIcon>
+              {!collapsed && <ListItemText primary="Instrument maintenance" />}
+            </ListItemButton>
+          );
+          return (
+            <ListItem key="instrument-maintenance" disablePadding>
+              {collapsed ? (
+                <Tooltip title="Instrument maintenance" placement="right" arrow>
+                  {listItemButton}
+                </Tooltip>
+              ) : (
+                listItemButton
+              )}
+            </ListItem>
+          );
+        })()}
         {coreItems.filter((item) => !item.permission || hasPermission(item.permission)).length === 0 && (
           <ListItem disablePadding>
             <Typography variant="body2" sx={{ px: 2, py: 1, color: 'text.secondary', fontStyle: 'italic' }}>

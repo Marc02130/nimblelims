@@ -867,6 +867,14 @@ class LimsRunService:
                 run_id,
                 self._user_id(),
             )
+            imp = self._create_import_event(
+                run_id=run_id,
+                instrument_id=None,
+                cro_source_id=None,
+                parser_id=None,
+                filename="admin_override",
+            )
+            import_id = imp.id
         if instrument_id or cro_source_id or parser_id:
             resolved_instrument = instrument_id
             if resolved_instrument:
@@ -1088,7 +1096,7 @@ class LimsRunService:
         run_id: uuid.UUID,
         instrument_id: Optional[uuid.UUID],
         cro_source_id: Optional[uuid.UUID],
-        parser_id: uuid.UUID,
+        parser_id: Optional[uuid.UUID],
         filename: Optional[str],
     ) -> LimsRunImport:
         imp = LimsRunImport(

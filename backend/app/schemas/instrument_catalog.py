@@ -10,17 +10,19 @@ InstrumentStatus = Literal["in_service", "out_of_service", "retired"]
 
 
 class InstrumentTypeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     active: bool = True
-    maintenance_tracked: bool = False
 
 
 class InstrumentTypeUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     active: Optional[bool] = None
-    maintenance_tracked: Optional[bool] = None
 
 
 class InstrumentTypeResponse(BaseModel):
@@ -30,7 +32,6 @@ class InstrumentTypeResponse(BaseModel):
     name: str
     description: Optional[str] = None
     active: bool
-    maintenance_tracked: bool = False
     created_at: datetime
     modified_at: datetime
 

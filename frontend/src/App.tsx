@@ -362,6 +362,16 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/instrument-maintenance"
+          element={
+            user?.role === 'Administrator' || user?.role === 'Lab Manager' ? (
+              <InstrumentCatalogManagement maintenanceOnly />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
           path="/admin/reagents"
           element={
             hasPermission('config:edit') ? (

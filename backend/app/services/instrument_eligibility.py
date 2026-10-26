@@ -22,6 +22,7 @@ INSTRUMENT_RETIRED = "instrument_retired"
 INSTRUMENT_OUT_OF_SERVICE = "instrument_out_of_service"
 INSTRUMENT_OVERDUE = "instrument_overdue"
 INSTRUMENT_NO_SCHEDULE = "instrument_no_schedule"
+INSTRUMENT_AWAITING_FIRST_DUE = "instrument_awaiting_first_due"
 
 
 def _stop(code: str, message: str) -> HTTPException:
@@ -95,20 +96,24 @@ def instrument_block_reason(
                 "and cannot be used."
             ),
         }
+    awaiting = next(
+        (schedule for schedule in schedules if schedule.next_due is None),
+        None,
+    )
+    if awaiting is not None:
+        return {
+            "code": INSTRUMENT_AWAITING_FIRST_DUE,
+            "message": (
+                f"{label} is awaiting its first due date and cannot be used. "
+                "A lab admin or manager sets it."
+            ),
+        }
     overdue = next(
-        (
-            schedule
-            for schedule in schedules
-            if schedule.next_due is None or schedule.next_due < due
-        ),
+        (schedule for schedule in schedules if schedule.next_due is not None and schedule.next_due < due),
         None,
     )
     if overdue is not None:
-        due_text = (
-            overdue.next_due.isoformat()
-            if overdue.next_due is not None
-            else "never calibrated"
-        )
+        due_text = overdue.next_due.isoformat()
         return {
             "code": INSTRUMENT_OVERDUE,
             "message": (

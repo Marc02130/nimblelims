@@ -23,5 +23,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # L4: restore writes that 0103 granted, except DELETE.
+    op.execute("GRANT INSERT, UPDATE ON instrument_types_legacy TO lims_app")
     op.execute("ALTER TABLE instrument_types_legacy NO FORCE ROW LEVEL SECURITY")
     op.execute("ALTER TABLE instrument_types_legacy DISABLE ROW LEVEL SECURITY")

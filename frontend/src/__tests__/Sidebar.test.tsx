@@ -318,6 +318,16 @@ describe('Sidebar', () => {
       expect(sidebar().getByText('Lab Mgmt')).toBeInTheDocument();
     });
 
+    test('shows Instrument maintenance for a Lab Manager and hides it for a technician', () => {
+      const manager = createMockUser(['project:manage', 'experiment:manage'], 'Lab Manager');
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], manager);
+      expect(sidebar().getByText('Instrument maintenance')).toBeInTheDocument();
+
+      const tech = createMockUser(['sample:create', 'experiment:manage'], 'Lab Technician');
+      renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], tech);
+      expect(sidebar().queryByText('Instrument maintenance')).not.toBeInTheDocument();
+    });
+
     test('does not render Lab Management section when user lacks project:manage permission', () => {
       const mockUser = createMockUser(['sample:create'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], mockUser);

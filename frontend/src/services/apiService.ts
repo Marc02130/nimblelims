@@ -1014,6 +1014,14 @@ export class ApiService {
     return response.data;
   }
 
+  async setInstrumentScheduleFirstDue(id: string, nextDue: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/instrument-maintenance-schedules/${id}/first-due`,
+      { next_due: nextDue }
+    );
+    return response.data;
+  }
+
   async getInstrumentMaintenanceEvents(params?: {
     instrument_id?: string;
     schedule_id?: string;

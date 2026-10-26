@@ -340,7 +340,7 @@ class LimsRunImport(Base):
     parser_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('data_parsers.id'),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     filename = Column(String(512), nullable=True)

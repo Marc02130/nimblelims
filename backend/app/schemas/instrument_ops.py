@@ -22,6 +22,10 @@ class MaintenanceScheduleUpdate(BaseModel):
     active: Optional[bool] = None
 
 
+class FirstDueCreate(BaseModel):
+    next_due: date
+
+
 class MaintenanceScheduleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
