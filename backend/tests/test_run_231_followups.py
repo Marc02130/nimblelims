@@ -40,6 +40,7 @@ from models.instrument import INSTRUMENT_TYPES_LIST_ID, CroSource, Instrument
 from models.list import ListEntry
 from models.user import Role, User
 from tests.test_elisa_run_gaps import GEN5, PARSER
+from tests.test_flexible_experiment import PLATE_READER_TYPE_ID
 from tests.test_run_229_followups import (
     LOCK_WAIT_S,
     _in_thread,
@@ -91,8 +92,14 @@ def committed(db_engine):
             s.add(parser)
             s.flush()
             s.add(ParserAnalysis(parser_id=parser.id, analysis_id=analysis.id, is_default=True))
-            run = LimsRun(name=f"R231 run {tag}", analysis_id=analysis.id, status=run_status,
-                          created_by=user.id, modified_by=user.id)
+            run = LimsRun(
+                name=f"R231 run {tag}",
+                analysis_id=analysis.id,
+                status=run_status,
+                instrument_type_id=uuid.UUID(PLATE_READER_TYPE_ID),
+                created_by=user.id,
+                modified_by=user.id,
+            )
             s.add(run)
             s.commit()
             ids = dict(user=user.id, run=run.id, analysis=analysis.id, analyte=analyte.id,
@@ -747,6 +754,15 @@ def _add_instrument(Session, tag: str):
         return inst.id
 
 
+def _bind_run_type(Session, run_id, instrument_id):
+    """Copy the instrument's type onto the run so import type-check is not leftover-null."""
+    with Session() as s:
+        inst = s.get(Instrument, instrument_id)
+        run = s.get(LimsRun, run_id)
+        run.instrument_type_id = inst.instrument_type_id
+        s.commit()
+
+
 def _retire_instrument(Session, instrument_id):
     with Session() as s:
         inst = s.get(Instrument, instrument_id)
@@ -765,6 +781,7 @@ def test_import_file_rechecks_explicit_instrument_after_the_run_lock(committed, 
     Session, make = committed
     ids = make(LimsRunStatus.running)
     inst_id = _add_instrument(Session, uuid.uuid4().hex[:8])
+    _bind_run_type(Session, ids["run"], inst_id)
     parsing, release = threading.Event(), threading.Event()
     real = service_module.InstrumentDataService
 
@@ -806,6 +823,7 @@ def test_import_file_rechecks_resolved_instrument_after_the_run_lock(committed, 
     Session, make = committed
     ids = make(LimsRunStatus.running)
     inst_id = _add_instrument(Session, uuid.uuid4().hex[:8])
+    _bind_run_type(Session, ids["run"], inst_id)
     parsing, release = threading.Event(), threading.Event()
     real = service_module.InstrumentDataService
 
