@@ -59,6 +59,21 @@ def _list_entry(client, admin_h, list_name, entry_name):
     return next(row for row in entries if row["name"] == entry_name)
 
 
+def _add_and_retire_entry(client, admin_h, list_name, name):
+    created = client.post(
+        f"/lists/{list_name}/entries",
+        headers=admin_h,
+        json={"name": name},
+    )
+    assert created.status_code == 201, created.text
+    retired = client.delete(
+        f"/lists/{list_name}/entries/{created.json()['id']}",
+        headers=admin_h,
+    )
+    assert retired.status_code == 204, retired.text
+    return created.json()
+
+
 def test_schema_catalog_registers_new_tables_and_drops_types():
     assert "instrument_types" not in schema_catalog.SYSTEM_TABLES
     assert "instrument_types" not in schema_catalog.LAB_TABLES
@@ -1160,3 +1175,139 @@ def test_missing_seed_list_message_is_generic(client, admin_h, db_session):
     )
     assert failed.status_code == 500
     assert failed.json()["detail"] == "A required list is not seeded"
+
+
+def test_removed_list_entries_are_not_newly_selectable(client, admin_h):
+    inst = _instrument(client, admin_h)
+    pm = _list_entry(client, admin_h, "maintenance_types", "PM")
+    removed_kind = _add_and_retire_entry(client, admin_h, "maintenance_types", _name("Kind"))
+    other_kind = _add_and_retire_entry(client, admin_h, "maintenance_types", _name("Kind2"))
+    missing = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={"instrument_id": inst["id"], "kind_id": str(uuid.uuid4()), "interval_days": 10},
+    )
+    assert missing.status_code == 400, missing.text
+    refused_create = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={"instrument_id": inst["id"], "kind_id": removed_kind["id"], "interval_days": 10},
+    )
+    assert refused_create.status_code == 422, refused_create.text
+    assert refused_create.json()["detail"]["code"] == "list_entry_inactive"
+    used_kind = client.post(
+        "/lists/maintenance_types/entries",
+        headers=admin_h,
+        json={"name": _name("KindKeep")},
+    )
+    assert used_kind.status_code == 201, used_kind.text
+    created = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "kind_id": used_kind.json()["id"],
+            "interval_days": 10,
+        },
+    )
+    assert created.status_code == 201, created.text
+    retire = client.delete(
+        f"/lists/maintenance_types/entries/{used_kind.json()['id']}",
+        headers=admin_h,
+    )
+    assert retire.status_code == 204, retire.text
+    keep = client.patch(
+        f"/v1/instrument-maintenance-schedules/{created.json()['id']}",
+        headers=admin_h,
+        json={"interval_days": 14},
+    )
+    assert keep.status_code == 200, keep.text
+    same_kind = client.patch(
+        f"/v1/instrument-maintenance-schedules/{created.json()['id']}",
+        headers=admin_h,
+        json={"kind_id": used_kind.json()["id"]},
+    )
+    assert same_kind.status_code == 200, same_kind.text
+    switch_removed = client.patch(
+        f"/v1/instrument-maintenance-schedules/{created.json()['id']}",
+        headers=admin_h,
+        json={"kind_id": other_kind["id"]},
+    )
+    assert switch_removed.status_code == 422, switch_removed.text
+    assert switch_removed.json()["detail"]["code"] == "list_entry_inactive"
+    switch_active = client.patch(
+        f"/v1/instrument-maintenance-schedules/{created.json()['id']}",
+        headers=admin_h,
+        json={"kind_id": pm["id"]},
+    )
+    assert switch_active.status_code == 200, switch_active.text
+
+    breakdown = _list_entry(client, admin_h, "downtime_reasons", "Breakdown")
+    removed_reason = _add_and_retire_entry(client, admin_h, "downtime_reasons", _name("Down"))
+    other_reason = _add_and_retire_entry(client, admin_h, "downtime_reasons", _name("Down2"))
+    refused_down = client.post(
+        "/v1/instrument-downtime",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "reason_id": removed_reason["id"],
+        },
+    )
+    assert refused_down.status_code == 422, refused_down.text
+    assert refused_down.json()["detail"]["code"] == "list_entry_inactive"
+    used_reason = client.post(
+        "/lists/downtime_reasons/entries",
+        headers=admin_h,
+        json={"name": _name("DownKeep")},
+    )
+    assert used_reason.status_code == 201, used_reason.text
+    down = client.post(
+        "/v1/instrument-downtime",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "reason_id": used_reason.json()["id"],
+        },
+    )
+    assert down.status_code == 201, down.text
+    assert client.delete(
+        f"/lists/downtime_reasons/entries/{used_reason.json()['id']}",
+        headers=admin_h,
+    ).status_code == 204
+    keep_down = client.patch(
+        f"/v1/instrument-downtime/{down.json()['id']}",
+        headers=admin_h,
+        json={"note": "still that reason"},
+    )
+    assert keep_down.status_code == 200, keep_down.text
+    same_reason = client.patch(
+        f"/v1/instrument-downtime/{down.json()['id']}",
+        headers=admin_h,
+        json={"reason_id": used_reason.json()["id"]},
+    )
+    assert same_reason.status_code == 200, same_reason.text
+    switch_down = client.patch(
+        f"/v1/instrument-downtime/{down.json()['id']}",
+        headers=admin_h,
+        json={"reason_id": other_reason["id"]},
+    )
+    assert switch_down.status_code == 422, switch_down.text
+    assert switch_down.json()["detail"]["code"] == "list_entry_inactive"
+    ok_down = client.patch(
+        f"/v1/instrument-downtime/{down.json()['id']}",
+        headers=admin_h,
+        json={"reason_id": breakdown["id"]},
+    )
+    assert ok_down.status_code == 200, ok_down.text
+    fresh = client.post(
+        "/v1/instrument-downtime",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "reason_id": breakdown["id"],
+        },
+    )
+    assert fresh.status_code == 201, fresh.text
