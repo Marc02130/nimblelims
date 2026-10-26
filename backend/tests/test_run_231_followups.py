@@ -269,8 +269,18 @@ def test_every_status_change_waits_on_a_held_run_lock(committed):
 
     def actions_for(ids):
         def do_import_file(svc):
-            svc.data_parser_svc.resolve_for_import = lambda **_kw: _fake_parser()
-            return svc.import_file(ids["run"], GEN5.read_bytes(), filename=GEN5.name)
+            svc.data_parser_svc.resolve_for_import = lambda **_kw: SimpleNamespace(
+                id=ids["parser"],
+                parser_config=PARSER,
+                instrument_id=None,
+                cro_source_id=ids["cro"],
+            )
+            return svc.import_file(
+                ids["run"],
+                GEN5.read_bytes(),
+                filename=GEN5.name,
+                cro_source_id=ids["cro"],
+            )
 
         return {
             "update_run": lambda svc: svc.update_run(ids["run"], LimsRunUpdate(description="x")),

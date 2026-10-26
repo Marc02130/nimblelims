@@ -747,11 +747,15 @@ class LimsRunService:
         self._assert_can_transition(run, LimsRunStatus.failed)
         from datetime import datetime, timezone
 
+        # Write status first. update_status reloads the row; setting the fail
+        # fields afterwards keeps them from being wiped by that refresh.
+        self._write_status(run, LimsRunStatus.failed)
         run.status_reason = text
         run.rejected_at = datetime.now(timezone.utc)
         run.failed_by = self._user_id()
         run.modified_by = self._user_id()
-        return self._transition(run, LimsRunStatus.failed)
+        self._commit_refresh(run)
+        return run
 
     def create_rerun(self, run_id: uuid.UUID, name: Optional[str] = None) -> LimsRun:
         """Draft run that replaces this one, with the same cohort samples.
