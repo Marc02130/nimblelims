@@ -1,4 +1,4 @@
-"""E2 review fixes: template inactivation ledger and void-guard lock.
+"""E2 review fixes: template inactivation ledger, event-update guard, void-guard lock.
 
 Revision ID: 0116_e2_review_fixes
 Revises: 0115_instrument_type_slots
@@ -280,31 +280,15 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF NEW.active IS FALSE AND OLD.active IS TRUE AND OLD.passed IS TRUE
-       AND OLD.schedule_id IS NOT NULL
-    THEN
+    IF NOT public.is_lab_manager_or_admin() THEN
+        RAISE EXCEPTION 'maintenance_event_update_forbidden'
+            USING ERRCODE = '42501';
+    END IF;
+    IF OLD.schedule_id IS NOT NULL THEN
         PERFORM 1
            FROM public.instrument_maintenance_schedules s
           WHERE s.id = OLD.schedule_id
           FOR UPDATE;
-        IF NOT EXISTS (
-            SELECT 1 FROM public.instrument_maintenance_events e
-             WHERE e.schedule_id = OLD.schedule_id
-               AND e.id <> OLD.id
-               AND e.active IS TRUE
-               AND e.passed IS TRUE
-        )
-        AND EXISTS (
-            SELECT 1 FROM public.instrument_maintenance_schedules s
-             WHERE s.id = OLD.schedule_id
-               AND (s.next_due IS NOT NULL OR s.last_done IS NOT NULL)
-        )
-        THEN
-            IF NOT public.is_lab_manager_or_admin() THEN
-                RAISE EXCEPTION 'only_passing_event_void_forbidden'
-                    USING ERRCODE = '42501';
-            END IF;
-        END IF;
     END IF;
     RETURN NEW;
 END;

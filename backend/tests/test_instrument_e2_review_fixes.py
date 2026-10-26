@@ -802,11 +802,21 @@ def test_refuse_void_only_passing_event_is_security_definer(migrated_engine):
 
 def test_void_guard_set_role_exact_error_and_forged_actor(migrated_engine):
     ids = _seed_schedule_event(migrated_engine, next_due=date.today())
+    failed = _seed_schedule_event(migrated_engine, next_due=date.today(), passed=False)
     void_sql = "UPDATE instrument_maintenance_events SET active = false WHERE id = :id"
+    note_sql = "UPDATE instrument_maintenance_events SET note = 'tech' WHERE id = :id"
     with pytest.raises((ProgrammingError, InternalError)) as raised:
         _run_as_lims_app(migrated_engine, ids["tech"], void_sql, {"id": ids["event"]})
     assert pgcode(raised.value) == "42501"
-    assert "only_passing_event_void_forbidden" in str(raised.value.orig)
+    assert "maintenance_event_update_forbidden" in str(raised.value.orig)
+    with pytest.raises((ProgrammingError, InternalError)) as note_raised:
+        _run_as_lims_app(migrated_engine, ids["tech"], note_sql, {"id": ids["event"]})
+    assert pgcode(note_raised.value) == "42501"
+    assert "maintenance_event_update_forbidden" in str(note_raised.value.orig)
+    with pytest.raises((ProgrammingError, InternalError)) as failed_raised:
+        _run_as_lims_app(migrated_engine, failed["tech"], void_sql, {"id": failed["event"]})
+    assert pgcode(failed_raised.value) == "42501"
+    assert "maintenance_event_update_forbidden" in str(failed_raised.value.orig)
     _run_as_lims_app(migrated_engine, ids["uid"], void_sql, {"id": ids["event"]})
     template_id = uuid.uuid4()
     with migrated_engine.begin() as conn:

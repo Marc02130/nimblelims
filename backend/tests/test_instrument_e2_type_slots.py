@@ -1118,6 +1118,18 @@ def test_tech_cannot_void_only_passing_event_manager_can(
         json={"next_due": date.today().isoformat()},
     )
     admin = db_session.query(User).filter(User.username == "admin").first()
+    created = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=tech_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(tech.id),
+            "passed": True,
+        },
+    )
+    assert created.status_code == 201, created.text
     only = client.post(
         "/v1/instrument-maintenance-events",
         headers=admin_h,
@@ -1130,59 +1142,72 @@ def test_tech_cannot_void_only_passing_event_manager_can(
         },
     )
     assert only.status_code == 201, only.text
-    refused = client.patch(
+    role_required = "One of the following roles required: Administrator, Lab Manager"
+    void_last = client.patch(
         f"/v1/instrument-maintenance-events/{only.json()['id']}",
         headers=tech_h,
         json={"active": False},
     )
-    assert refused.status_code == 403, refused.text
-    assert refused.json()["detail"]["code"] == "only_passing_event_void_forbidden"
-    other_inst = _instrument(client, admin_h, maintenance_tracked=True)
-    other_sched = client.post(
-        "/v1/instrument-maintenance-schedules",
-        headers=admin_h,
-        json={"instrument_id": other_inst["id"], "kind_id": kind_id, "interval_days": 10},
-    ).json()
-    client.post(
-        f"/v1/instrument-maintenance-schedules/{other_sched['id']}/first-due",
-        headers=admin_h,
-        json={"next_due": date.today().isoformat()},
-    )
-    first = client.post(
-        "/v1/instrument-maintenance-events",
-        headers=admin_h,
-        json={
-            "instrument_id": other_inst["id"],
-            "schedule_id": other_sched["id"],
-            "performed_on": date.today().isoformat(),
-            "performed_by_user_id": str(admin.id),
-            "passed": True,
-        },
-    )
-    second = client.post(
-        "/v1/instrument-maintenance-events",
-        headers=admin_h,
-        json={
-            "instrument_id": other_inst["id"],
-            "schedule_id": other_sched["id"],
-            "performed_on": date.today().isoformat(),
-            "performed_by_user_id": str(admin.id),
-            "passed": True,
-        },
-    )
-    assert first.status_code == 201 and second.status_code == 201
-    non_last = client.patch(
-        f"/v1/instrument-maintenance-events/{first.json()['id']}",
+    assert void_last.status_code == 403, void_last.text
+    assert void_last.json()["detail"] == role_required
+    void_non_last = client.patch(
+        f"/v1/instrument-maintenance-events/{created.json()['id']}",
         headers=tech_h,
         json={"active": False},
     )
-    assert non_last.status_code == 200, non_last.text
-    ok = client.patch(
-        f"/v1/instrument-maintenance-events/{only.json()['id']}",
+    assert void_non_last.status_code == 403, void_non_last.text
+    assert void_non_last.json()["detail"] == role_required
+    failed = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(admin.id),
+            "passed": False,
+        },
+    )
+    assert failed.status_code == 201, failed.text
+    void_failed = client.patch(
+        f"/v1/instrument-maintenance-events/{failed.json()['id']}",
+        headers=tech_h,
+        json={"active": False},
+    )
+    assert void_failed.status_code == 403, void_failed.text
+    assert void_failed.json()["detail"] == role_required
+    field_edit = client.patch(
+        f"/v1/instrument-maintenance-events/{created.json()['id']}",
+        headers=tech_h,
+        json={"note": "tech edit"},
+    )
+    assert field_edit.status_code == 403, field_edit.text
+    assert field_edit.json()["detail"] == role_required
+    manager_void = client.patch(
+        f"/v1/instrument-maintenance-events/{created.json()['id']}",
         headers=mgr_h,
-        json={"active": False},
+        json={"active": False, "reason": "manager void"},
     )
-    assert ok.status_code == 200, ok.text
+    assert manager_void.status_code == 200, manager_void.text
+    unvoid = client.patch(
+        f"/v1/instrument-maintenance-events/{created.json()['id']}",
+        headers=tech_h,
+        json={"active": True, "reason": "tech restore"},
+    )
+    assert unvoid.status_code == 403, unvoid.text
+    assert unvoid.json()["detail"] == role_required
+    admin_ok = client.patch(
+        f"/v1/instrument-maintenance-events/{only.json()['id']}",
+        headers=admin_h,
+        json={"note": "admin edit"},
+    )
+    assert admin_ok.status_code == 200, admin_ok.text
+    admin_void = client.patch(
+        f"/v1/instrument-maintenance-events/{only.json()['id']}",
+        headers=admin_h,
+        json={"active": False, "reason": "admin void last"},
+    )
+    assert admin_void.status_code == 200, admin_void.text
 
 
 def test_update_schedule_waits_on_held_lock(migrated_engine):
