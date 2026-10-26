@@ -745,7 +745,7 @@ def test_l4_l5_downgrade_guards():
     assert "instrument_maintenance_audits has rows" in tracked
     hardening = (BACKEND / "db/migrations/versions/0114_instrument_hardening.py").read_text()
     assert "instrument_schedule_audits has rows" in hardening
-    assert "REVOKE EXECUTE ON FUNCTION is_lab_manager_or_admin() FROM PUBLIC" in hardening
+    assert "REVOKE EXECUTE ON FUNCTION public.is_lab_manager_or_admin() FROM PUBLIC" in hardening
     assert "SET search_path = pg_catalog, public" in hardening
 
 

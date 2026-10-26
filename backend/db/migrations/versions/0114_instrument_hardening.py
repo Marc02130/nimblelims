@@ -382,8 +382,6 @@ def downgrade() -> None:
         "ON instrument_maintenance_schedules FOR ALL "
         f"USING ({_DOWN_POLICY}) WITH CHECK ({_DOWN_POLICY})"
     )
-    op.execute("DROP FUNCTION IF EXISTS is_lab_manager_or_admin()")
-    op.execute("DROP FUNCTION IF EXISTS has_config_edit()")
     op.execute("DROP POLICY IF EXISTS instrument_type_defaults_select ON instrument_type_defaults")
     op.execute(
         "CREATE POLICY instrument_type_defaults_access ON instrument_type_defaults FOR ALL "
@@ -402,6 +400,8 @@ def downgrade() -> None:
         "ON instrument_maintenance_audits FOR ALL "
         f"USING ({_DOWN_POLICY}) WITH CHECK ({_DOWN_POLICY})"
     )
+    op.execute("DROP FUNCTION IF EXISTS is_lab_manager_or_admin()")
+    op.execute("DROP FUNCTION IF EXISTS has_config_edit()")
     op.execute("COMMENT ON TABLE instrument_type_defaults IS NULL")
     op.execute("GRANT INSERT, UPDATE ON instrument_type_defaults TO lims_app")
     op.execute("GRANT UPDATE ON instrument_maintenance_audits TO lims_app")
