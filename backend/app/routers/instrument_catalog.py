@@ -75,9 +75,14 @@ def _type_out(db: Session, row: ListEntry) -> InstrumentTypeResponse:
 
 
 def _audit_maintenance_tracked(
-    db: Session, instrument: Instrument, previous: bool, new_value: bool, user: User
+    db: Session,
+    instrument: Instrument,
+    previous: bool,
+    new_value: bool,
+    user: User,
+    always: bool = False,
 ) -> None:
-    if previous == new_value:
+    if not always and previous == new_value:
         return
     db.add(
         InstrumentMaintenanceAudit(
@@ -322,6 +327,11 @@ def create_instrument(
         modified_by=current_user.id,
     )
     db.add(row)
+    db.flush()
+    if row.maintenance_tracked is False:
+        _audit_maintenance_tracked(
+            db, row, False, False, current_user, always=True
+        )
     try:
         db.commit()
     except IntegrityError as e:

@@ -6,12 +6,15 @@ Revises: 0113_maintenance_tracked
 Revision id stays at or under 32 characters because
 ``alembic_version.version_num`` is varchar(32).
 
-No new tables. Nothing is dropped. No DELETE grants.
+Adds append-only ``instrument_schedule_audits``. Nothing is dropped.
+No DELETE grants. No auto-seeded next_due.
 """
 
 from __future__ import annotations
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "0114_instrument_hardening"
 down_revision = "0113_maintenance_tracked"
@@ -62,7 +65,11 @@ def upgrade() -> None:
     op.execute(
         """
         CREATE OR REPLACE FUNCTION is_lab_manager_or_admin()
-        RETURNS BOOLEAN AS $$
+        RETURNS BOOLEAN
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = pg_catalog, public
+        AS $$
         DECLARE
             user_role_name TEXT;
         BEGIN
@@ -72,9 +79,10 @@ def upgrade() -> None:
             WHERE u.id = current_user_id();
             RETURN user_role_name IN ('Administrator', 'Lab Manager');
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
+        $$;
         """
     )
+    op.execute("REVOKE EXECUTE ON FUNCTION is_lab_manager_or_admin() FROM PUBLIC")
     op.execute("GRANT EXECUTE ON FUNCTION is_lab_manager_or_admin() TO lims_app")
 
     op.execute(
@@ -100,7 +108,11 @@ def upgrade() -> None:
     op.execute(
         """
         CREATE OR REPLACE FUNCTION instrument_maintenance_schedules_guard()
-        RETURNS trigger AS $$
+        RETURNS trigger
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = pg_catalog, public
+        AS $$
         DECLARE
             derived_last date;
         BEGIN
@@ -145,8 +157,14 @@ def upgrade() -> None:
             END IF;
             RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
+        $$;
         """
+    )
+    op.execute(
+        "REVOKE EXECUTE ON FUNCTION instrument_maintenance_schedules_guard() FROM PUBLIC"
+    )
+    op.execute(
+        "GRANT EXECUTE ON FUNCTION instrument_maintenance_schedules_guard() TO lims_app"
     )
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_maintenance_schedules_guard "
@@ -160,6 +178,81 @@ def upgrade() -> None:
         EXECUTE FUNCTION instrument_maintenance_schedules_guard()
         """
     )
+
+    uuid_t = postgresql.UUID(as_uuid=True)
+    op.create_table(
+        "instrument_schedule_audits",
+        sa.Column(
+            "id",
+            uuid_t,
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "instrument_id",
+            uuid_t,
+            sa.ForeignKey("instruments.id"),
+            nullable=False,
+        ),
+        sa.Column(
+            "schedule_id",
+            uuid_t,
+            sa.ForeignKey("instrument_maintenance_schedules.id"),
+            nullable=True,
+        ),
+        sa.Column(
+            "event_id",
+            uuid_t,
+            sa.ForeignKey("instrument_maintenance_events.id"),
+            nullable=True,
+        ),
+        sa.Column("action", sa.String(32), nullable=False),
+        sa.Column("previous_value", sa.Text(), nullable=True),
+        sa.Column("new_value", sa.Text(), nullable=True),
+        sa.Column("overdue", sa.Boolean(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("NOW()"),
+        ),
+        sa.Column(
+            "created_by",
+            uuid_t,
+            sa.ForeignKey("users.id", ondelete="RESTRICT"),
+            nullable=True,
+        ),
+        sa.CheckConstraint(
+            "action IN ('first_due', 'schedule_active', 'schedule_interval', 'event_void')",
+            name="ck_instrument_schedule_audits_action",
+        ),
+    )
+    op.create_index(
+        "ix_instrument_schedule_audits_instrument_id",
+        "instrument_schedule_audits",
+        ["instrument_id"],
+    )
+    op.create_index(
+        "ix_instrument_schedule_audits_schedule_id",
+        "instrument_schedule_audits",
+        ["schedule_id"],
+    )
+    # 0103 default privileges also grant UPDATE/DELETE. Nothing is deleted.
+    op.execute("GRANT SELECT, INSERT ON instrument_schedule_audits TO lims_app")
+    op.execute("REVOKE UPDATE ON instrument_schedule_audits FROM lims_app")
+    op.execute("REVOKE DELETE ON instrument_schedule_audits FROM lims_app")
+    op.execute("ALTER TABLE instrument_schedule_audits ENABLE ROW LEVEL SECURITY")
+    op.execute(
+        "CREATE POLICY instrument_schedule_audits_select "
+        "ON instrument_schedule_audits FOR SELECT "
+        f"USING ({_CATALOG_POLICY})"
+    )
+    op.execute(
+        "CREATE POLICY instrument_schedule_audits_insert "
+        "ON instrument_schedule_audits FOR INSERT "
+        f"WITH CHECK ({_CATALOG_POLICY})"
+    )
+    op.execute("ALTER TABLE instrument_schedule_audits FORCE ROW LEVEL SECURITY")
 
     op.execute(
         "ALTER TABLE lims_run_imports ALTER COLUMN parser_id DROP NOT NULL"
@@ -186,13 +279,37 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    leftover = conn.exec_driver_sql(
+    leftover_imports = conn.exec_driver_sql(
         "SELECT count(*) FROM lims_run_imports WHERE filename = 'admin_override'"
     ).scalar()
-    if leftover:
+    if leftover_imports:
         raise RuntimeError(
             "0114 downgrade refuses: admin_override import rows exist"
         )
+    leftover_audits = conn.exec_driver_sql(
+        "SELECT count(*) FROM instrument_schedule_audits"
+    ).scalar()
+    if leftover_audits:
+        raise RuntimeError(
+            "0114 downgrade refuses: instrument_schedule_audits has rows"
+        )
+    op.execute(
+        "DROP POLICY IF EXISTS instrument_schedule_audits_select "
+        "ON instrument_schedule_audits"
+    )
+    op.execute(
+        "DROP POLICY IF EXISTS instrument_schedule_audits_insert "
+        "ON instrument_schedule_audits"
+    )
+    op.drop_index(
+        "ix_instrument_schedule_audits_schedule_id",
+        table_name="instrument_schedule_audits",
+    )
+    op.drop_index(
+        "ix_instrument_schedule_audits_instrument_id",
+        table_name="instrument_schedule_audits",
+    )
+    op.drop_table("instrument_schedule_audits")
     op.execute(
         "ALTER TABLE lims_run_imports DROP CONSTRAINT IF EXISTS ck_lims_run_imports_source_xor"
     )

@@ -48,6 +48,7 @@ from models.instrument import (
     InstrumentDowntime,
     InstrumentMaintenanceEvent,
     InstrumentMaintenanceSchedule,
+    InstrumentScheduleAudit,
     InstrumentUse,
 )
 from models.list import List as ListModel, ListEntry
@@ -67,6 +68,46 @@ VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
 
 def _refuse(code: str, message: str) -> None:
     raise HTTPException(status_code=422, detail={"code": code, "message": message})
+
+
+def _audit_text(value) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _schedule_overdue(row: InstrumentMaintenanceSchedule) -> bool:
+    if not row.active or row.next_due is None:
+        return False
+    return row.next_due < current_lab_day()
+
+
+def _write_schedule_audit(
+    db: Session,
+    *,
+    instrument_id: UUID,
+    action: str,
+    user: User,
+    schedule_id: Optional[UUID] = None,
+    event_id: Optional[UUID] = None,
+    previous_value=None,
+    new_value=None,
+    overdue: Optional[bool] = None,
+) -> None:
+    db.add(
+        InstrumentScheduleAudit(
+            instrument_id=instrument_id,
+            schedule_id=schedule_id,
+            event_id=event_id,
+            action=action,
+            previous_value=_audit_text(previous_value),
+            new_value=_audit_text(new_value),
+            overdue=overdue,
+            created_by=user.id,
+        )
+    )
 
 
 def _require_http_certificate(url: Optional[str]) -> None:
@@ -246,10 +287,37 @@ def update_schedule(
     if "service_vendor_id" in data and data["service_vendor_id"] is not None:
         if not db.query(Vendor).filter(Vendor.id == data["service_vendor_id"]).first():
             raise HTTPException(status_code=400, detail="Invalid service vendor")
+    overdue_at_time = _schedule_overdue(row)
+    previous_active = row.active
+    previous_interval = row.interval_days
     for k, v in data.items():
         setattr(row, k, v)
     # A new interval applies from the next passing event. Recomputing now
     # from last_done would clear an overdue block without that event.
+    # Deactivating an overdue schedule is allowed (a retired instrument is
+    # legitimate). The active flip and any interval change are audited.
+    if "active" in data and row.active is not previous_active:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_active",
+            user=current_user,
+            previous_value=previous_active,
+            new_value=row.active,
+            overdue=overdue_at_time,
+        )
+    if "interval_days" in data and row.interval_days != previous_interval:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_interval",
+            user=current_user,
+            previous_value=previous_interval,
+            new_value=row.interval_days,
+            overdue=overdue_at_time,
+        )
     row.modified_by = current_user.id
     _commit(db, row, "Could not update maintenance schedule")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
@@ -265,9 +333,12 @@ def set_first_due(
     current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
-    row = db.query(InstrumentMaintenanceSchedule).filter(
-        InstrumentMaintenanceSchedule.id == schedule_id
-    ).first()
+    row = (
+        db.query(InstrumentMaintenanceSchedule)
+        .filter(InstrumentMaintenanceSchedule.id == schedule_id)
+        .with_for_update()
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
     if row.next_due is not None or row.last_done is not None:
@@ -277,6 +348,16 @@ def set_first_due(
         )
     row.next_due = body.next_due
     row.modified_by = current_user.id
+    _write_schedule_audit(
+        db,
+        instrument_id=row.instrument_id,
+        schedule_id=row.id,
+        action="first_due",
+        user=current_user,
+        previous_value=None,
+        new_value=body.next_due,
+        overdue=_schedule_overdue(row),
+    )
     _commit(db, row, "Could not set the first due date")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
 
@@ -384,6 +465,7 @@ def update_event(
         _require_http_certificate(data["certificate_url"])
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
+    voiding = "active" in data and data["active"] is False and row.active is True
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -395,8 +477,34 @@ def update_event(
             .first()
         )
         if schedule is not None:
+            prior_next_due = schedule.next_due
+            overdue_at_time = _schedule_overdue(schedule)
             recompute_schedule(db, schedule)
             schedule.modified_by = current_user.id
+            if voiding:
+                _write_schedule_audit(
+                    db,
+                    instrument_id=row.instrument_id,
+                    schedule_id=schedule.id,
+                    event_id=row.id,
+                    action="event_void",
+                    user=current_user,
+                    previous_value=prior_next_due,
+                    new_value=schedule.next_due,
+                    overdue=overdue_at_time,
+                )
+    elif voiding:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=None,
+            event_id=row.id,
+            action="event_void",
+            user=current_user,
+            previous_value=None,
+            new_value=None,
+            overdue=None,
+        )
     try:
         db.commit()
     except IntegrityError:

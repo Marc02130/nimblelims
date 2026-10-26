@@ -12,7 +12,7 @@ from app.services import configuring_agent_allow as allow
 from app.services import configuring_agent_catalog as cat
 from app.services.configuring_agent_apply import CannotExpress, execute_step
 from models.flexible_experiment import LimsRun, LimsRunImport
-from models.instrument import InstrumentMaintenanceAudit
+from models.instrument import InstrumentMaintenanceAudit, InstrumentScheduleAudit
 from tests.test_instrument_tracking import (
     _instrument,
     _list_entry,
@@ -743,3 +743,348 @@ def test_l4_l5_downgrade_guards():
     assert "GRANT INSERT, UPDATE ON instrument_types_legacy" in lock
     assert "GRANT DELETE ON instrument_types_legacy" not in lock
     assert "instrument_maintenance_audits has rows" in tracked
+    hardening = (BACKEND / "db/migrations/versions/0114_instrument_hardening.py").read_text()
+    assert "instrument_schedule_audits has rows" in hardening
+    assert "REVOKE EXECUTE ON FUNCTION is_lab_manager_or_admin() FROM PUBLIC" in hardening
+    assert "SET search_path = pg_catalog, public" in hardening
+
+
+def _schedule_audits(db_session, schedule_id, action=None):
+    q = db_session.query(InstrumentScheduleAudit).filter(
+        InstrumentScheduleAudit.schedule_id == schedule_id
+    )
+    if action:
+        q = q.filter(InstrumentScheduleAudit.action == action)
+    return q.order_by(InstrumentScheduleAudit.created_at.asc()).all()
+
+
+def test_first_due_writes_one_audit_second_call_is_422(
+    client, admin_h, db_session, test_admin_user
+):
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    sched = _schedule(client, admin_h, inst["id"])
+    due = date.today() + timedelta(days=14)
+    first = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(due)},
+    )
+    assert first.status_code == 200, first.text
+    db_session.expire_all()
+    rows = _schedule_audits(db_session, sched["id"], "first_due")
+    assert len(rows) == 1
+    assert rows[0].previous_value is None
+    assert rows[0].new_value == str(due)
+    assert rows[0].created_by == test_admin_user.id
+    assert rows[0].created_at is not None
+    assert rows[0].instrument_id == uuid.UUID(inst["id"])
+    second = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(due + timedelta(days=1))},
+    )
+    assert second.status_code == 422, second.text
+    assert second.json()["detail"]["code"] == "first_due_already_set"
+    db_session.expire_all()
+    assert len(_schedule_audits(db_session, sched["id"], "first_due")) == 1
+
+
+def test_first_due_waits_on_held_schedule_lock(migrated_engine):
+    import threading
+    import time
+
+    from fastapi import HTTPException
+    from sqlalchemy.orm import sessionmaker
+
+    from app.routers.instrument_ops import set_first_due
+    from app.schemas.instrument_ops import FirstDueCreate
+    from models.instrument import InstrumentMaintenanceSchedule
+    from models.user import User
+
+    Session = sessionmaker(bind=migrated_engine, autoflush=False)
+    with migrated_engine.begin() as conn:
+        admin = conn.execute(text("SELECT id FROM roles WHERE name = 'Administrator'")).scalar()
+        client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
+        type_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'Plate reader' LIMIT 1")
+        ).scalar()
+        kind_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'PM' LIMIT 1")
+        ).scalar()
+        assert all([admin, client_id, type_id, kind_id])
+        uid = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
+                "VALUES (:id, 'lock', :u, :e, 'x', :r, :c, true)"
+            ),
+            {
+                "id": uid,
+                "u": f"e1-lock-{uid.hex[:6]}",
+                "e": f"e1-lock-{uid.hex[:6]}@x.org",
+                "r": admin,
+                "c": client_id,
+            },
+        )
+        inst = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO instruments (id, name, instrument_type_id, status, active, "
+                "maintenance_tracked, created_by, modified_by) "
+                "VALUES (:id, :n, :t, 'in_service', true, true, :u, :u)"
+            ),
+            {"id": inst, "n": f"E1lock-{inst.hex[:6]}", "t": type_id, "u": uid},
+        )
+        sched = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO instrument_maintenance_schedules "
+                "(id, instrument_id, kind_id, interval_days, next_due, last_done, "
+                "active, created_by, modified_by) "
+                "VALUES (:id, :i, :k, 10, NULL, NULL, true, :u, :u)"
+            ),
+            {"id": sched, "i": inst, "k": kind_id, "u": uid},
+        )
+
+    inside = threading.Event()
+    release = threading.Event()
+    box: dict = {}
+
+    def hold_and_set():
+        with Session() as s:
+            row = (
+                s.query(InstrumentMaintenanceSchedule)
+                .filter(InstrumentMaintenanceSchedule.id == sched)
+                .with_for_update()
+                .first()
+            )
+            inside.set()
+            assert release.wait(5), "test did not release the lock holder"
+            row.next_due = date.today()
+            s.commit()
+
+    def do_first_due():
+        with Session() as s:
+            user = s.get(User, uid)
+            try:
+                box["value"] = set_first_due(
+                    sched,
+                    FirstDueCreate(next_due=date.today() + timedelta(days=2)),
+                    user,
+                    s,
+                )
+            except HTTPException as exc:
+                box["error"] = exc
+
+    holder = threading.Thread(target=hold_and_set, daemon=True)
+    waiter = threading.Thread(target=do_first_due, daemon=True)
+    holder.start()
+    assert inside.wait(5)
+    waiter.start()
+    deadline = time.monotonic() + 5
+    waiting = False
+    while time.monotonic() < deadline:
+        with migrated_engine.connect() as conn:
+            waiting = conn.execute(
+                text(
+                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
+                    "AND query ILIKE '%instrument_maintenance_schedules%' "
+                    "AND pid <> pg_backend_pid()"
+                )
+            ).scalar()
+            conn.rollback()
+        if waiting:
+            break
+        time.sleep(0.05)
+    assert waiting, "second first-due did not wait on FOR UPDATE"
+    release.set()
+    holder.join(5)
+    waiter.join(5)
+    assert "error" in box
+    assert box["error"].status_code == 422
+    assert box["error"].detail["code"] == "first_due_already_set"
+    with migrated_engine.connect() as conn:
+        audits = conn.execute(
+            text(
+                "SELECT count(*) FROM instrument_schedule_audits "
+                "WHERE schedule_id = :id AND action = 'first_due'"
+            ),
+            {"id": sched},
+        ).scalar()
+        assert audits == 0
+
+
+def test_update_schedule_audits_active_and_interval_when_overdue(
+    client, admin_h, db_session, test_admin_user
+):
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    sched = _schedule(client, admin_h, inst["id"], interval=10)
+    past = date.today() - timedelta(days=3)
+    due = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(past)},
+    )
+    assert due.status_code == 200, due.text
+    retired = client.patch(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}",
+        headers=admin_h,
+        json={"active": False},
+    )
+    assert retired.status_code == 200, retired.text
+    db_session.expire_all()
+    active_rows = _schedule_audits(db_session, sched["id"], "schedule_active")
+    assert len(active_rows) == 1
+    assert active_rows[0].previous_value == "true"
+    assert active_rows[0].new_value == "false"
+    assert active_rows[0].overdue is True
+    assert active_rows[0].created_by == test_admin_user.id
+    assert active_rows[0].created_at is not None
+    restored = client.patch(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}",
+        headers=admin_h,
+        json={"active": True, "interval_days": 21},
+    )
+    assert restored.status_code == 200, restored.text
+    db_session.expire_all()
+    on_rows = _schedule_audits(db_session, sched["id"], "schedule_active")
+    assert len(on_rows) == 2
+    assert on_rows[1].previous_value == "false"
+    assert on_rows[1].new_value == "true"
+    assert on_rows[1].overdue is False
+    interval_rows = _schedule_audits(db_session, sched["id"], "schedule_interval")
+    assert len(interval_rows) == 1
+    assert interval_rows[0].previous_value == "10"
+    assert interval_rows[0].new_value == "21"
+    assert interval_rows[0].overdue is False
+    kind = _list_entry(client, admin_h, "maintenance_types", "calibration")
+    kind_only = client.patch(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}",
+        headers=admin_h,
+        json={"kind_id": kind["id"]},
+    )
+    assert kind_only.status_code == 200, kind_only.text
+    db_session.expire_all()
+    assert len(_schedule_audits(db_session, sched["id"], "schedule_active")) == 2
+    assert len(_schedule_audits(db_session, sched["id"], "schedule_interval")) == 1
+
+
+def test_void_last_event_is_audited_and_keeps_ruling_7(
+    client, admin_h, db_session, test_admin_user
+):
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    sched = _schedule(client, admin_h, inst["id"], interval=10)
+    first_due = date.today()
+    client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(first_due)},
+    )
+    performed = date.today() - timedelta(days=4)
+    created = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": str(performed),
+            "performed_by_user_id": str(test_admin_user.id),
+            "passed": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    advanced = client.get(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}", headers=admin_h
+    ).json()
+    cleared = advanced["next_due"]
+    assert cleared == str(performed + timedelta(days=10))
+    voided = client.patch(
+        f"/v1/instrument-maintenance-events/{created.json()['id']}",
+        headers=admin_h,
+        json={"active": False},
+    )
+    assert voided.status_code == 200, voided.text
+    awaiting = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
+    assert awaiting["code"] == "instrument_awaiting_first_due"
+    db_session.expire_all()
+    voids = _schedule_audits(db_session, sched["id"], "event_void")
+    assert len(voids) == 1
+    assert voids[0].event_id == uuid.UUID(created.json()["id"])
+    assert voids[0].previous_value == cleared
+    assert voids[0].new_value is None
+    assert voids[0].created_by == test_admin_user.id
+    assert voids[0].created_at is not None
+    reset = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(date.today() + timedelta(days=7))},
+    )
+    assert reset.status_code == 200, reset.text
+    db_session.expire_all()
+    first_dues = _schedule_audits(db_session, sched["id"], "first_due")
+    assert len(first_dues) == 2
+
+
+def test_lab_manager_function_search_path_and_execute_revoked(migrated_engine):
+    names = (
+        "is_lab_manager_or_admin",
+        "instrument_maintenance_schedules_guard",
+    )
+    with migrated_engine.connect() as conn:
+        for name in names:
+            config = conn.execute(
+                text(
+                    """
+                    SELECT proconfig
+                    FROM pg_proc p
+                    JOIN pg_namespace n ON n.oid = p.pronamespace
+                    WHERE n.nspname = 'public' AND p.proname = :n
+                    """
+                ),
+                {"n": name},
+            ).scalar()
+            assert config is not None, name
+            assert any(
+                item.startswith("search_path=pg_catalog, public") for item in config
+            ), name
+        assert conn.execute(
+            text("SELECT has_function_privilege('public', :fn, 'EXECUTE')"),
+            {"fn": "is_lab_manager_or_admin()"},
+        ).scalar() is False
+        assert conn.execute(
+            text("SELECT has_function_privilege('lims_app', :fn, 'EXECUTE')"),
+            {"fn": "is_lab_manager_or_admin()"},
+        ).scalar() is True
+        for privilege in ("UPDATE", "DELETE"):
+            allowed = conn.execute(
+                text(
+                    "SELECT has_table_privilege('lims_app', 'instrument_schedule_audits', :p)"
+                ),
+                {"p": privilege},
+            ).scalar()
+            assert allowed is False, privilege
+
+
+def test_create_with_maintenance_tracked_false_writes_audit(
+    client, admin_h, db_session, test_admin_user
+):
+    inst = _instrument(client, admin_h, maintenance_tracked=False)
+    db_session.expire_all()
+    rows = (
+        db_session.query(InstrumentMaintenanceAudit)
+        .filter(InstrumentMaintenanceAudit.instrument_id == inst["id"])
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].previous_value is False
+    assert rows[0].new_value is False
+    assert rows[0].created_by == test_admin_user.id
+    assert rows[0].created_at is not None
+    tracked = _instrument(client, admin_h, maintenance_tracked=True)
+    db_session.expire_all()
+    tracked_rows = (
+        db_session.query(InstrumentMaintenanceAudit)
+        .filter(InstrumentMaintenanceAudit.instrument_id == tracked["id"])
+        .all()
+    )
+    assert tracked_rows == []

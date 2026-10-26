@@ -97,6 +97,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
                         "instrument_uses",
                         "instrument_type_defaults",
                         "instrument_maintenance_audits",
+                        "instrument_schedule_audits",
                     ]
                 },
             ).all()
@@ -136,6 +137,7 @@ def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
         "instrument_type_defaults",
         "instrument_types_legacy",
         "instrument_maintenance_audits",
+        "instrument_schedule_audits",
     )
     with migrated_engine.connect() as conn:
         for table in tables:
@@ -551,6 +553,7 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
     os.environ["MIGRATE_DATABASE_URL"] = url
     with migrated_engine.begin() as conn:
         conn.execute(text("DELETE FROM instrument_maintenance_audits"))
+        conn.execute(text("DELETE FROM instrument_schedule_audits"))
         conn.execute(text("DELETE FROM lims_run_imports WHERE filename = 'admin_override'"))
     type_id = uuid.uuid4()
     inst_id = uuid.uuid4()

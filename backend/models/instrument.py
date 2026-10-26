@@ -143,6 +143,42 @@ class InstrumentMaintenanceAudit(Base):
     )
 
 
+class InstrumentScheduleAudit(Base):
+    """Append-only first-due, schedule, and event-void history."""
+
+    __tablename__ = "instrument_schedule_audits"
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('first_due', 'schedule_active', 'schedule_interval', 'event_void')",
+            name="ck_instrument_schedule_audits_action",
+        ),
+    )
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    instrument_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("instruments.id"), nullable=False, index=True
+    )
+    schedule_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("instrument_maintenance_schedules.id"),
+        nullable=True,
+        index=True,
+    )
+    event_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("instrument_maintenance_events.id"),
+        nullable=True,
+    )
+    action = Column(String(32), nullable=False)
+    previous_value = Column(Text, nullable=True)
+    new_value = Column(Text, nullable=True)
+    overdue = Column(Boolean, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+
+
 class CroSource(BaseModel):
     """External/CRO export-source catalog (file shape lineage)."""
 
