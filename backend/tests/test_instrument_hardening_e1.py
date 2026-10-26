@@ -417,7 +417,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     ).json()["allowed"] is True
 
 
-def test_api_patch_off_writes_one_audit_row(client, admin_h, db_session):
+def test_api_patch_off_writes_one_audit_row(client, admin_h, db_session, test_admin_user):
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     patched = client.patch(
         f"/v1/instruments/{inst['id']}",
@@ -433,6 +433,8 @@ def test_api_patch_off_writes_one_audit_row(client, admin_h, db_session):
     assert len(rows) == 1
     assert rows[0].previous_value is True
     assert rows[0].new_value is False
+    assert rows[0].created_by == test_admin_user.id
+    assert rows[0].created_at is not None
 
 
 def test_type_default_is_refused_and_table_is_retired(client, admin_h, migrated_engine):

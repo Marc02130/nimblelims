@@ -906,6 +906,11 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
 
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     assert inst["maintenance_tracked"] is True
+    off = {"maintenance_tracked": False}
+    path = f"/v1/instruments/{inst['id']}"
+    classified = allow.classify_call("PATCH", path, off)
+    assert classified.ok is True
+    assert allow.needs_second_confirm("PATCH", path, off, classified.kind) is False
     monkeypatch.setattr(svc, "_key_for_run", lambda _db: (
         type("P", (), {"agent_provider": "xai", "agent_model": "grok-test-model"})(),
         "test-key",
@@ -945,6 +950,8 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
     result, code = svc.apply_run(db_session, test_admin_user, run.id)
     assert code == 200, result.error_message
     assert result.status == "done"
+    assert result.confirmed_by == test_admin_user.id
+    assert result.confirmed_at is not None
     after = client.get(f"/v1/instruments/{inst['id']}", headers=admin_h).json()
     assert after["maintenance_tracked"] is False
     item = db_session.query(ConfigurationItem).filter_by(run_id=run.id).one()
@@ -958,6 +965,8 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
     )
     assert audit.previous_value is True
     assert audit.new_value is False
+    assert audit.created_by == test_admin_user.id
+    assert audit.created_at is not None
 
 
 def test_json_import_requires_source_unless_admin(
