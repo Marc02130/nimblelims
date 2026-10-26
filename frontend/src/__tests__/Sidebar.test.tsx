@@ -318,11 +318,13 @@ describe('Sidebar', () => {
       expect(sidebar().getByText('Lab Mgmt')).toBeInTheDocument();
     });
 
-    test('shows Instrument maintenance for a Lab Manager and hides it for a technician', () => {
+    test('shows Instrument maintenance for a Lab Manager', () => {
       const manager = createMockUser(['project:manage', 'experiment:manage'], 'Lab Manager');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], manager);
       expect(sidebar().getByText('Instrument maintenance')).toBeInTheDocument();
+    });
 
+    test('hides Instrument maintenance for a technician', () => {
       const tech = createMockUser(['sample:create', 'experiment:manage'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], tech);
       expect(sidebar().queryByText('Instrument maintenance')).not.toBeInTheDocument();
