@@ -258,14 +258,15 @@ describe('InstrumentCatalogManagement', () => {
       }
       return [];
     });
-    wrap(<InstrumentCatalogManagement />);
+    const first = wrap(<InstrumentCatalogManagement />);
     fireEvent.click(await screen.findByRole('tab', { name: 'Maintenance' }));
     fireEvent.click(screen.getByRole('button', { name: /Add Maintenance/i }));
     fireEvent.mouseDown(await screen.findByLabelText('Kind'));
     expect(await screen.findByRole('option', { name: 'PM' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Retired kind' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    fireEvent.click(screen.getByRole('tab', { name: 'Downtime' }));
+    first.unmount();
+    wrap(<InstrumentCatalogManagement />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Downtime' }));
     fireEvent.click(screen.getByRole('button', { name: /Add Downtime/i }));
     fireEvent.mouseDown(await screen.findByLabelText('Reason'));
     expect(await screen.findByRole('option', { name: 'Breakdown' })).toBeInTheDocument();

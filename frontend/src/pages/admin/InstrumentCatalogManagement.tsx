@@ -1023,8 +1023,9 @@ const InstrumentCatalogManagement: React.FC<{
                 </Select>
               </FormControl>
               <FormControl fullWidth margin="normal">
-                <InputLabel>Kind</InputLabel>
+                <InputLabel id="schedule-kind-label">Kind</InputLabel>
                 <Select
+                  labelId="schedule-kind-label"
                   label="Kind"
                   value={scheduleForm.kind_id}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, kind_id: String(e.target.value) })}
@@ -1172,8 +1173,9 @@ const InstrumentCatalogManagement: React.FC<{
                 </Select>
               </FormControl>
               <FormControl fullWidth margin="normal">
-                <InputLabel>Reason</InputLabel>
+                <InputLabel id="downtime-reason-label">Reason</InputLabel>
                 <Select
+                  labelId="downtime-reason-label"
                   label="Reason"
                   value={downtimeForm.reason_id}
                   onChange={(e) => setDowntimeForm({ ...downtimeForm, reason_id: String(e.target.value) })}
