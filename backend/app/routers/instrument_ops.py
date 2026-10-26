@@ -1,11 +1,11 @@
 """Maintenance, downtime, and instrument use. Nothing is deleted.
 
 Schedule create, edit, and first-due need Administrator or Lab Manager.
-Events, downtime, and uses are bench work (experiment:manage). Passing
-events recompute next_due only after a lab admin or manager has set the
-first due date. Voiding the only passing event (which clears first due)
-is Administrator / Lab Manager only. A technician may still void a
-non-last passing event or a failed event.
+Create of events, downtime, and uses is bench work (experiment:manage).
+Passing events recompute next_due only after a lab admin or manager has
+set the first due date. Edit, void, and un-void of a maintenance event
+are Administrator / Lab Manager only. A technician may create an event
+and cannot PATCH one.
 """
 from datetime import date, timedelta
 from typing import List, Optional
@@ -111,30 +111,6 @@ def _write_schedule_audit(
             created_by=user.id,
         )
     )
-
-
-def _void_clears_first_due(db: Session, event: InstrumentMaintenanceEvent) -> bool:
-    """True when voiding this event would return the item to awaiting first due."""
-    if event.passed is not True or event.active is not True or event.schedule_id is None:
-        return False
-    schedule = (
-        db.query(InstrumentMaintenanceSchedule)
-        .filter(InstrumentMaintenanceSchedule.id == event.schedule_id)
-        .first()
-    )
-    if schedule is None or (schedule.next_due is None and schedule.last_done is None):
-        return False
-    other = (
-        db.query(InstrumentMaintenanceEvent.id)
-        .filter(
-            InstrumentMaintenanceEvent.schedule_id == event.schedule_id,
-            InstrumentMaintenanceEvent.id != event.id,
-            InstrumentMaintenanceEvent.active.is_(True),
-            InstrumentMaintenanceEvent.passed.is_(True),
-        )
-        .first()
-    )
-    return other is None
 
 
 def _require_http_certificate(url: Optional[str]) -> None:
@@ -395,6 +371,36 @@ def update_schedule(
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
 
 
+def _lock_schedule(db: Session, schedule_id: UUID) -> InstrumentMaintenanceSchedule:
+    from sqlalchemy.exc import OperationalError
+    from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
+
+    try:
+        row = (
+            db.query(InstrumentMaintenanceSchedule)
+            .filter(InstrumentMaintenanceSchedule.id == schedule_id)
+            .with_for_update()
+            .first()
+        )
+    except OperationalError as exc:
+        if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+            raise
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "schedule_busy",
+                "message": (
+                    "Another change to this schedule is in progress. "
+                    "Wait for it to finish, then try again."
+                ),
+            },
+        ) from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    return row
+
+
 @schedules_router.post(
     "/{schedule_id}/first-due",
     response_model=MaintenanceScheduleResponse,
@@ -405,14 +411,7 @@ def set_first_due(
     current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(InstrumentMaintenanceSchedule)
-        .filter(InstrumentMaintenanceSchedule.id == schedule_id)
-        .with_for_update()
-        .first()
-    )
-    if row is None:
-        raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    row = _lock_schedule(db, schedule_id)
     if row.next_due is not None or row.last_done is not None:
         _refuse(
             "first_due_already_set",
@@ -523,7 +522,7 @@ def create_event(
 def update_event(
     event_id: UUID,
     body: MaintenanceEventUpdate,
-    current_user: User = Depends(require_experiment_manage),
+    current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
     row = (
@@ -533,6 +532,8 @@ def update_event(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance event not found")
+    if row.schedule_id:
+        _lock_schedule(db, row.schedule_id)
     data = explicit_updates(body, row, refuse_null={"active"})
     data.pop("reason", None)
     if "certificate_url" in data:
@@ -540,19 +541,7 @@ def update_event(
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
     voiding = "active" in data and data["active"] is False and row.active is True
-    if voiding and _void_clears_first_due(db, row):
-        role = getattr(getattr(current_user, "role", None), "name", None)
-        if role not in ("Administrator", "Lab Manager"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "code": "only_passing_event_void_forbidden",
-                    "message": (
-                        "Only an Administrator or Lab Manager can void the "
-                        "only passing event (that clears the first due date)."
-                    ),
-                },
-            )
+    restoring = "active" in data and data["active"] is True and row.active is not True
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -568,26 +557,26 @@ def update_event(
             overdue_at_time = _schedule_overdue(schedule)
             recompute_schedule(db, schedule)
             schedule.modified_by = current_user.id
-            if voiding:
+            if voiding or restoring:
                 _write_schedule_audit(
                     db,
                     instrument_id=row.instrument_id,
                     schedule_id=schedule.id,
                     event_id=row.id,
-                    action="event_void",
+                    action="event_restore" if restoring else "event_void",
                     user=current_user,
                     previous_value=prior_next_due,
                     new_value=schedule.next_due,
                     overdue=overdue_at_time,
                     reason=body.reason,
                 )
-    elif voiding:
+    elif voiding or restoring:
         _write_schedule_audit(
             db,
             instrument_id=row.instrument_id,
             schedule_id=None,
             event_id=row.id,
-            action="event_void",
+            action="event_restore" if restoring else "event_void",
             user=current_user,
             previous_value=None,
             new_value=None,
@@ -994,8 +983,27 @@ def record_instrument_use(
     current_user: User = Depends(require_experiment_manage),
     db: Session = Depends(get_db),
 ):
+    if body.entry_id is not None and body.lims_run_id is not None:
+        _refuse(
+            "use_target_conflict",
+            "Send entry_id with experiment_id, not with lims_run_id.",
+        )
+    if body.entry_id is not None and body.experiment_id is None:
+        _refuse(
+            "entry_experiment_required",
+            "entry_id requires experiment_id.",
+        )
     if body.lims_run_id is None and body.experiment_id is None:
         _refuse(USE_TARGET_REQUIRED, "Record the use on a LIMS run or an experiment")
+    if body.entry_id is not None:
+        entry = db.query(Entry).filter(Entry.id == body.entry_id).first()
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Entry not found")
+        if entry.experiment_id != body.experiment_id:
+            _refuse(
+                "entry_experiment_mismatch",
+                "This entry does not belong to that experiment.",
+            )
     if body.lims_run_id is not None and not db.query(LimsRun).filter(LimsRun.id == body.lims_run_id).first():
         raise HTTPException(status_code=404, detail="LIMS run not found")
     if body.experiment_id is not None and not db.query(Experiment).filter(Experiment.id == body.experiment_id).first():

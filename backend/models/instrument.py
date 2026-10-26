@@ -150,7 +150,7 @@ class InstrumentScheduleAudit(Base):
     __table_args__ = (
         CheckConstraint(
             "action IN ('first_due', 'schedule_active', 'schedule_interval', "
-            "'schedule_kind', 'schedule_vendor', 'event_void')",
+            "'schedule_kind', 'schedule_vendor', 'event_void', 'event_restore')",
             name="ck_instrument_schedule_audits_action",
         ),
     )
@@ -362,3 +362,22 @@ class InstrumentUse(Base):
     )
 
     instrument = relationship("Instrument", foreign_keys=[instrument_id])
+
+
+class InstrumentTemplateInactivation(Base):
+    """Append-only ledger of untyped LIMS run templates set inactive."""
+
+    __tablename__ = "instrument_template_inactivations"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    experiment_template_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("experiment_templates.id"),
+        nullable=False,
+        index=True,
+    )
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )

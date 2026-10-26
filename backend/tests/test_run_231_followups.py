@@ -36,11 +36,12 @@ from models.flexible_experiment import (
     LimsRunStatus,
     ParserAnalysis,
 )
+from models.experiment import ExperimentTemplate
 from models.instrument import INSTRUMENT_TYPES_LIST_ID, CroSource, Instrument
 from models.list import ListEntry
 from models.user import Role, User
 from tests.test_elisa_run_gaps import GEN5, PARSER
-from tests.test_flexible_experiment import PLATE_READER_TYPE_ID
+from tests.test_flexible_experiment import PLATE_READER_TYPE_ID, VALID_TEMPLATE_DEF
 from tests.test_run_229_followups import (
     LOCK_WAIT_S,
     _in_thread,
@@ -92,10 +93,40 @@ def committed(db_engine):
             s.add(parser)
             s.flush()
             s.add(ParserAnalysis(parser_id=parser.id, analysis_id=analysis.id, is_default=True))
+            template = ExperimentTemplate(
+                name=f"R231 cro {tag}",
+                lifecycle_type="cro",
+                template_definition={
+                    **VALID_TEMPLATE_DEF,
+                    "entries": [
+                        {
+                            "entry_type": "instrument",
+                            "predefined_entry_key": "instruments",
+                            "name": "Instruments",
+                            "config": {
+                                "slots": [
+                                    {
+                                        "key": "run_import",
+                                        "label": "Import",
+                                        "instrument_type_id": PLATE_READER_TYPE_ID,
+                                        "required": True,
+                                        "run_import": True,
+                                    }
+                                ]
+                            },
+                        }
+                    ],
+                },
+                created_by=user.id,
+                modified_by=user.id,
+            )
+            s.add(template)
+            s.flush()
             run = LimsRun(
                 name=f"R231 run {tag}",
                 analysis_id=analysis.id,
                 status=run_status,
+                experiment_template_id=template.id,
                 instrument_type_id=uuid.UUID(PLATE_READER_TYPE_ID),
                 created_by=user.id,
                 modified_by=user.id,
@@ -103,7 +134,8 @@ def committed(db_engine):
             s.add(run)
             s.commit()
             ids = dict(user=user.id, run=run.id, analysis=analysis.id, analyte=analyte.id,
-                       role=role.id, org=org.id, cro=cro.id, parser=parser.id)
+                       role=role.id, org=org.id, cro=cro.id, parser=parser.id,
+                       template=template.id)
         made.append(ids)
         return ids
 
@@ -113,6 +145,11 @@ def committed(db_engine):
             c.execute(text("DELETE FROM lims_run_data WHERE lims_run_id = :i"), {"i": ids["run"]})
             c.execute(text("DELETE FROM lims_run_imports WHERE lims_run_id = :i"), {"i": ids["run"]})
             c.execute(text("DELETE FROM lims_runs WHERE id = :i"), {"i": ids["run"]})
+            if ids.get("template"):
+                c.execute(
+                    text("DELETE FROM experiment_templates WHERE id = :i"),
+                    {"i": ids["template"]},
+                )
             c.execute(text("DELETE FROM parser_analyses WHERE analysis_id = :i"), {"i": ids["analysis"]})
             c.execute(text("DELETE FROM data_parsers WHERE id = :i"), {"i": ids["parser"]})
             c.execute(text("DELETE FROM cro_sources WHERE id = :i"), {"i": ids["cro"]})
@@ -565,6 +602,7 @@ _APP_PRIVILEGES = (
     ("parser_analyses", "SELECT"),
     ("users", "SELECT"),
     ("roles", "SELECT"),
+    ("experiment_templates", "SELECT"),
 )
 
 
@@ -592,7 +630,17 @@ def lims_app_world(migrated_engine):
             c.execute(text(f"GRANT {privilege} ON TABLE {table} TO lims_app"))
         ids = {
             k: uuid.uuid4()
-            for k in ("org", "user", "other_org", "other_user", "analysis", "run", "cro", "parser")
+            for k in (
+                "org",
+                "user",
+                "other_org",
+                "other_user",
+                "analysis",
+                "run",
+                "cro",
+                "parser",
+                "template",
+            )
         }
         for org, user, label in (("org", "user", "a"), ("other_org", "other_user", "b")):
             c.execute(
@@ -613,10 +661,25 @@ def lims_app_world(migrated_engine):
         )
         c.execute(
             text(
-                "INSERT INTO lims_runs (id, name, status, analysis_id, created_by, modified_by) "
-                "VALUES (:id, :n, 'running', :a, :u, :u)"
+                "INSERT INTO experiment_templates "
+                "(id, name, template_definition, lifecycle_type, created_by, modified_by) "
+                "VALUES (:id, :n, '{}'::jsonb, 'cro', :u, :u)"
             ),
-            {"id": ids["run"], "n": f"R231 run {tag}", "a": ids["analysis"], "u": ids["user"]},
+            {"id": ids["template"], "n": f"R231 cro {tag}", "u": ids["user"]},
+        )
+        c.execute(
+            text(
+                "INSERT INTO lims_runs "
+                "(id, name, status, analysis_id, experiment_template_id, created_by, modified_by) "
+                "VALUES (:id, :n, 'running', :a, :t, :u, :u)"
+            ),
+            {
+                "id": ids["run"],
+                "n": f"R231 run {tag}",
+                "a": ids["analysis"],
+                "t": ids["template"],
+                "u": ids["user"],
+            },
         )
         c.execute(
             text("INSERT INTO cro_sources (id, name, active) VALUES (:id, :n, true)"),
@@ -663,6 +726,7 @@ def lims_app_world(migrated_engine):
         c.execute(text("DELETE FROM lims_run_data WHERE lims_run_id = :i"), {"i": ids["run"]})
         c.execute(text("DELETE FROM lims_run_imports WHERE lims_run_id = :i"), {"i": ids["run"]})
         c.execute(text("DELETE FROM lims_runs WHERE id = :i"), {"i": ids["run"]})
+        c.execute(text("DELETE FROM experiment_templates WHERE id = :i"), {"i": ids["template"]})
         c.execute(text("DELETE FROM parser_analyses WHERE parser_id = :i"), {"i": ids["parser"]})
         c.execute(text("DELETE FROM data_parsers WHERE id = :i"), {"i": ids["parser"]})
         c.execute(text("DELETE FROM cro_sources WHERE id = :i"), {"i": ids["cro"]})

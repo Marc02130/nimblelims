@@ -328,6 +328,7 @@ describe('Sidebar', () => {
       const tech = createMockUser(['sample:create', 'experiment:manage'], 'Lab Technician');
       renderWithProviders(<Sidebar {...defaultProps} />, ['/dashboard'], tech);
       expect(sidebar().queryByText('Instrument maintenance')).not.toBeInTheDocument();
+      expect(sidebar().getByText('Maintenance events')).toBeInTheDocument();
     });
 
     test('does not render Lab Management section when user lacks project:manage permission', () => {

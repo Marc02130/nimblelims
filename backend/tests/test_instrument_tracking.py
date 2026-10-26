@@ -69,6 +69,7 @@ def test_schema_catalog_registers_new_tables_and_drops_types():
         "instrument_uses",
         "instrument_type_defaults",
         "lims_run_type_substitutions",
+        "instrument_template_inactivations",
     ):
         assert name in schema_catalog.LAB_TABLES
         assert schema_catalog.shown_in_schema(name, schema_catalog.kind_for(name))
@@ -84,6 +85,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
             "instrument_downtime",
             "instrument_uses",
             "instrument_type_defaults",
+            "instrument_template_inactivations",
         } <= names
         forced = dict(
             conn.execute(
@@ -100,6 +102,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
                         "instrument_maintenance_audits",
                         "instrument_schedule_audits",
                         "lims_run_type_substitutions",
+                        "instrument_template_inactivations",
                     ]
                 },
             ).all()
@@ -141,6 +144,7 @@ def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
         "instrument_maintenance_audits",
         "instrument_schedule_audits",
         "lims_run_type_substitutions",
+        "instrument_template_inactivations",
     )
     with migrated_engine.connect() as conn:
         for table in tables:

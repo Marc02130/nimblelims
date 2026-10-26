@@ -116,7 +116,7 @@ class LimsRunStartRequest(BaseModel):
 
 class LimsRunSubstituteInstrumentTypeRequest(BaseModel):
     instrument_type_id: uuid.UUID
-    reason: str = Field(..., min_length=1)
+    reason: str = Field(..., min_length=1, max_length=500)
 
 
 class LimsRunCohort(BaseModel):
