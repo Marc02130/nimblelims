@@ -14,12 +14,22 @@ No Accept, Confirm, or UAT Pass is recorded here. Nothing in this file says a sl
 ## Rulings (Marc, relayed 2026-10-26)
 
 - **R-1 Scope and label.** This packet is about instruments. The user-facing label is **Instrument**, not "Equipment". Labels become configurable later. Only LIMS runs are tied to instruments. Experiments use equipment (pipettes, incubators). That equipment is tracked but is not tied to results.
-- **R-2 Instrument types.** Types come from the existing list. A type has no metadata and no type-level maintenance default. Labs can add and remove types. A LIMS run template must specify the type, and the type is locked to the template. An ad hoc run locks the type at start.
-- **R-3 Maintenance.** `maintenance_tracked` is per instrument and off by default. When it is off, only use is recorded. When it is on, `next_due` is **never** auto-seeded. The item stays in status **Awaiting first due date** until a Lab Manager or Administrator sets it. Overdue items are blocked from import and use. Voiding the only passing event returns the item to **Awaiting first due date**. The configuring agent asks whether the lab tracks maintenance and sets the flag. It never sets schedules or due dates. Turning the flag off needs one confirm and is audited.
-- **R-4 Roles.** Schedule create and edit, and the first due date, belong to Lab Manager and Administrator, with a backup. The backup mechanism is not in the repo (see OQ-IT-1).
-- **R-5 Runs.** Once data is imported, a run cannot be canceled. It can only be failed. The instrument used at run or import must be of the template's type. The person running the experiment (tech or manager) can substitute an instrument type on a run. The substitution needs a **required** reason and writes an audit row. Legacy untyped templates are removed with no backward compatibility, because the product is not live.
-- **R-6 Audit.** These are all audited: setting the first due date, schedule changes, event voids, and changes to `maintenance_tracked`.
-- **R-7 Status.** #231, #232, #233, #234, and #235 are merged. E2 (migration `0115_instrument_type_slots`, typed templates and substitution) is **in progress** (Dieter). E2 is not shipped.
+- **R-2 Instrument types.** Types come from the existing list. A type has no metadata and no type-level maintenance default. Labs can add and remove types. A LIMS run template must specify the type, and the type is locked to the template. Ad hoc runs are decided under OQ-IT-2 below: the instruments and the types are edited on the entry, and a LIMS run's type is required.
+- **R-3 Maintenance.** `maintenance_tracked` is per instrument and off by default. When it is off, only use is recorded. When it is on, `next_due` is **never** auto-seeded. The item stays in status **Awaiting first due date** until a Lab Manager or Administrator sets it. Overdue items are blocked from import and use. Voiding the only passing event returns the item to **Awaiting first due date**. The configuring agent asks whether the lab tracks maintenance and sets the flag. It never sets schedules or due dates. Turning the flag off needs one confirm and is audited. That confirm is the admin dialog's **Save** (OQ-IT-5).
+- **R-4 Roles.** Schedule create and edit, and the first due date, belong to Lab Manager and Administrator. The backup is a second Lab Manager. There is no new role (OQ-IT-1).
+- **R-5 Runs.** Once data is imported, a run cannot be canceled. It can only be failed. The instrument used at run or import must be of the template's type. The person running the experiment is whoever created it, so `created_by` is the field (OQ-IT-3). That person can substitute an instrument type on a run. The substitution needs a **required** reason and writes an audit row. Legacy untyped templates are removed with no backward compatibility, because the product is not live.
+- **R-6 Audit.** These are all audited: setting the first due date, schedule changes (including kind and service vendor, OQ-IT-4), event voids, and changes to `maintenance_tracked`.
+- **R-7 Status.** #231, #232, #233, #234, and #235 are merged. E2 (migration `0115_instrument_type_slots`, typed templates and substitution) is **in progress** in [#236](https://github.com/Marc02130/nimblelims/pull/236). E2 is not shipped. OQ-IT-2 is a change to E2's scope that #236 does not implement.
+
+## Decisions on the open questions (Marc, 2026-10-26)
+
+- **OQ-IT-1 is Decided. Shipped.** The backup for schedules and the first due date is a second Lab Manager. No new role, no backup permission, and no named delegate. Any user with the Lab Manager role already passes `require_lab_manager` and `is_lab_manager_or_admin()`.
+- **OQ-IT-2 is Decided. Not built, and it changes E2.** On an ad hoc run, the instruments used are edited on the entry itself, and instrument types can be added and removed on that entry. A LIMS run's type is required, because parsing and the rest of the run need it. [#236](https://github.com/Marc02130/nimblelims/pull/236) does not do this. On that branch an ad hoc run may leave `lims_runs.instrument_type_id` null, and a null snapshot is not type-checked (`instrument_slots.py`: "Null snapshot is unchecked (ad hoc runs only)"). This file does not claim #236 implements the ruling.
+- **OQ-IT-3 is Decided. E2, in progress.** The person running the experiment is whoever created it: a lab tech, a lab manager, or another creator. `created_by` is the right field. There is no `started_by`. #236 keys substitution on `lims_runs.created_by`.
+- **OQ-IT-4 is Decided. Not built.** A change to a schedule's kind and a change to its service vendor are audited, the same way an Active flip and an interval change already are. #235 writes no row for kind-only or vendor-only PATCH.
+- **OQ-IT-5 is Decided. Shipped.** The admin instrument dialog's **Save** is the one confirm for turning **Track maintenance** off. `InstrumentCatalogManagement.tsx` offers Cancel and Save and no second prompt. Save sends `maintenance_tracked` on the instrument PATCH. Cancel writes nothing.
+- **OQ-IT-6 is Deferred.** No decision. The open question is in §11.
+- **OQ-IT-7 is Decided. Not built.** Only a Lab Manager or an Administrator may void the only passing event. A Lab Technician may not. Today `update_event` requires `experiment:manage` (`require_experiment_manage` in `instrument_ops.py`). The Lab Technician seed role has that permission, and the handler does not add a check when the void is the last passing event.
 
 The standing Marc locks still apply. There is no delete; removal is a status flag (L-B, 2026-10-04). Confirm-before-apply applies to the configuring agent (L-C). See the [configuring-agent PRD](../configuring-agent/PRD.md).
 
@@ -45,7 +55,7 @@ The packet stays sample-centric. A result stays on the sample's Test (WO-7: Test
 | Downtime records | Lab-room locations (the existing `locations` rows are client sites) |
 | Instrument recorded on each LIMS run import and on each use | An `instrument_id` column on `lims_runs` |
 | Equipment use on experiments (tracking only) | Tying experiment equipment to results |
-| Type on LIMS run templates and a type lock on runs (E2, in progress) | Configurable labels (later; see OQ-IT-6) |
+| Type on LIMS run templates and a type lock on runs (E2, in progress) | Configurable labels (deferred, OQ-IT-6; no decision) |
 
 **Instrument vs equipment.** The product label is **Instrument** everywhere, including on experiments. In this file, "equipment" means an instrument used on an experiment, such as a pipette or an incubator. It is recorded as a use. It does not feed results. Only a LIMS run ties an instrument to results, through its imports.
 
@@ -59,12 +69,12 @@ The packet stays sample-centric. A result stays on the sample's Test (WO-7: Test
 |------|-----|
 | Administrator | Everything below. Unsourced JSON import (logged as `admin_override`). |
 | Lab Manager | Create and edit maintenance schedules. Set the first due date. Bench work. |
-| Lab Technician (`experiment:manage`) | Bench work: log maintenance events, void events, record downtime, record uses, import. Substitute a run's type (E2, subject to OQ-IT-3). |
+| Lab Technician (`experiment:manage`) | Bench work: log maintenance events, record downtime, record uses, import. Substitute a run's type when they created the run (E2, `lims_runs.created_by`). Voiding the only passing event is not this role (OQ-IT-7, not built). |
 | Configuration editor (`config:edit`) | Catalog: types, instruments, vendors, CRO sources. Turn **Track maintenance** on or off. Cannot create schedules or set due dates. |
 | Configuring agent (as the confirming user) | Propose instruments with an explicit yes/no on maintenance tracking. Never schedules, due dates, events, downtime, uses, status, or active. |
 | Client | No instrument writes (403). Catalog reads follow the existing RLS. |
 
-**Backup (R-4).** The ruling says Lab Manager and Administrator, "with a backup". Today the check is the role name: either role passes (`require_lab_manager`, and `is_lab_manager_or_admin()` in the database). There is no named delegate, no backup permission, and no backup role in the repo. The backup mechanism is **OQ-IT-1**. This file does not invent one.
+**Backup (OQ-IT-1, Decided, shipped).** The backup is a second person with the Lab Manager role. There is no new role and no delegate record. Schedule create, schedule edit, and the first due date already accept every Administrator and every Lab Manager (`require_lab_manager`, and `is_lab_manager_or_admin()` in the database). A lab covers an absence by having two Lab Manager users.
 
 ---
 
@@ -74,8 +84,8 @@ The packet stays sample-centric. A result stays on the sample's Test (WO-7: Test
 - Seeded types are Plate reader, qPCR, LC-MS, Liquid handler, Balance, and Centrifuge. Labs add more types, such as Pipette or Incubator.
 - **Remove means retire.** Under L-B (no delete), a type is removed by turning **Active** off. A retired type cannot be assigned to an instrument or, after E2, to a template slot or a substitution.
 - **No type-level maintenance default.** A type cannot carry `maintenance_tracked`. The earlier side table `instrument_type_defaults` is kept read-only as history.
-- **Template type (E2, in progress).** A LIMS run template must name the type its imports use. After a run references that template, the type is locked.
-- **Ad hoc runs (no template)** lock the type at start (R-2). The E2 description leaves an ad hoc type optional instead. That gap is **OQ-IT-2**.
+- **Template type (E2, in progress).** A LIMS run template must name the type its imports use. After a run references that template, the type is locked. A LIMS run's type is required (OQ-IT-2).
+- **Ad hoc runs (OQ-IT-2, Decided, not built).** The instruments used are edited on the entry itself. Instrument types can be added and removed on that entry. This replaces the earlier "lock the type at start" reading of R-2. What is shipped today is adding and removing instruments on an experiment entry (`allowed_instrument_ids`), not types. [#236](https://github.com/Marc02130/nimblelims/pull/236) still lets an ad hoc run leave its type null and skips the type check. Requiring the type, and adding or removing types on the ad hoc entry, is an E2 scope change. It is not in #236.
 
 ---
 
@@ -104,9 +114,9 @@ When **Track maintenance** is off, maintenance states do not apply and do not bl
 4. A Lab Manager or Administrator sets the first due date once. A second attempt is refused.
 5. A passing event, logged on the bench, moves last done and next due forward. It does this only after the first due date has been set. An event logged before that does not set a date.
 6. Changing the interval does not move next due and does not clear an overdue block. The new interval applies from the next passing event.
-7. Voiding the only remaining passing event returns the schedule to **Awaiting first due date**. Only a Lab Manager or Administrator can set it again.
+7. Voiding the only remaining passing event returns the schedule to **Awaiting first due date**. Only a Lab Manager or Administrator can set the first due date again. Only a Lab Manager or Administrator may perform that void (OQ-IT-7). That role check is **not built**: today any user with `experiment:manage`, including a Lab Technician, can void the event.
 8. Overdue (next due before today on the lab clock) blocks new imports and new uses.
-9. Turning **Track maintenance** off takes one confirm and is audited (§7). Turning it off is a legitimate choice for a lab with its own system, so it is not refused when the instrument is overdue.
+9. Turning **Track maintenance** off takes one confirm and is audited (§7). That confirm is **Save** on the admin instrument dialog (OQ-IT-5, shipped): Cancel and Save, no second prompt, and Save sends the flag. The agent's one confirm is the apply confirm. Turning the flag off is a legitimate choice for a lab with its own system, so it is not refused when the instrument is overdue.
 
 ---
 
@@ -117,7 +127,8 @@ When **Track maintenance** is off, maintenance states do not apply and do not bl
 - **Import source.** A JSON import needs an instrument, a CRO source, or a parser. The one exception is an Administrator, whose import is recorded as `admin_override`.
 - **Cancel vs fail (R-5).** A run with any imported data cannot be canceled. It can be failed, with a required reason. Every imported row stays. Nothing is deleted. Every status change takes the run's row lock, so a cancel cannot race an import.
 - **Type rule (E2, in progress).** The instrument used at run or import must be of the template's type. A mismatch is refused.
-- **Substitution (E2, in progress).** The person running the experiment (tech or manager) may substitute the run's instrument type. A reason is required. One audit row records who, when, the old type, the new type, and the reason. The template does not change. Earlier imports keep the type they were checked against.
+- **Ad hoc entry (OQ-IT-2, not built).** On an ad hoc run the instruments used are edited on the entry, and instrument types can be added and removed there. The type is still required on a LIMS run. #236 does not require it for an ad hoc run and does not put add-and-remove of types on that entry.
+- **Substitution (E2, in progress).** Whoever created the run (`lims_runs.created_by`; there is no `started_by`) may substitute the run's instrument type (OQ-IT-3). A reason is required. One audit row records who, when, the old type, the new type, and the reason. The template does not change. Earlier imports keep the type they were checked against. #236 also lets a Lab Manager or Administrator substitute a run they did not create.
 - **Legacy untyped templates (E2, in progress).** These are removed with no backward compatibility. Under L-B, removal is the status flag: the E2 migration sets them inactive and keeps the rows.
 
 ---
@@ -129,7 +140,7 @@ Every audited write records who and when. Audit rows are append-only: the applic
 | Event | Required | Today |
 |-------|----------|-------|
 | First due date set | Who, when, old (none), new date | Shipped (#235): `instrument_schedule_audits` action `first_due` |
-| Schedule change | Who, when, old, new | Shipped (#235) for the Active flip and interval change, with "was it overdue". Kind and service-vendor changes write no row (OQ-IT-4). |
+| Schedule change | Who, when, old, new, including kind and service vendor (OQ-IT-4) | Shipped (#235) for the Active flip and the interval change, with "was it overdue". Kind and service-vendor rows are **not built**. |
 | Maintenance event void | Who, when, event, next due before and after | Shipped (#235): action `event_void` |
 | `maintenance_tracked` change | Who, when, old, new | Shipped (#225, #235): `instrument_maintenance_audits` on every change, and on create with the flag off |
 | Run type substitution | Who, when, from, to, reason | In progress (E2): `lims_run_type_substitutions` |
@@ -173,27 +184,23 @@ Every audited write records who and when. Audit rows are append-only: the applic
 | Every run status change locks the run; lock timeout is 409 `run_busy`; file import parses before the lock | Shipped (`main`, then `instrument-tracking`) | [#233](https://github.com/Marc02130/nimblelims/pull/233) |
 | Merge of #233; eligibility re-checked after the run lock; `update_status` refuses illegal transitions; fail validates before writing | Shipped | [#234](https://github.com/Marc02130/nimblelims/pull/234) |
 | E1: no auto-seeded next due; **Awaiting first due date**; first due by Lab Manager or Administrator only; schedule roles in API and database; type default retired; schedule, first-due, and void audits; Lab Manager **Instrument maintenance** page | Shipped | [#235](https://github.com/Marc02130/nimblelims/pull/235) (`0114_instrument_hardening`, current head) |
-| E2: typed template import slot, run type snapshot, import and parser type check, type substitution with reason and audit, untyped LIMS run templates set inactive | **In progress**, not merged | [#236](https://github.com/Marc02130/nimblelims/pull/236) (open; `0115_instrument_type_slots` exists only on `cursor/instrument-e2-type-slots-bfe5`) |
-| Ad hoc run type locked at start | Not built. The E2 description leaves the ad hoc type optional (OQ-IT-2). | — |
-| Backup for the Lab Manager and Administrator schedule role | Not built (OQ-IT-1) | — |
-| Configurable labels | Not built (later, per R-1) | — |
-| Audit of schedule kind and service-vendor changes | Not built (OQ-IT-4) | — |
+| E2: typed template import slot, run type snapshot, import and parser type check, type substitution on `created_by` with reason and audit, untyped LIMS run templates set inactive | **In progress**, not merged. Ad hoc type stays optional on this branch. | [#236](https://github.com/Marc02130/nimblelims/pull/236) (open; `0115_instrument_type_slots` exists only on `cursor/instrument-e2-type-slots-bfe5`) |
+| Backup is a second Lab Manager; no new role (OQ-IT-1) | Shipped. The existing Lab Manager role is the whole mechanism. | #235 |
+| Admin dialog **Save** is the one confirm for turning tracking off (OQ-IT-5) | Shipped. Cancel and Save, no second prompt. | #235 UI |
+| Ad hoc entry: edit the instruments used, add and remove types on the entry, and require a type on every LIMS run including ad hoc (OQ-IT-2) | **Not built.** E2 scope change. #236 leaves the ad hoc type null and unchecked. | — |
+| Audit of schedule kind and service-vendor changes (OQ-IT-4) | **Not built.** Active and interval are audited. | — |
+| Void of the only passing event limited to Lab Manager and Administrator (OQ-IT-7) | **Not built.** Today `experiment:manage`, including Lab Technician. | — |
+| Configurable labels (OQ-IT-6) | **Deferred.** No decision. | — |
 
 ---
 
 ## 11. Open questions
 
-These questions could not be answered from the repo or the 2026-10-26 rulings. They are not decided here.
+OQ-IT-1, OQ-IT-2, OQ-IT-3, OQ-IT-4, OQ-IT-5, and OQ-IT-7 are **Decided** (Marc, 2026-10-26). The decisions are at the top of this file. One question stays open, and it has no decision.
 
-| ID | Question | What the repo shows | Blocks |
-|----|----------|---------------------|--------|
-| **OQ-IT-1** | What is the "backup" for the schedule and first-due role? Is it a named delegate per lab, a permission that can be granted to another role, or just "either role covers the other"? | A role-name check: Administrator or Lab Manager (`require_lab_manager`, `is_lab_manager_or_admin()`). No delegate or backup concept. | A change to who may set schedules |
-| **OQ-IT-2** | How does an ad hoc run (no template) "lock the type at start"? Where does the type come from, and is it required? | `lims_runs.experiment_template_id` is nullable. The E2 description says an ad hoc run "may leave that type null, or set it on start", and an import with a null type is unchecked. | E2 ad hoc behavior |
-| **OQ-IT-3** | Who is "the person running the experiment" for substitution? | `lims_runs` has `created_by` and no `started_by`. The E2 description lets a Lab Technician substitute on runs they created, and a Lab Manager or Administrator on any run. | E2 substitution permission |
-| **OQ-IT-4** | Do "schedule changes" (R-6) include kind and service vendor? | The #235 audit covers the Active flip and interval changes only. | Audit completeness |
-| **OQ-IT-5** | In the admin UI, is the instrument dialog's **Save** the "one confirm" for turning **Track maintenance** off, or does the UI need its own prompt? | The UI is a switch followed by Save, with no separate prompt. The agent path is one apply confirm. The API PATCH is the single write. | Copy and UI for R-3 |
-| **OQ-IT-6** | When do labels become configurable, and through what? | Nothing in the repo. | Later label work |
-| **OQ-IT-7** | Should a Lab Technician be able to void the only passing event? Doing so returns the instrument to **Awaiting first due date**, which only a Lab Manager or Administrator can clear. | Event void is `experiment:manage`. It is audited. | Role split for voids |
+| ID | State | Question |
+|----|-------|----------|
+| **OQ-IT-6** | **Deferred.** No decision. | Labels are not configurable in this packet (R-1). When that work starts, the open question is whether to recommend third-party label software (for example BarTender) and only create label files, or to print directly to a printer. Nothing in the repo chooses either one. |
 
 ---
 
@@ -202,4 +209,4 @@ These questions could not be answered from the repo or the 2026-10-26 rulings. T
 - **Data-parsers Decision #2** (2026-07-19) put vendor and model on the type. #223 moved them onto the instrument, and types became a plain list (R-2).
 - The **AI data import idea** said "light catalog, not full equipment ops" and deferred calibration and status. This packet adds maintenance, downtime, and status. Full asset management stays out.
 - **#225** seeded `next_due` as today + interval. R-3 and #235 replace that: due dates are never auto-seeded.
-- The #235 HOWTO copy says "a run is not locked to one type". That describes the shipped slice. R-2 and R-5 replace it once E2 merges: the template type plus a substitution with a reason.
+- The #235 HOWTO copy says "a run is not locked to one type". That describes the shipped slice. Once E2 merges, a template run carries the template type and a substitution needs a reason. An ad hoc run still needs the OQ-IT-2 change on top of #236: types edited on the entry, and a type required on every LIMS run.
