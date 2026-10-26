@@ -120,6 +120,8 @@ class LimsRunRead(BaseModel):
     canceled_at: Optional[datetime]
     status_reason: Optional[str] = None
     rejected_at: Optional[datetime] = None
+    # User who failed the run; None on runs failed before this was recorded.
+    failed_by: Optional[uuid.UUID] = None
     replaces_run_id: Optional[uuid.UUID] = None
     created_at: datetime
     created_by: Optional[uuid.UUID]

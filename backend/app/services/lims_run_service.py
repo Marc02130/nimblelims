@@ -31,6 +31,7 @@ from typing import List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.repositories.flexible_experiment_repository import (
@@ -150,6 +151,22 @@ class LimsRunService:
 
     def get_run(self, run_id: uuid.UUID) -> LimsRun:
         run = self.run_repo.get_by_id(run_id)
+        if not run:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LIMS run not found")
+        return run
+
+    def _get_run_for_update(self, run_id: uuid.UUID) -> LimsRun:
+        """Row-lock the run until commit so cancel, fail and import serialize.
+
+        populate_existing() refreshes a run already in the session, so callers
+        see the status committed by whoever held the lock before them.
+        """
+        run = self.db.execute(
+            select(LimsRun)
+            .where(LimsRun.id == run_id)
+            .with_for_update(of=LimsRun)
+            .execution_options(populate_existing=True)
+        ).scalar_one_or_none()
         if not run:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LIMS run not found")
         return run
@@ -642,9 +659,11 @@ class LimsRunService:
     def cancel_run(self, run_id: uuid.UUID) -> LimsRun:
         """Non-terminal → canceled, only while no import row is stored.
 
-        A run with imported data has already run. Fail it instead.
+        A run with imported data has already run. Fail it instead. The row
+        lock makes a concurrent import either finish first (then this refuses)
+        or wait and find the run canceled.
         """
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         if has_imported_data(self.db, run.id):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -671,11 +690,12 @@ class LimsRunService:
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="A reason is required to fail the run",
             )
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         from datetime import datetime, timezone
 
         run.status_reason = text
         run.rejected_at = datetime.now(timezone.utc)
+        run.failed_by = self._user_id()
         run.modified_by = self._user_id()
         return self._transition(run, LimsRunStatus.failed)
 
@@ -768,7 +788,7 @@ class LimsRunService:
         Import pre-parsed rows. Prefer import_file() for CSV with parser resolution.
         Still requires analysis + instrument|CRO + active parser when source provided.
         """
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         self._assert_import_allowed(run)
         if not run.analysis_id:
             raise HTTPException(400, "Run requires analysis_id before import")
@@ -869,7 +889,7 @@ class LimsRunService:
         filename: Optional[str] = None,
     ) -> ImportFileResponse:
         """Parse file with resolved data parser and import rows."""
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         self._assert_import_allowed(run)
         if not run.analysis_id:
             raise HTTPException(400, "Run requires analysis_id before import")

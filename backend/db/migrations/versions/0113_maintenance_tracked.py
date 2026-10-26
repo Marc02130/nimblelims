@@ -1,7 +1,7 @@
 """Optional per-instrument maintenance tracking.
 
-Revision ID: 0112_maintenance_tracked
-Revises: 0111_instrument_legacy_lock
+Revision ID: 0113_maintenance_tracked
+Revises: 0112_instrument_legacy_lock
 
 Marc (2026-10-22): maintenance is optional. Some labs use their own metrology
 system. ``instruments.maintenance_tracked`` is NOT NULL default false
@@ -25,8 +25,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision = "0112_maintenance_tracked"
-down_revision = "0111_instrument_legacy_lock"
+revision = "0113_maintenance_tracked"
+down_revision = "0112_instrument_legacy_lock"
 branch_labels = None
 depends_on = None
 
@@ -45,7 +45,7 @@ TABLES = (
 
 def _m0089():
     path = os.path.join(os.path.dirname(__file__), "0089_register_schema_catalog.py")
-    spec = importlib.util.spec_from_file_location("_m0089_for_0112", path)
+    spec = importlib.util.spec_from_file_location("_m0089_for_0113", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

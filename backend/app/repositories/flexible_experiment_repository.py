@@ -51,7 +51,14 @@ class LimsRunRepository:
         if created_by:
             q = q.filter(LimsRun.created_by == created_by)
         total = q.count()
-        items = q.order_by(LimsRun.created_at.desc()).offset((page - 1) * size).limit(size).all()
+        from sqlalchemy.orm import selectinload
+        items = (
+            q.options(selectinload(LimsRun.experiment_template))
+            .order_by(LimsRun.created_at.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+            .all()
+        )
         return items, total
 
     def create(

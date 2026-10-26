@@ -275,7 +275,7 @@ def _expect_date(conn, table: str, column: str, row_id) -> None:
 
 
 def _instant_names(conn, names: set[str]) -> set[str]:
-    """0110 renames instrument_types; 0102's frozen list still uses the old name."""
+    """0111 renames instrument_types; 0102's frozen list still uses the old name."""
     tables = {
         row[0]
         for row in conn.execute(
@@ -351,7 +351,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         assert after[name] == 0
     missing = set(before) - set(after)
     assert missing <= {"instrument_types"}
-    # 0110 seeds instrument_types / maintenance_types / downtime_reasons and
+    # 0111 seeds instrument_types / maintenance_types / downtime_reasons and
     # their entries. The 0102 frozen counts cannot include lists/list_entries
     # after that, or the round-trip would treat those seed rows as drift.
     skip = {
