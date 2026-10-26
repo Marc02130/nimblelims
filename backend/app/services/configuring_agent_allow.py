@@ -50,11 +50,15 @@ INSTRUMENT_BENCH_GAP = (
     "(POST /v1/instrument-maintenance-events, POST /v1/instrument-downtime, POST /v1/instrument-uses). "
     "An instrument serial or asset tag in an SOP is example data."
 )
+INSTRUMENT_SCHEDULE_GAP = (
+    "Lab admins or managers set schedules and the first due date in the admin UI"
+)
 _INSTRUMENT_BENCH = (
     "/v1/instrument-maintenance-events",
     "/v1/instrument-downtime",
     "/v1/instrument-uses",
 )
+_INSTRUMENT_SCHEDULE = ("/v1/instrument-maintenance-schedules",)
 
 _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/schema/tables$"), "schema_tables", "schema:edit", "table"),
@@ -91,8 +95,6 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("PATCH", re.compile(r"^/v1/instruments/[^/]+$"), "other", "config:edit", "instrument"),
     ("POST", re.compile(r"^/v1/instrument-types$"), "other", "config:edit", "instrument_type"),
     ("PATCH", re.compile(r"^/v1/instrument-types/[^/]+$"), "other", "config:edit", "instrument_type"),
-    ("POST", re.compile(r"^/v1/instrument-maintenance-schedules$"), "other", "config:edit", "instrument_schedule"),
-    ("PATCH", re.compile(r"^/v1/instrument-maintenance-schedules/[^/]+$"), "other", "config:edit", "instrument_schedule"),
 )
 
 DROP_DELETE_GAP = (
@@ -202,25 +204,28 @@ def _body_gap(method: str, path: str, body: Any) -> Optional[str]:
     if path == "/v1/instrument-maintenance-schedules" or path.startswith(
         "/v1/instrument-maintenance-schedules/"
     ):
-        blocked = {"active", "last_done", "next_due"} & set(body)
-        if blocked:
+        return INSTRUMENT_SCHEDULE_GAP
+    if path == "/v1/instrument-types" or re.match(r"^/v1/instrument-types/[^/]+$", path):
+        if isinstance(body, dict) and "maintenance_tracked" in body:
             return (
-                "A maintenance schedule's last_done and next_due come from events, "
-                "and active is not set by this configuration run. "
-                "Send interval, kind, and instrument only."
-            )
-        if method == "PATCH" and "interval_days" in body:
-            return (
-                "A new interval applies from the next passing event. "
-                "Changing interval_days does not clear an overdue schedule."
+                "Instrument types are a plain list. "
+                "Maintenance tracking is set per instrument."
             )
     if path == "/v1/instruments" or re.match(r"^/v1/instruments/[^/]+$", path):
-        blocked = {"status", "active"} & set(body)
+        blocked = {"status", "active", "next_due", "last_done"} & set(body or {})
         if blocked:
             return (
                 "Instrument status and active are not set by this configuration run. "
-                "Send name, type, and vendor only."
+                "Schedules and due dates are set by a lab admin or manager. "
+                "Send name, type, vendor, and maintenance_tracked only."
             )
+        if method == "POST" and path == "/v1/instruments":
+            tracked = (body or {}).get("maintenance_tracked")
+            if tracked is not True and tracked is not False:
+                return (
+                    "Answer before confirming: does the lab track maintenance "
+                    "for this instrument in NimbleLIMS?"
+                )
     return None
 
 
@@ -242,6 +247,9 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
     for prefix in _INSTRUMENT_BENCH:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, INSTRUMENT_BENCH_GAP)
+    for prefix in _INSTRUMENT_SCHEDULE:
+        if path == prefix or path.startswith(prefix + "/"):
+            return Classified(False, "other", None, None, INSTRUMENT_SCHEDULE_GAP)
     for prefix, reason in _OUT_OF_SCOPE:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, reason)

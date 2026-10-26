@@ -345,6 +345,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "instrument_types_legacy",
         "instrument_type_defaults",
         "instrument_maintenance_audits",
+        "instrument_schedule_audits",
     }
     assert extra <= allowed_extra
     for name in extra:

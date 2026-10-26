@@ -30,6 +30,7 @@ from .instrument import (
     Instrument,
     InstrumentTypeDefault,
     InstrumentMaintenanceAudit,
+    InstrumentScheduleAudit,
     CroSource,
     InstrumentMaintenanceSchedule,
     InstrumentMaintenanceEvent,

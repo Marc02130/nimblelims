@@ -314,7 +314,9 @@ def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> 
     if path == "/v1/instrument-maintenance-schedules" or path.startswith(
         "/v1/instrument-maintenance-schedules/"
     ):
-        return _instrument_schedule(db, user, method, path, body)
+        raise CannotExpress(
+            "Lab admins or managers set schedules and the first due date in the admin UI"
+        )
     if path.startswith("/users/"):
         return _user_role(db, user, path, body)
     if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
@@ -467,13 +469,20 @@ def _instrument_catalog(db, user, method: str, path: str, body: dict) -> list[Ap
     from app.routers.instrument_catalog import create_instrument, update_instrument
     from app.schemas.instrument_catalog import InstrumentCreate, InstrumentUpdate
 
-    blocked = {"status", "active"} & set(body or {})
+    blocked = {"status", "active", "next_due", "last_done"} & set(body or {})
     if blocked:
         raise CannotExpress(
             "Instrument status and active are not set by this configuration run. "
-            "Send name, type, and vendor only."
+            "Schedules and due dates are set by a lab admin or manager. "
+            "Send name, type, vendor, and maintenance_tracked only."
         )
     if method == "POST" and path == "/v1/instruments":
+        tracked = (body or {}).get("maintenance_tracked")
+        if tracked is not True and tracked is not False:
+            raise CannotExpress(
+                "Answer before confirming: does the lab track maintenance "
+                "for this instrument in NimbleLIMS?"
+            )
         created = create_instrument(InstrumentCreate.model_validate(body), user, db)
         return [AppliedChange("instrument", created.name, created.id)]
     instrument_id = _uuid_from_path(path)
@@ -494,36 +503,16 @@ def _instrument_types(db, user, method: str, path: str, body: dict) -> list[Appl
     from app.routers.instrument_catalog import create_instrument_type, update_instrument_type
     from app.schemas.instrument_catalog import InstrumentTypeCreate, InstrumentTypeUpdate
 
+    if "maintenance_tracked" in (body or {}):
+        raise CannotExpress(
+            "Instrument types are a plain list. Maintenance tracking is set per instrument."
+        )
     if method == "POST" and path == "/v1/instrument-types":
         created = create_instrument_type(InstrumentTypeCreate.model_validate(body), user, db)
         return [AppliedChange("instrument_type", created.name, created.id)]
     type_id = _uuid_from_path(path)
     updated = update_instrument_type(type_id, InstrumentTypeUpdate.model_validate(body), user, db)
     return [AppliedChange("instrument_type", updated.name, updated.id)]
-
-
-def _instrument_schedule(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
-    from app.routers.instrument_ops import create_schedule, update_schedule
-    from app.schemas.instrument_ops import MaintenanceScheduleCreate, MaintenanceScheduleUpdate
-
-    blocked = {"active", "last_done", "next_due"} & set(body or {})
-    if blocked:
-        raise CannotExpress(
-            "A maintenance schedule's last_done and next_due come from events, "
-            "and active is not set by this configuration run. "
-            "Send interval, kind, and instrument only."
-        )
-    if method == "PATCH" and "interval_days" in (body or {}):
-        raise CannotExpress(
-            "A new interval applies from the next passing event. "
-            "Changing interval_days does not clear an overdue schedule."
-        )
-    if method == "POST" and path == "/v1/instrument-maintenance-schedules":
-        created = create_schedule(MaintenanceScheduleCreate.model_validate(body), user, db)
-        return [AppliedChange("instrument_schedule", created.kind_name or str(created.id), created.id)]
-    schedule_id = _uuid_from_path(path)
-    updated = update_schedule(schedule_id, MaintenanceScheduleUpdate.model_validate(body), user, db)
-    return [AppliedChange("instrument_schedule", updated.kind_name or str(updated.id), updated.id)]
 
 
 def _transition(db, user, body: dict) -> list[AppliedChange]:

@@ -1,10 +1,12 @@
 """Maintenance, downtime, and instrument use. Nothing is deleted.
 
-Schedules and catalog writes need config:edit. Events, downtime, and uses
-are bench work (experiment:manage). Passing events advance the schedule;
-voiding an event recomputes last_done and next_due.
+Schedule create, edit, and first-due need Administrator or Lab Manager.
+Events, downtime, and uses are bench work (experiment:manage). Passing
+events recompute next_due only after a lab admin or manager has set the
+first due date. Voiding the only passing event returns the item to
+awaiting first due date.
 """
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import List, Optional
 from uuid import UUID
 
@@ -16,7 +18,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.lab_time import current_lab_day
 from app.core.patch_fields import explicit_updates
-from app.core.rbac import require_config_edit, require_experiment_manage
+from app.core.rbac import require_experiment_manage, require_lab_manager
 from app.core.security import get_current_user
 from app.database import get_db
 from app.schemas.instrument_ops import (
@@ -32,6 +34,7 @@ from app.schemas.instrument_ops import (
     MaintenanceEventCreate,
     MaintenanceEventResponse,
     MaintenanceEventUpdate,
+    FirstDueCreate,
     MaintenanceScheduleCreate,
     MaintenanceScheduleResponse,
     MaintenanceScheduleUpdate,
@@ -45,6 +48,7 @@ from models.instrument import (
     InstrumentDowntime,
     InstrumentMaintenanceEvent,
     InstrumentMaintenanceSchedule,
+    InstrumentScheduleAudit,
     InstrumentUse,
 )
 from models.list import List as ListModel, ListEntry
@@ -64,6 +68,46 @@ VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
 
 def _refuse(code: str, message: str) -> None:
     raise HTTPException(status_code=422, detail={"code": code, "message": message})
+
+
+def _audit_text(value) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _schedule_overdue(row: InstrumentMaintenanceSchedule) -> bool:
+    if not row.active or row.next_due is None:
+        return False
+    return row.next_due < current_lab_day()
+
+
+def _write_schedule_audit(
+    db: Session,
+    *,
+    instrument_id: UUID,
+    action: str,
+    user: User,
+    schedule_id: Optional[UUID] = None,
+    event_id: Optional[UUID] = None,
+    previous_value=None,
+    new_value=None,
+    overdue: Optional[bool] = None,
+) -> None:
+    db.add(
+        InstrumentScheduleAudit(
+            instrument_id=instrument_id,
+            schedule_id=schedule_id,
+            event_id=event_id,
+            action=action,
+            previous_value=_audit_text(previous_value),
+            new_value=_audit_text(new_value),
+            overdue=overdue,
+            created_by=user.id,
+        )
+    )
 
 
 def _require_http_certificate(url: Optional[str]) -> None:
@@ -146,7 +190,11 @@ def _schedule_query(db: Session):
 
 
 def recompute_schedule(db: Session, schedule: InstrumentMaintenanceSchedule) -> None:
-    """Set last_done / next_due from the latest active passing event, or clear."""
+    """Advance last_done / next_due from events only after first due is set.
+
+    No passing event (voided-only) returns the item to awaiting first due.
+    While next_due is null, an event does not set next_due or last_done.
+    """
     latest = (
         db.query(InstrumentMaintenanceEvent)
         .filter(
@@ -163,6 +211,8 @@ def recompute_schedule(db: Session, schedule: InstrumentMaintenanceSchedule) -> 
     if latest is None:
         schedule.last_done = None
         schedule.next_due = None
+        return
+    if schedule.next_due is None:
         return
     schedule.last_done = latest.performed_on
     schedule.next_due = latest.performed_on + timedelta(days=schedule.interval_days)
@@ -202,7 +252,7 @@ def get_schedule(
 )
 def create_schedule(
     body: MaintenanceScheduleCreate,
-    current_user: User = Depends(require_config_edit),
+    current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
     _require_instrument(db, body.instrument_id)
@@ -211,7 +261,7 @@ def create_schedule(
         raise HTTPException(status_code=400, detail="Invalid service vendor")
     row = InstrumentMaintenanceSchedule(
         **body.model_dump(),
-        next_due=current_lab_day() + timedelta(days=body.interval_days),
+        next_due=None,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
@@ -223,7 +273,7 @@ def create_schedule(
 def update_schedule(
     schedule_id: UUID,
     body: MaintenanceScheduleUpdate,
-    current_user: User = Depends(require_config_edit),
+    current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
     row = db.query(InstrumentMaintenanceSchedule).filter(
@@ -237,12 +287,78 @@ def update_schedule(
     if "service_vendor_id" in data and data["service_vendor_id"] is not None:
         if not db.query(Vendor).filter(Vendor.id == data["service_vendor_id"]).first():
             raise HTTPException(status_code=400, detail="Invalid service vendor")
+    overdue_at_time = _schedule_overdue(row)
+    previous_active = row.active
+    previous_interval = row.interval_days
     for k, v in data.items():
         setattr(row, k, v)
     # A new interval applies from the next passing event. Recomputing now
     # from last_done would clear an overdue block without that event.
+    # Deactivating an overdue schedule is allowed (a retired instrument is
+    # legitimate). The active flip and any interval change are audited.
+    if "active" in data and row.active is not previous_active:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_active",
+            user=current_user,
+            previous_value=previous_active,
+            new_value=row.active,
+            overdue=overdue_at_time,
+        )
+    if "interval_days" in data and row.interval_days != previous_interval:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_interval",
+            user=current_user,
+            previous_value=previous_interval,
+            new_value=row.interval_days,
+            overdue=overdue_at_time,
+        )
     row.modified_by = current_user.id
     _commit(db, row, "Could not update maintenance schedule")
+    return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
+
+
+@schedules_router.post(
+    "/{schedule_id}/first-due",
+    response_model=MaintenanceScheduleResponse,
+)
+def set_first_due(
+    schedule_id: UUID,
+    body: FirstDueCreate,
+    current_user: User = Depends(require_lab_manager),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(InstrumentMaintenanceSchedule)
+        .filter(InstrumentMaintenanceSchedule.id == schedule_id)
+        .with_for_update()
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    if row.next_due is not None or row.last_done is not None:
+        _refuse(
+            "first_due_already_set",
+            "The first due date is already set.",
+        )
+    row.next_due = body.next_due
+    row.modified_by = current_user.id
+    _write_schedule_audit(
+        db,
+        instrument_id=row.instrument_id,
+        schedule_id=row.id,
+        action="first_due",
+        user=current_user,
+        previous_value=None,
+        new_value=body.next_due,
+        overdue=_schedule_overdue(row),
+    )
+    _commit(db, row, "Could not set the first due date")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
 
 
@@ -349,6 +465,7 @@ def update_event(
         _require_http_certificate(data["certificate_url"])
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
+    voiding = "active" in data and data["active"] is False and row.active is True
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -360,8 +477,34 @@ def update_event(
             .first()
         )
         if schedule is not None:
+            prior_next_due = schedule.next_due
+            overdue_at_time = _schedule_overdue(schedule)
             recompute_schedule(db, schedule)
             schedule.modified_by = current_user.id
+            if voiding:
+                _write_schedule_audit(
+                    db,
+                    instrument_id=row.instrument_id,
+                    schedule_id=schedule.id,
+                    event_id=row.id,
+                    action="event_void",
+                    user=current_user,
+                    previous_value=prior_next_due,
+                    new_value=schedule.next_due,
+                    overdue=overdue_at_time,
+                )
+    elif voiding:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=None,
+            event_id=row.id,
+            action="event_void",
+            user=current_user,
+            previous_value=None,
+            new_value=None,
+            overdue=None,
+        )
     try:
         db.commit()
     except IntegrityError:

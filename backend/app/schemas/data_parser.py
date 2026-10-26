@@ -103,7 +103,7 @@ class LimsRunImportRead(BaseModel):
     lims_run_id: UUID
     instrument_id: Optional[UUID]
     cro_source_id: Optional[UUID]
-    parser_id: UUID
+    parser_id: Optional[UUID]
     filename: Optional[str]
     imported_at: datetime
     imported_by: Optional[UUID]

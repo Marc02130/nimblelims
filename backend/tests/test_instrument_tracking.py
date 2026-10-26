@@ -97,6 +97,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
                         "instrument_uses",
                         "instrument_type_defaults",
                         "instrument_maintenance_audits",
+                        "instrument_schedule_audits",
                     ]
                 },
             ).all()
@@ -136,6 +137,7 @@ def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
         "instrument_type_defaults",
         "instrument_types_legacy",
         "instrument_maintenance_audits",
+        "instrument_schedule_audits",
     )
     with migrated_engine.connect() as conn:
         for table in tables:
@@ -291,6 +293,12 @@ def test_open_downtime_and_overdue_block(client, admin_h, db_session, test_admin
         },
     )
     assert sched.status_code == 201, sched.text
+    first_due = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched.json()['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(date.today() - timedelta(days=1))},
+    )
+    assert first_due.status_code == 200, first_due.text
     performed = date.today() - timedelta(days=2)
     event = client.post(
         "/v1/instrument-maintenance-events",
@@ -345,6 +353,12 @@ def test_passing_event_advances_and_void_recomputes(client, admin_h, test_admin_
             "interval_days": 10,
         },
     ).json()
+    first_due = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(date.today())},
+    )
+    assert first_due.status_code == 200, first_due.text
     first_day = date.today() - timedelta(days=20)
     missing = client.post(
         "/v1/instrument-maintenance-events",
@@ -426,8 +440,7 @@ def test_schedule_create_and_update_ignore_due_fields(client, admin_h):
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["last_done"] is None
-    seeded = date.today() + timedelta(days=30)
-    assert body["next_due"] == str(seeded)
+    assert body["next_due"] is None
     patched = client.patch(
         f"/v1/instrument-maintenance-schedules/{body['id']}",
         headers=admin_h,
@@ -435,48 +448,62 @@ def test_schedule_create_and_update_ignore_due_fields(client, admin_h):
     )
     assert patched.status_code == 200, patched.text
     assert patched.json()["last_done"] is None
-    assert patched.json()["next_due"] == str(seeded)
+    assert patched.json()["next_due"] is None
 
 
 def test_agent_refuses_schedule_due_and_active_fields():
-    from app.services.configuring_agent_apply import CannotExpress, _instrument_schedule
+    from app.services.configuring_agent_apply import CannotExpress, execute_step
 
     path = "/v1/instrument-maintenance-schedules"
     for extra in (
         {"last_done": "2020-01-01"},
         {"next_due": "2020-01-01"},
         {"active": False},
+        {},
     ):
         body = {"instrument_id": "x", "kind_id": "y", "interval_days": 30, **extra}
         classified = allow.classify_call("POST", path, body)
         assert classified.ok is False
         assert classified.gap
-        assert "events" in classified.gap
+        assert "schedules" in classified.gap or "first due" in classified.gap
         try:
-            _instrument_schedule(None, None, "POST", path, body)
+            execute_step(None, None, "POST", path, body)
         except CannotExpress as exc:
-            assert "events" in exc.gap
+            assert "schedules" in str(exc) or "first due" in str(exc)
         else:
-            raise AssertionError("apply should refuse last_done, next_due, and active")
+            raise AssertionError("apply should refuse the schedule route")
 
 
 def test_agent_may_create_instruments_and_schedules_not_events_or_downtime():
-    assert allow.classify_call("POST", "/v1/instruments", {"name": "Qubit"}).ok
+    asked = allow.classify_call("POST", "/v1/instruments", {"name": "Qubit"})
+    assert asked.ok is False
+    assert "track maintenance" in (asked.gap or "").lower()
+    assert allow.classify_call(
+        "POST",
+        "/v1/instruments",
+        {"name": "Qubit", "maintenance_tracked": False},
+    ).ok
     blocked_status = allow.classify_call("PATCH", "/v1/instruments/abc", {"active": False})
     assert blocked_status.ok is False
     assert "status" in blocked_status.gap or "active" in blocked_status.gap
     assert allow.classify_call(
         "PATCH", "/v1/instruments/abc", {"maintenance_tracked": True}
     ).ok
-    assert allow.classify_call(
+    type_flag = allow.classify_call(
         "POST", "/v1/instrument-types", {"name": "Balance", "maintenance_tracked": True}
-    ).ok
-    assert allow.classify_call("POST", "/v1/instrument-maintenance-schedules", {"interval_days": 30}).ok
+    )
+    assert type_flag.ok is False
+    assert "plain list" in (type_flag.gap or "")
+    schedule_post = allow.classify_call(
+        "POST", "/v1/instrument-maintenance-schedules", {"interval_days": 30}
+    )
+    assert schedule_post.ok is False
+    assert "schedules" in (schedule_post.gap or "") or "first due" in (schedule_post.gap or "")
     refused_interval = allow.classify_call(
         "PATCH", "/v1/instrument-maintenance-schedules/abc", {"interval_days": 7}
     )
     assert refused_interval.ok is False
-    assert "interval" in refused_interval.gap
+    assert "schedules" in (refused_interval.gap or "") or "first due" in (refused_interval.gap or "")
     for path in (
         "/v1/instrument-maintenance-events",
         "/v1/instrument-downtime",
@@ -488,7 +515,7 @@ def test_agent_may_create_instruments_and_schedules_not_events_or_downtime():
     paths = {row["path"] for row in cat.route_formats()}
     assert "/v1/instruments" in paths
     assert "/v1/instrument-types" in paths
-    assert "/v1/instrument-maintenance-schedules" in paths
+    assert "/v1/instrument-maintenance-schedules" not in paths
 
 
 def test_no_delete_routes_left_on_instrument_ops(client, admin_h):
@@ -524,6 +551,10 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
     previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
+    with migrated_engine.begin() as conn:
+        conn.execute(text("DELETE FROM instrument_maintenance_audits"))
+        conn.execute(text("DELETE FROM instrument_schedule_audits"))
+        conn.execute(text("DELETE FROM lims_run_imports WHERE filename = 'admin_override'"))
     type_id = uuid.uuid4()
     inst_id = uuid.uuid4()
     inactive_id = uuid.uuid4()
@@ -685,6 +716,12 @@ def test_interval_change_does_not_clear_overdue(client, admin_h, test_admin_user
         headers=admin_h,
         json={"instrument_id": inst["id"], "kind_id": kind["id"], "interval_days": 1},
     ).json()
+    first_due = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(date.today() - timedelta(days=1))},
+    )
+    assert first_due.status_code == 200, first_due.text
     event = client.post(
         "/v1/instrument-maintenance-events",
         headers=admin_h,
@@ -715,7 +752,7 @@ def test_interval_change_does_not_clear_overdue(client, admin_h, test_admin_user
         {"interval_days": 14},
     )
     assert refused.ok is False
-    assert "interval" in refused.gap
+    assert "schedules" in (refused.gap or "") or "first due" in (refused.gap or "")
 
 
 def test_maintenance_off_ignores_schedule_downtime_and_retired_still_block(
@@ -791,7 +828,15 @@ def test_maintenance_on_requires_schedule_and_never_calibrated_is_overdue(
         json={"instrument_id": inst["id"], "kind_id": kind["id"], "interval_days": 7},
     ).json()
     assert sched["last_done"] is None
-    assert sched["next_due"] == str(date.today() + timedelta(days=7))
+    assert sched["next_due"] is None
+    awaiting = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
+    assert awaiting["code"] == "instrument_awaiting_first_due"
+    first_due = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": str(date.today() - timedelta(days=1))},
+    )
+    assert first_due.status_code == 200, first_due.text
     later = date.today() + timedelta(days=8)
 
     def _later():
@@ -838,17 +883,23 @@ def test_type_default_is_inherited_unless_explicit(client, admin_h):
         headers=admin_h,
         json={"name": _name("Tracked type"), "maintenance_tracked": True},
     )
-    assert typed.status_code == 201, typed.text
-    assert typed.json()["maintenance_tracked"] is True
-    inherited = _instrument(client, admin_h, instrument_type_id=typed.json()["id"])
-    assert inherited["maintenance_tracked"] is True
+    assert typed.status_code == 422, typed.text
+    plain = client.post(
+        "/v1/instrument-types",
+        headers=admin_h,
+        json={"name": _name("Plain type")},
+    )
+    assert plain.status_code == 201, plain.text
+    assert "maintenance_tracked" not in plain.json()
+    omitted = _instrument(client, admin_h, instrument_type_id=plain.json()["id"])
+    assert omitted["maintenance_tracked"] is False
     explicit = _instrument(
         client,
         admin_h,
-        instrument_type_id=typed.json()["id"],
-        maintenance_tracked=False,
+        instrument_type_id=plain.json()["id"],
+        maintenance_tracked=True,
     )
-    assert explicit["maintenance_tracked"] is False
+    assert explicit["maintenance_tracked"] is True
 
 
 def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_session, test_admin_user, test_org, monkeypatch):
@@ -858,6 +909,11 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
 
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     assert inst["maintenance_tracked"] is True
+    off = {"maintenance_tracked": False}
+    path = f"/v1/instruments/{inst['id']}"
+    classified = allow.classify_call("PATCH", path, off)
+    assert classified.ok is True
+    assert allow.needs_second_confirm("PATCH", path, off, classified.kind) is False
     monkeypatch.setattr(svc, "_key_for_run", lambda _db: (
         type("P", (), {"agent_provider": "xai", "agent_model": "grok-test-model"})(),
         "test-key",
@@ -897,6 +953,8 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
     result, code = svc.apply_run(db_session, test_admin_user, run.id)
     assert code == 200, result.error_message
     assert result.status == "done"
+    assert result.confirmed_by == test_admin_user.id
+    assert result.confirmed_at is not None
     after = client.get(f"/v1/instruments/{inst['id']}", headers=admin_h).json()
     assert after["maintenance_tracked"] is False
     item = db_session.query(ConfigurationItem).filter_by(run_id=run.id).one()
@@ -910,6 +968,8 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
     )
     assert audit.previous_value is True
     assert audit.new_value is False
+    assert audit.created_by == test_admin_user.id
+    assert audit.created_at is not None
 
 
 def test_json_import_requires_source_unless_admin(

@@ -852,6 +852,7 @@ class LimsRunService:
             raise HTTPException(400, "Run requires analysis_id before import")
 
         import_id = None
+        parser = None
         if not (instrument_id or cro_source_id or parser_id):
             role = getattr(getattr(self.current_user, "role", None), "name", None)
             if role != "Administrator":
@@ -867,6 +868,14 @@ class LimsRunService:
                 run_id,
                 self._user_id(),
             )
+            imp = self._create_import_event(
+                run_id=run_id,
+                instrument_id=None,
+                cro_source_id=None,
+                parser_id=None,
+                filename="admin_override",
+            )
+            import_id = imp.id
         if instrument_id or cro_source_id or parser_id:
             resolved_instrument = instrument_id
             if resolved_instrument:
@@ -915,10 +924,8 @@ class LimsRunService:
             }
             for row in rows
         ]
-        parser_config = None
-        if import_id is not None:
-            parser_config = parser.parser_config
-        elif rows and any(r.sample_key for r in rows):
+        parser_config = parser.parser_config if parser is not None else None
+        if parser_config is None and rows and any(r.sample_key for r in rows):
             parser_config = {"sample_col": "__explicit__", "columns": []}
         link_rows(
             self.db,
@@ -1088,7 +1095,7 @@ class LimsRunService:
         run_id: uuid.UUID,
         instrument_id: Optional[uuid.UUID],
         cro_source_id: Optional[uuid.UUID],
-        parser_id: uuid.UUID,
+        parser_id: Optional[uuid.UUID],
         filename: Optional[str],
     ) -> LimsRunImport:
         imp = LimsRunImport(

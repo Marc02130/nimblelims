@@ -76,8 +76,6 @@ def _schema_for(method: str, kind: str):
         InstrumentTypeUpdate,
         InstrumentUpdate,
     )
-    from app.schemas.instrument_ops import MaintenanceScheduleCreate, MaintenanceScheduleUpdate
-
     table = {
         ("POST", "analysis"): AnalysisCreate,
         ("POST", "analyte"): AnalyteCreate,
@@ -104,8 +102,6 @@ def _schema_for(method: str, kind: str):
         ("PATCH", "instrument"): InstrumentUpdate,
         ("POST", "instrument_type"): InstrumentTypeCreate,
         ("PATCH", "instrument_type"): InstrumentTypeUpdate,
-        ("POST", "instrument_schedule"): MaintenanceScheduleCreate,
-        ("PATCH", "instrument_schedule"): MaintenanceScheduleUpdate,
     }
     return table.get((method, kind))
 
@@ -123,7 +119,6 @@ _PATH_NAMES = {
     r"^/analyses/[^/]+/analytes$": "/analyses/{analysis_id}/analytes",
     r"^/v1/instruments/[^/]+$": "/v1/instruments/{instrument_id}",
     r"^/v1/instrument-types/[^/]+$": "/v1/instrument-types/{type_id}",
-    r"^/v1/instrument-maintenance-schedules/[^/]+$": "/v1/instrument-maintenance-schedules/{schedule_id}",
 }
 
 
@@ -596,8 +591,6 @@ def resolve_body(db, user: User, method: str, path: str, body: Any) -> Any:
         return _resolve_instrument_type_body(db, data)
     if re.match(r"^/v1/instruments/[^/]+$", path) and method == "PATCH":
         return _resolve_instrument_body(db, data)
-    if path == "/v1/instrument-maintenance-schedules" and method == "POST":
-        return _resolve_schedule_body(db, data)
 
     if path == "/containers/types" and method == "POST":
         if "name" not in data and _first(data, "display_name", "label"):
@@ -841,19 +834,11 @@ def _current_values(db, user: User, method: str, path: str, body: Any) -> Option
         }
     match = re.match(r"^/v1/instrument-types/([^/]+)$", path)
     if method == "PATCH" and match:
-        from models.instrument import InstrumentTypeDefault
-
         row = db.query(ListEntry).filter(ListEntry.id == _uuid(match.group(1))).first()
         if row is None:
             return None
-        default = (
-            db.query(InstrumentTypeDefault)
-            .filter(InstrumentTypeDefault.instrument_type_id == row.id)
-            .first()
-        )
         return {
             "name": row.name,
-            "maintenance_tracked": bool(default.maintenance_tracked) if default else False,
             "active": row.active,
         }
     return None
@@ -1290,37 +1275,4 @@ def _resolve_instrument_type_body(db, data: dict) -> dict:
     }
     if "active" in data:
         out["active"] = data["active"]
-    if "maintenance_tracked" in data:
-        out["maintenance_tracked"] = data["maintenance_tracked"]
-    return {k: v for k, v in out.items() if v is not None}
-
-
-def _resolve_schedule_body(db, data: dict) -> dict:
-    from models.instrument import Instrument
-    from models.list import List, ListEntry
-    from models.reagent import Vendor
-
-    kinds = db.query(List).filter(List.name == "maintenance_types").first()
-    kind_ref = _first(data, "kind_id", "kind", "maintenance_type")
-    kind_id = kind_ref
-    if kind_ref and _uuid(kind_ref) is None and kinds is not None:
-        row = (
-            db.query(ListEntry)
-            .filter(
-                ListEntry.list_id == kinds.id,
-                func.lower(ListEntry.name) == str(kind_ref).strip().lower(),
-            )
-            .first()
-        )
-        kind_id = str(row.id) if row is not None else kind_ref
-    out: dict[str, Any] = {
-        "instrument_id": _named_id(
-            db, Instrument, _first(data, "instrument_id", "instrument", "instrument_name")
-        ),
-        "kind_id": kind_id,
-        "interval_days": data.get("interval_days"),
-        "service_vendor_id": _named_id(
-            db, Vendor, _first(data, "service_vendor_id", "service_vendor", "vendor")
-        ),
-    }
     return {k: v for k, v in out.items() if v is not None}

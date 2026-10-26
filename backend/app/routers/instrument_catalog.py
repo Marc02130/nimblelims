@@ -32,7 +32,6 @@ from models.instrument import (
     CroSource,
     Instrument,
     InstrumentMaintenanceAudit,
-    InstrumentTypeDefault,
 )
 from models.list import List as ListModel, ListEntry
 from models.reagent import Vendor
@@ -64,53 +63,26 @@ def _type_query(db: Session):
     return db.query(ListEntry).filter(ListEntry.list_id == _types_list_id(db))
 
 
-def _type_maintenance_default(db: Session, type_id: UUID) -> bool:
-    row = (
-        db.query(InstrumentTypeDefault)
-        .filter(InstrumentTypeDefault.instrument_type_id == type_id)
-        .first()
-    )
-    return bool(row.maintenance_tracked) if row is not None else False
-
-
-def _upsert_type_default(
-    db: Session, type_id: UUID, tracked: bool, user: User
-) -> None:
-    row = (
-        db.query(InstrumentTypeDefault)
-        .filter(InstrumentTypeDefault.instrument_type_id == type_id)
-        .first()
-    )
-    if row is None:
-        db.add(
-            InstrumentTypeDefault(
-                instrument_type_id=type_id,
-                maintenance_tracked=tracked,
-                created_by=user.id,
-                modified_by=user.id,
-            )
-        )
-        return
-    row.maintenance_tracked = tracked
-    row.modified_by = user.id
-
-
 def _type_out(db: Session, row: ListEntry) -> InstrumentTypeResponse:
     return InstrumentTypeResponse(
         id=row.id,
         name=row.name,
         description=row.description,
         active=row.active,
-        maintenance_tracked=_type_maintenance_default(db, row.id),
         created_at=row.created_at,
         modified_at=row.modified_at,
     )
 
 
 def _audit_maintenance_tracked(
-    db: Session, instrument: Instrument, previous: bool, new_value: bool, user: User
+    db: Session,
+    instrument: Instrument,
+    previous: bool,
+    new_value: bool,
+    user: User,
+    always: bool = False,
 ) -> None:
-    if previous == new_value:
+    if not always and previous == new_value:
         return
     db.add(
         InstrumentMaintenanceAudit(
@@ -193,7 +165,6 @@ def create_instrument_type(
     )
     db.add(row)
     db.flush()
-    _upsert_type_default(db, row.id, body.maintenance_tracked, current_user)
     try:
         db.commit()
     except IntegrityError:
@@ -214,14 +185,11 @@ def update_instrument_type(
     if not row:
         raise HTTPException(status_code=404, detail="Instrument type not found")
     data = explicit_updates(body, row, refuse_null={"active"})
-    tracked = data.pop("maintenance_tracked", None)
     if "name" in data and data["name"] != row.name:
         if _type_query(db).filter(ListEntry.name == data["name"]).first():
             raise HTTPException(status_code=400, detail="Instrument type name already exists")
     for k, v in data.items():
         setattr(row, k, v)
-    if tracked is not None:
-        _upsert_type_default(db, row.id, tracked, current_user)
     row.modified_by = current_user.id
     try:
         db.commit()
@@ -352,15 +320,18 @@ def create_instrument(
         raise HTTPException(status_code=400, detail="Instrument name already exists")
     payload = body.model_dump()
     if payload.get("maintenance_tracked") is None:
-        payload["maintenance_tracked"] = _type_maintenance_default(
-            db, body.instrument_type_id
-        )
+        payload["maintenance_tracked"] = False
     row = Instrument(
         **payload,
         created_by=current_user.id,
         modified_by=current_user.id,
     )
     db.add(row)
+    db.flush()
+    if row.maintenance_tracked is False:
+        _audit_maintenance_tracked(
+            db, row, False, False, current_user, always=True
+        )
     try:
         db.commit()
     except IntegrityError as e:

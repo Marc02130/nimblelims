@@ -336,6 +336,11 @@ def _sync_maintenance_column() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
+    leftover = conn.execute(sa.text("SELECT count(*) FROM instrument_maintenance_audits")).scalar()
+    if leftover:
+        raise RuntimeError(
+            "0113 downgrade refuses: instrument_maintenance_audits has rows"
+        )
     conn.execute(
         sa.text(
             """

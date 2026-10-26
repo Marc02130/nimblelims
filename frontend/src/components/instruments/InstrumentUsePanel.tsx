@@ -98,8 +98,9 @@ const InstrumentUsePanel: React.FC<Props> = ({
     try {
       const elig = await apiService.getInstrumentEligibility(instrumentId);
       if (elig && elig.allowed === false) {
+        const awaiting = elig.code === 'instrument_awaiting_first_due' ? 'Awaiting first due date. ' : '';
         const tracked = elig.maintenance_tracked ? 'Maintenance is tracked. ' : '';
-        setStop(`${tracked}${elig.message || 'This instrument cannot be used.'}`);
+        setStop(`${awaiting}${tracked}${elig.message || 'This instrument cannot be used.'}`);
         return;
       }
       const saved = await apiService.addExperimentInstrument(experimentId, instrumentId);
@@ -118,8 +119,9 @@ const InstrumentUsePanel: React.FC<Props> = ({
     try {
       const elig = await apiService.getInstrumentEligibility(instrumentId);
       if (elig && elig.allowed === false) {
+        const awaiting = elig.code === 'instrument_awaiting_first_due' ? 'Awaiting first due date. ' : '';
         const tracked = elig.maintenance_tracked ? 'Maintenance is tracked. ' : '';
-        setStop(`${tracked}${elig.message || 'This instrument cannot be used.'}`);
+        setStop(`${awaiting}${tracked}${elig.message || 'This instrument cannot be used.'}`);
         return;
       }
       await apiService.recordInstrumentUse({

@@ -1,7 +1,11 @@
 /**
  * Admin catalog for instrument types (list), instruments, CRO sources,
  * maintenance schedules, and downtime. Nothing is deleted: retire with
- * active / status flags.
+ * active / status flags. Types are a configurable list — add or retire
+ * (Active off). A run is not locked to one type.
+ *
+ * Lab Managers reach schedules and first-due through the role-gated
+ * Instrument maintenance view (maintenanceOnly).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -37,7 +41,6 @@ interface InstrumentType {
   name: string;
   description?: string;
   active: boolean;
-  maintenance_tracked?: boolean;
 }
 
 interface VendorOption {
@@ -109,7 +112,7 @@ interface ListEntryOption {
 
 type TabKey = 'types' | 'instances' | 'cro' | 'maintenance' | 'downtime';
 
-const emptyTypeForm = { name: '', description: '', active: true, maintenance_tracked: false };
+const emptyTypeForm = { name: '', description: '', active: true };
 const emptyInstrumentForm = {
   name: '',
   description: '',
@@ -150,12 +153,17 @@ const STATUSES = [
   { value: 'retired', label: 'Retired' },
 ];
 
-const InstrumentCatalogManagement: React.FC = () => {
-  const { hasPermission } = useUser();
+const AWAITING_FIRST_DUE = 'Awaiting first due date';
+
+const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
+  maintenanceOnly = false,
+}) => {
+  const { hasPermission, user } = useUser();
   const canEdit = hasPermission('config:edit');
   const canBench = hasPermission('experiment:manage');
+  const canManageSchedules = user?.role === 'Administrator' || user?.role === 'Lab Manager';
 
-  const [tab, setTab] = useState<TabKey>('types');
+  const [tab, setTab] = useState<TabKey>(maintenanceOnly ? 'maintenance' : 'types');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +188,8 @@ const InstrumentCatalogManagement: React.FC = () => {
   const [downtimeForm, setDowntimeForm] = useState(emptyDowntimeForm);
   const [submitting, setSubmitting] = useState(false);
   const [stopReason, setStopReason] = useState<string | null>(null);
+  const [firstDueId, setFirstDueId] = useState<string | null>(null);
+  const [firstDueDate, setFirstDueDate] = useState('');
 
   const loadAll = useCallback(async () => {
     try {
@@ -230,6 +240,14 @@ const InstrumentCatalogManagement: React.FC = () => {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  const awaitingByInstrument = useMemo(() => {
+    const awaiting = new Set<string>();
+    for (const row of schedules) {
+      if (row.active && !row.next_due) awaiting.add(row.instrument_id);
+    }
+    return awaiting;
+  }, [schedules]);
 
   const filterBySearch = <T,>(rows: T[], extra?: (row: T) => string) => {
     if (!searchTerm) return rows;
@@ -282,7 +300,6 @@ const InstrumentCatalogManagement: React.FC = () => {
         name: row.name,
         description: row.description || '',
         active: row.active,
-        maintenance_tracked: Boolean(row.maintenance_tracked),
       });
     } else if (tab === 'instances') {
       setInstrumentForm({
@@ -335,7 +352,6 @@ const InstrumentCatalogManagement: React.FC = () => {
           name: typeForm.name.trim(),
           description: typeForm.description.trim() || undefined,
           active: typeForm.active,
-          maintenance_tracked: typeForm.maintenance_tracked,
         };
         if (!payload.name) throw new Error('Name is required');
         if (editingId) await apiService.updateInstrumentType(editingId, payload);
@@ -425,6 +441,28 @@ const InstrumentCatalogManagement: React.FC = () => {
     }
   };
 
+  const submitFirstDue = async () => {
+    if (!firstDueId || !firstDueDate) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiService.setInstrumentScheduleFirstDue(firstDueId, firstDueDate);
+      setSuccess('First due date set');
+      setFirstDueId(null);
+      setFirstDueDate('');
+      await loadAll();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(
+        (detail && typeof detail === 'object' && detail.message) ||
+          err.message ||
+          (typeof detail === 'string' ? detail : 'Could not set the first due date')
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const activeCol: GridColDef = {
     field: 'active',
     headerName: 'Active',
@@ -434,16 +472,24 @@ const InstrumentCatalogManagement: React.FC = () => {
     ),
   };
 
-  const actionsCol = (onEdit: (p: GridRowParams) => void, extra?: (p: GridRowParams) => React.ReactElement[]): GridColDef => ({
+  const canActOnTab =
+    tab === 'maintenance' ? canManageSchedules : tab === 'downtime' ? canBench || canEdit : canEdit;
+
+  const actionsCol = (
+    onEdit: (p: GridRowParams) => void,
+    extra?: (p: GridRowParams) => React.ReactElement[]
+  ): GridColDef => ({
     field: 'actions',
     type: 'actions',
     headerName: 'Actions',
-    width: 120,
+    width: 140,
     getActions: (params) => {
-      if (!canEdit && tab !== 'downtime') return extra ? extra(params) : [];
-      const items = [
-        <GridActionsCellItem key="edit" icon={<Edit />} label="Edit" onClick={() => onEdit(params)} />,
-      ];
+      const items: React.ReactElement[] = [];
+      if (canActOnTab) {
+        items.push(
+          <GridActionsCellItem key="edit" icon={<Edit />} label="Edit" onClick={() => onEdit(params)} />
+        );
+      }
       if (extra) items.push(...extra(params));
       return items;
     },
@@ -452,7 +498,6 @@ const InstrumentCatalogManagement: React.FC = () => {
   const typeColumns: GridColDef[] = [
     { field: 'name', headerName: 'Name', flex: 1, minWidth: 140 },
     { field: 'description', headerName: 'Description', flex: 1, minWidth: 160 },
-    { field: 'maintenance_tracked', headerName: 'Track maintenance', width: 160 },
     activeCol,
     actionsCol((p) => openEdit(p.row)),
   ];
@@ -465,6 +510,17 @@ const InstrumentCatalogManagement: React.FC = () => {
     { field: 'serial_number', headerName: 'Serial', width: 120 },
     { field: 'status', headerName: 'Status', width: 140 },
     { field: 'maintenance_tracked', headerName: 'Track maintenance', width: 160 },
+    {
+      field: 'due_status',
+      headerName: 'Next due',
+      width: 180,
+      valueGetter: (_value, row) => {
+        if (!row.maintenance_tracked) return '';
+        return awaitingByInstrument.has(row.id) ? AWAITING_FIRST_DUE : '';
+      },
+      renderCell: (params) =>
+        params.value ? <Chip size="small" color="warning" label={params.value} /> : null,
+    },
     activeCol,
     actionsCol(
       (p) => openEdit(p.row),
@@ -494,10 +550,33 @@ const InstrumentCatalogManagement: React.FC = () => {
     { field: 'kind_name', headerName: 'Kind', width: 140 },
     { field: 'interval_days', headerName: 'Interval (days)', width: 140 },
     { field: 'last_done', headerName: 'Last done', width: 120 },
-    { field: 'next_due', headerName: 'Next due', width: 120 },
+    {
+      field: 'next_due',
+      headerName: 'Next due',
+      width: 180,
+      renderCell: (params) =>
+        params.value ? (
+          String(params.value)
+        ) : (
+          <Chip size="small" color="warning" label={AWAITING_FIRST_DUE} />
+        ),
+    },
     { field: 'service_vendor_name', headerName: 'Service vendor', width: 160 },
     activeCol,
-    actionsCol((p) => openEdit(p.row)),
+    actionsCol((p) => openEdit(p.row), (p) => {
+      if (!canManageSchedules || p.row.next_due || p.row.last_done) return [];
+      return [
+        <GridActionsCellItem
+          key="first-due"
+          label="Set first due date"
+          showInMenu
+          onClick={() => {
+            setFirstDueId(p.row.id);
+            setFirstDueDate('');
+          }}
+        />,
+      ];
+    }),
   ];
 
   const downtimeColumns: GridColDef[] = [
@@ -543,14 +622,12 @@ const InstrumentCatalogManagement: React.FC = () => {
             : downtimeColumns;
 
   const canCreate =
-    tab === 'downtime' || tab === 'maintenance'
-      ? (tab === 'maintenance' ? canEdit : canBench || canEdit)
-      : canEdit;
+    tab === 'maintenance' ? canManageSchedules : tab === 'downtime' ? canBench || canEdit : canEdit;
 
   return (
     <FillHeightPage>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-        <Typography variant="h5">Instruments</Typography>
+        <Typography variant="h5">{maintenanceOnly ? 'Instrument maintenance' : 'Instruments'}</Typography>
         {canCreate && (
           <Button startIcon={<Add />} variant="contained" onClick={openCreate}>
             Add {title.replace(/s$/, '')}
@@ -558,8 +635,9 @@ const InstrumentCatalogManagement: React.FC = () => {
         )}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Types are a configurable list. Vendor and model live on each instrument. Retire with status
-        or active; there is no delete.
+        {maintenanceOnly
+          ? 'Lab managers and administrators set schedules and the first due date. Retire a schedule with Active off; there is no delete.'
+          : 'Types are a configurable list. Add a type or retire it with Active off — there is no delete. A run is not locked to one type. Vendor and model live on each instrument.'}
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(null)}>
@@ -576,13 +654,15 @@ const InstrumentCatalogManagement: React.FC = () => {
           {success}
         </Alert>
       )}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
-        <Tab value="types" label="Types" />
-        <Tab value="instances" label="Instruments" />
-        <Tab value="cro" label="CRO sources" />
-        <Tab value="maintenance" label="Maintenance" />
-        <Tab value="downtime" label="Downtime" />
-      </Tabs>
+      {!maintenanceOnly && (
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
+          <Tab value="types" label="Types" />
+          <Tab value="instances" label="Instruments" />
+          <Tab value="cro" label="CRO sources" />
+          <Tab value="maintenance" label="Maintenance" />
+          <Tab value="downtime" label="Downtime" />
+        </Tabs>
+      )}
       <TextField
         size="small"
         placeholder="Search"
@@ -631,17 +711,6 @@ const InstrumentCatalogManagement: React.FC = () => {
                 }
                 label="Active"
               />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={typeForm.maintenance_tracked}
-                    onChange={(e) =>
-                      setTypeForm({ ...typeForm, maintenance_tracked: e.target.checked })
-                    }
-                  />
-                }
-                label="Track maintenance by default"
-              />
             </>
           )}
           {tab === 'instances' && (
@@ -659,17 +728,12 @@ const InstrumentCatalogManagement: React.FC = () => {
                   labelId="instrument-type-label"
                   label="Type"
                   value={instrumentForm.instrument_type_id}
-                  onChange={(e) => {
-                    const typeId = String(e.target.value);
-                    const selected = types.find((t) => t.id === typeId);
+                  onChange={(e) =>
                     setInstrumentForm({
                       ...instrumentForm,
-                      instrument_type_id: typeId,
-                      maintenance_tracked: editingId
-                        ? instrumentForm.maintenance_tracked
-                        : Boolean(selected?.maintenance_tracked),
-                    });
-                  }}
+                      instrument_type_id: String(e.target.value),
+                    })
+                  }
                 >
                   {types.map((t) => (
                     <MenuItem key={t.id} value={t.id}>
@@ -894,6 +958,27 @@ const InstrumentCatalogManagement: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={submitting} variant="contained">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(firstDueId)} onClose={() => setFirstDueId(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Set first due date</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="First due date"
+            type="date"
+            fullWidth
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+            value={firstDueDate}
+            onChange={(e) => setFirstDueDate(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFirstDueId(null)}>Cancel</Button>
+          <Button onClick={submitFirstDue} disabled={submitting || !firstDueDate} variant="contained">
             Save
           </Button>
         </DialogActions>
