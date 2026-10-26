@@ -121,7 +121,11 @@ interface ClientOption {
 interface ListEntryOption {
   id: string;
   name: string;
+  active?: boolean;
 }
+
+const pickerEntries = (rows: ListEntryOption[], currentId?: string) =>
+  rows.filter((row) => row.active !== false || (currentId && row.id === currentId));
 
 type TabKey = 'types' | 'instances' | 'cro' | 'maintenance' | 'events' | 'downtime';
 
@@ -257,13 +261,17 @@ const InstrumentCatalogManagement: React.FC<{
       }
       try {
         const kinds = await apiService.getListEntries('maintenance_types');
-        setMaintenanceKinds((kinds || []).map((e: any) => ({ id: e.id, name: e.name })));
+        setMaintenanceKinds(
+          (kinds || []).map((e: any) => ({ id: e.id, name: e.name, active: e.active !== false }))
+        );
       } catch {
         setMaintenanceKinds([]);
       }
       try {
         const reasons = await apiService.getListEntries('downtime_reasons');
-        setDowntimeReasons((reasons || []).map((e: any) => ({ id: e.id, name: e.name })));
+        setDowntimeReasons(
+          (reasons || []).map((e: any) => ({ id: e.id, name: e.name, active: e.active !== false }))
+        );
       } catch {
         setDowntimeReasons([]);
       }
@@ -1021,7 +1029,7 @@ const InstrumentCatalogManagement: React.FC<{
                   value={scheduleForm.kind_id}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, kind_id: String(e.target.value) })}
                 >
-                  {maintenanceKinds.map((k) => (
+                  {pickerEntries(maintenanceKinds, scheduleForm.kind_id).map((k) => (
                     <MenuItem key={k.id} value={k.id}>
                       {k.name}
                     </MenuItem>
@@ -1170,7 +1178,7 @@ const InstrumentCatalogManagement: React.FC<{
                   value={downtimeForm.reason_id}
                   onChange={(e) => setDowntimeForm({ ...downtimeForm, reason_id: String(e.target.value) })}
                 >
-                  {downtimeReasons.map((k) => (
+                  {pickerEntries(downtimeReasons, downtimeForm.reason_id).map((k) => (
                     <MenuItem key={k.id} value={k.id}>
                       {k.name}
                     </MenuItem>
