@@ -602,6 +602,7 @@ _APP_PRIVILEGES = (
     ("parser_analyses", "SELECT"),
     ("users", "SELECT"),
     ("roles", "SELECT"),
+    ("experiment_templates", "SELECT"),
 )
 
 
@@ -629,7 +630,17 @@ def lims_app_world(migrated_engine):
             c.execute(text(f"GRANT {privilege} ON TABLE {table} TO lims_app"))
         ids = {
             k: uuid.uuid4()
-            for k in ("org", "user", "other_org", "other_user", "analysis", "run", "cro", "parser")
+            for k in (
+                "org",
+                "user",
+                "other_org",
+                "other_user",
+                "analysis",
+                "run",
+                "cro",
+                "parser",
+                "template",
+            )
         }
         for org, user, label in (("org", "user", "a"), ("other_org", "other_user", "b")):
             c.execute(
@@ -650,10 +661,25 @@ def lims_app_world(migrated_engine):
         )
         c.execute(
             text(
-                "INSERT INTO lims_runs (id, name, status, analysis_id, created_by, modified_by) "
-                "VALUES (:id, :n, 'running', :a, :u, :u)"
+                "INSERT INTO experiment_templates "
+                "(id, name, template_definition, lifecycle_type, created_by, modified_by) "
+                "VALUES (:id, :n, '{}'::jsonb, 'cro', :u, :u)"
             ),
-            {"id": ids["run"], "n": f"R231 run {tag}", "a": ids["analysis"], "u": ids["user"]},
+            {"id": ids["template"], "n": f"R231 cro {tag}", "u": ids["user"]},
+        )
+        c.execute(
+            text(
+                "INSERT INTO lims_runs "
+                "(id, name, status, analysis_id, experiment_template_id, created_by, modified_by) "
+                "VALUES (:id, :n, 'running', :a, :t, :u, :u)"
+            ),
+            {
+                "id": ids["run"],
+                "n": f"R231 run {tag}",
+                "a": ids["analysis"],
+                "t": ids["template"],
+                "u": ids["user"],
+            },
         )
         c.execute(
             text("INSERT INTO cro_sources (id, name, active) VALUES (:id, :n, true)"),
@@ -700,6 +726,7 @@ def lims_app_world(migrated_engine):
         c.execute(text("DELETE FROM lims_run_data WHERE lims_run_id = :i"), {"i": ids["run"]})
         c.execute(text("DELETE FROM lims_run_imports WHERE lims_run_id = :i"), {"i": ids["run"]})
         c.execute(text("DELETE FROM lims_runs WHERE id = :i"), {"i": ids["run"]})
+        c.execute(text("DELETE FROM experiment_templates WHERE id = :i"), {"i": ids["template"]})
         c.execute(text("DELETE FROM parser_analyses WHERE parser_id = :i"), {"i": ids["parser"]})
         c.execute(text("DELETE FROM data_parsers WHERE id = :i"), {"i": ids["parser"]})
         c.execute(text("DELETE FROM cro_sources WHERE id = :i"), {"i": ids["cro"]})

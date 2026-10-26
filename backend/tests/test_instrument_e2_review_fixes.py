@@ -66,7 +66,10 @@ def _add_cro_parser(db_session, analysis_id, cro_source_id):
 
 def test_m1_0115_downgrade_refuses_data_and_passes_when_empty(migrated_engine):
     m0115 = _load_migration(MIGRATION_0115)
-    with migrated_engine.begin() as conn:
+    connection = migrated_engine.connect()
+    transaction = connection.begin()
+    try:
+        conn = connection
         admin = conn.execute(text("SELECT id FROM roles WHERE name = 'Administrator'")).scalar()
         client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
         type_id = conn.execute(
@@ -76,10 +79,11 @@ def test_m1_0115_downgrade_refuses_data_and_passes_when_empty(migrated_engine):
         conn.execute(
             text(
                 "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
-                "VALUES (:id, 'm1', :u, :e, 'x', :r, :c, true)"
+                "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
             ),
             {
                 "id": uid,
+                "n": f"m1-{uid.hex[:6]}",
                 "u": f"m1-{uid.hex[:6]}",
                 "e": f"m1-{uid.hex[:6]}@x.org",
                 "r": admin,
@@ -127,11 +131,11 @@ def test_m1_0115_downgrade_refuses_data_and_passes_when_empty(migrated_engine):
             ),
             {"id": uuid.uuid4(), "i": inst, "u": uid},
         )
-
-    with migrated_engine.connect() as conn:
         with pytest.raises(RuntimeError, match="0115 downgrade refuses"):
             m0115.refuse_downgrade_if_slot_data(conn)
-        conn.rollback()
+    finally:
+        transaction.rollback()
+        connection.close()
 
 
 def test_m1_0115_downgrade_empty_passes_then_rolls_back(migrated_engine):
@@ -151,7 +155,10 @@ def test_m1_0115_downgrade_empty_passes_then_rolls_back(migrated_engine):
 
 def test_m2_ledger_flips_untyped_templates_on_nonempty_db(migrated_engine):
     m0116 = _load_migration(MIGRATION_0116)
-    with migrated_engine.begin() as conn:
+    connection = migrated_engine.connect()
+    transaction = connection.begin()
+    try:
+        conn = connection
         admin = conn.execute(
             text(
                 "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id "
@@ -282,6 +289,9 @@ def test_m2_ledger_flips_untyped_templates_on_nonempty_db(migrated_engine):
         assert ids == {referenced, unreferenced}
         assert {row[1] for row in ledger} == {"0115_untyped_lims_run_template"}
         assert {row[2] for row in ledger} == {admin}
+    finally:
+        transaction.rollback()
+        connection.close()
 
 
 def test_m2_ledger_privileges_and_force_rls(migrated_engine):
@@ -678,7 +688,7 @@ def test_m5_void_waits_on_held_schedule_lock(migrated_engine):
             try:
                 box["value"] = update_event(
                     ids["event"],
-                    MaintenanceEventUpdate(active=False, reason="void under lock"),
+                    MaintenanceEventUpdate(active=False),
                     current_user=user,
                     db=s,
                 )

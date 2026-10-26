@@ -485,10 +485,21 @@ def downgrade() -> None:
     op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_select ON instrument_maintenance_events")
     op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_insert ON instrument_maintenance_events")
     op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_update ON instrument_maintenance_events")
+    # Restore the 0111 FOR ALL policy so 0114 can drop has_config_edit().
     op.execute(
         "CREATE POLICY instrument_maintenance_events_access "
         "ON instrument_maintenance_events FOR ALL "
-        f"USING ({_CATALOG_POLICY}) WITH CHECK ({_CATALOG_POLICY})"
+        "USING (is_admin() OR has_experiment_access() OR EXISTS ("
+        "SELECT 1 FROM users u "
+        "JOIN role_permissions rp ON rp.role_id = u.role_id "
+        "JOIN permissions p ON p.id = rp.permission_id "
+        "WHERE u.id = current_user_id() AND p.name = 'config:edit' AND p.active = true"
+        ")) WITH CHECK (is_admin() OR has_experiment_access() OR EXISTS ("
+        "SELECT 1 FROM users u "
+        "JOIN role_permissions rp ON rp.role_id = u.role_id "
+        "JOIN permissions p ON p.id = rp.permission_id "
+        "WHERE u.id = current_user_id() AND p.name = 'config:edit' AND p.active = true"
+        "))"
     )
     op.execute(_0115_VOID_FN)
     op.execute(
