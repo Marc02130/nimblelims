@@ -549,6 +549,9 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
     previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
+    with migrated_engine.begin() as conn:
+        conn.execute(text("DELETE FROM instrument_maintenance_audits"))
+        conn.execute(text("DELETE FROM lims_run_imports WHERE filename = 'admin_override'"))
     type_id = uuid.uuid4()
     inst_id = uuid.uuid4()
     inactive_id = uuid.uuid4()

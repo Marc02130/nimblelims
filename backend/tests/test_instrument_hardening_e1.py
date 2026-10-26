@@ -23,6 +23,34 @@ from tests.test_instrument_tracking import (
 BACKEND = Path(__file__).resolve().parents[1]
 
 
+def _run_as_lims_app(engine, user_id, sql, params=None):
+    """Run one statement as lims_app, then RESET ROLE so the pool stays clean.
+
+    A failed statement aborts the transaction; rollback first or RESET ROLE
+    cannot run. Session-level SET ROLE survives commit and would otherwise
+    leak onto the next test that borrows this connection.
+    """
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SET ROLE lims_app"))
+            conn.execute(
+                text("SELECT set_config('app.current_user_id', :u, true)"),
+                {"u": str(user_id)},
+            )
+            result = conn.execute(text(sql), params or {})
+            conn.commit()
+            return result
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            try:
+                conn.execute(text("RESET ROLE"))
+            except Exception:
+                conn.rollback()
+                conn.execute(text("RESET ROLE"))
+
+
 @pytest.fixture
 def admin_h(client, test_admin_user):
     return _login(client, "admin", "adminpassword")
@@ -94,7 +122,7 @@ def test_agent_asks_and_sets_maintenance_tracked(client, admin_h, db_session, te
             },
         )
         assert changes[0].kind == "instrument"
-        row = client.get(f"/v1/instruments/{changes[0].id}", headers=admin_h).json()
+        row = client.get(f"/v1/instruments/{changes[0].target_id}", headers=admin_h).json()
         assert row["maintenance_tracked"] is flag
 
 
@@ -530,14 +558,7 @@ def test_db_schedule_enforcement_as_lims_app(migrated_engine):
     refused = (DataError, IntegrityError, InternalError, ProgrammingError)
 
     def run_as(user_id, sql, params):
-        with migrated_engine.connect() as s:
-            s.execute(text("SET ROLE lims_app"))
-            s.execute(
-                text("SELECT set_config('app.current_user_id', :u, true)"),
-                {"u": str(user_id)},
-            )
-            s.execute(text(sql), params)
-            s.commit()
+        return _run_as_lims_app(migrated_engine, user_id, sql, params)
 
     insert_sql = (
         "INSERT INTO instrument_maintenance_schedules "
@@ -650,25 +671,30 @@ def test_m2_audits_append_only_as_lims_app(migrated_engine):
                 {"p": privilege},
             ).scalar()
             assert allowed is False, privilege
-        conn.execute(text("SET ROLE lims_app"))
-        conn.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": str(uid)})
-        updated = conn.execute(
-            text("UPDATE instrument_maintenance_audits SET new_value = true WHERE id = :id"),
+    with pytest.raises(ProgrammingError):
+        _run_as_lims_app(
+            migrated_engine,
+            uid,
+            "UPDATE instrument_maintenance_audits SET new_value = true WHERE id = :id",
             {"id": audit},
         )
-        deleted = conn.execute(
-            text("DELETE FROM instrument_maintenance_audits WHERE id = :id"),
+    with pytest.raises(ProgrammingError):
+        _run_as_lims_app(
+            migrated_engine,
+            uid,
+            "DELETE FROM instrument_maintenance_audits WHERE id = :id",
             {"id": audit},
         )
-        assert updated.rowcount == 0
-        assert deleted.rowcount == 0
-        conn.rollback()
-    with migrated_engine.connect() as conn:
+    with migrated_engine.begin() as conn:
         left = conn.execute(
             text("SELECT new_value FROM instrument_maintenance_audits WHERE id = :id"),
             {"id": audit},
         ).scalar()
         assert left is False
+        conn.execute(
+            text("DELETE FROM instrument_maintenance_audits WHERE id = :id"),
+            {"id": audit},
+        )
 
 
 def test_m3_admin_override_import(
