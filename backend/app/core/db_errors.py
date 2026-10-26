@@ -6,6 +6,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 UNIQUE_VIOLATION = "23505"
+LOCK_NOT_AVAILABLE = "55P03"
+QUERY_CANCELED = "57014"
+
+
+def pgcode(exc: Exception) -> Optional[str]:
+    return getattr(getattr(exc, "orig", None), "pgcode", None)
+
+
+def is_lock_timeout(exc: Exception) -> bool:
+    """lock_timeout expired while waiting for a row or table lock."""
+    return pgcode(exc) == LOCK_NOT_AVAILABLE
 
 
 def constraint_name(exc: IntegrityError) -> Optional[str]:

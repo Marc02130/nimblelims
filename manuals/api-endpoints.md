@@ -2516,6 +2516,8 @@ Operator steps: [configuring-agent.md](configuring-agent.md).
 
 Full run lifecycle is under `/v1/lims-runs`. See [lims-runs.md](lims-runs.md) for product rules.
 
+**Concurrent changes:** every status change (`/order`, `/start`, `/cohort`, `/results-received`, `/review`, `/complete`, `/cancel`, `/fail`, `/reject`), `PATCH /v1/lims-runs/{id}`, `/import` and `/import-file` lock the run row (`FOR NO KEY UPDATE`) and check the status after the lock. A request that waits past the database lock timeout is **409** `{"detail": {"code": "run_busy", "message": ...}}` and changes nothing; retry it. `/import-file` parses before it locks; if the run's analysis changed meanwhile it is **409** `run_changed`. A lock timeout on any other row that no route handles is **409** `row_busy` instead of a 500.
+
 ### GET /v1/lims-runs/{id}/dose-response/summary
 Curve Curator counts for one run. **Requires** `experiment:manage`.
 
