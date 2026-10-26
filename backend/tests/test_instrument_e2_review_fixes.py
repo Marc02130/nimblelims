@@ -253,15 +253,16 @@ def test_m2_ledger_flips_untyped_templates_on_nonempty_db(migrated_engine):
             {"a": run_id, "b": typed_run},
         ).all()
         assert after_snap == run_snap
-        states = dict(
-            conn.execute(
+        states = {
+            row[0]: (row[1], row[2])
+            for row in conn.execute(
                 text(
                     "SELECT id, active, modified_by FROM experiment_templates "
                     "WHERE id IN (:a, :b, :c, :d)"
                 ),
                 {"a": referenced, "b": unreferenced, "c": typed, "d": plain},
             ).all()
-        )
+        }
         assert states[referenced][0] is False
         assert states[unreferenced][0] is False
         assert states[typed][0] is True
@@ -561,10 +562,11 @@ def _seed_schedule_event(migrated_engine, *, next_due=None, passed=True):
         conn.execute(
             text(
                 "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
-                "VALUES (:id, 'e2rf', :u, :e, 'x', :r, :c, true)"
+                "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
             ),
             {
                 "id": uid,
+                "n": f"e2rf-{uid.hex[:6]}",
                 "u": f"e2rf-{uid.hex[:6]}",
                 "e": f"e2rf-{uid.hex[:6]}@x.org",
                 "r": admin,
@@ -574,10 +576,11 @@ def _seed_schedule_event(migrated_engine, *, next_due=None, passed=True):
         conn.execute(
             text(
                 "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
-                "VALUES (:id, 'e2rft', :u, :e, 'x', :r, :c, true)"
+                "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
             ),
             {
                 "id": tech_uid,
+                "n": f"e2rft-{tech_uid.hex[:6]}",
                 "u": f"e2rft-{tech_uid.hex[:6]}",
                 "e": f"e2rft-{tech_uid.hex[:6]}@x.org",
                 "r": tech,
@@ -587,10 +590,11 @@ def _seed_schedule_event(migrated_engine, *, next_due=None, passed=True):
         conn.execute(
             text(
                 "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
-                "VALUES (:id, 'e2rfo', :u, :e, 'x', :r, :c, true)"
+                "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
             ),
             {
                 "id": other,
+                "n": f"e2rfo-{other.hex[:6]}",
                 "u": f"e2rfo-{other.hex[:6]}",
                 "e": f"e2rfo-{other.hex[:6]}@x.org",
                 "r": admin,
@@ -662,11 +666,14 @@ def test_m5_void_waits_on_held_schedule_lock(migrated_engine):
             s.commit()
 
     def do_void():
+        from app.core.lab_time import publish_lab_zone
+
         with Session() as s:
             s.execute(
                 text("SELECT set_config('app.current_user_id', :u, true)"),
                 {"u": str(ids["uid"])},
             )
+            publish_lab_zone(s)
             user = s.get(User, ids["uid"])
             try:
                 box["value"] = update_event(

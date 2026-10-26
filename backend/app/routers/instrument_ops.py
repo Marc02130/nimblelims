@@ -1020,17 +1020,17 @@ def record_instrument_use(
     current_user: User = Depends(require_experiment_manage),
     db: Session = Depends(get_db),
 ):
+    if body.entry_id is not None and body.experiment_id is None:
+        _refuse(
+            "entry_experiment_required",
+            "entry_id requires experiment_id.",
+        )
     if body.lims_run_id is None and body.experiment_id is None:
         _refuse(USE_TARGET_REQUIRED, "Record the use on a LIMS run or an experiment")
     if body.entry_id is not None and body.lims_run_id is not None:
         _refuse(
             "use_target_conflict",
             "Send entry_id with experiment_id, not with lims_run_id.",
-        )
-    if body.entry_id is not None and body.experiment_id is None:
-        _refuse(
-            "entry_experiment_required",
-            "entry_id requires experiment_id.",
         )
     if body.entry_id is not None:
         entry = db.query(Entry).filter(Entry.id == body.entry_id).first()
