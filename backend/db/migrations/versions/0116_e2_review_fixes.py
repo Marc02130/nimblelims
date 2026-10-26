@@ -396,6 +396,26 @@ def upgrade() -> None:
 
     ledger_untyped_lims_run_templates()
 
+    # 0111's events policy inlined SELECT FROM users for config:edit. lims_app
+    # has no SELECT on users, so SET ROLE updates died before the void trigger.
+    # Match 0114 schedules: SECURITY DEFINER helpers only.
+    op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_access ON instrument_maintenance_events")
+    op.execute(
+        "CREATE POLICY instrument_maintenance_events_select "
+        "ON instrument_maintenance_events FOR SELECT "
+        f"USING ({_CATALOG_POLICY})"
+    )
+    op.execute(
+        "CREATE POLICY instrument_maintenance_events_insert "
+        "ON instrument_maintenance_events FOR INSERT "
+        f"WITH CHECK ({_CATALOG_POLICY})"
+    )
+    op.execute(
+        "CREATE POLICY instrument_maintenance_events_update "
+        "ON instrument_maintenance_events FOR UPDATE "
+        f"USING ({_CATALOG_POLICY}) WITH CHECK ({_CATALOG_POLICY})"
+    )
+
     op.execute(_REFUSE_VOID_FN)
     op.execute(
         "ALTER FUNCTION public.refuse_void_only_passing_event() SECURITY DEFINER"
@@ -461,6 +481,14 @@ def downgrade() -> None:
         "CHECK (action IN ("
         "'first_due', 'schedule_active', 'schedule_interval', "
         "'schedule_kind', 'schedule_vendor', 'event_void'))"
+    )
+    op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_select ON instrument_maintenance_events")
+    op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_insert ON instrument_maintenance_events")
+    op.execute("DROP POLICY IF EXISTS instrument_maintenance_events_update ON instrument_maintenance_events")
+    op.execute(
+        "CREATE POLICY instrument_maintenance_events_access "
+        "ON instrument_maintenance_events FOR ALL "
+        f"USING ({_CATALOG_POLICY}) WITH CHECK ({_CATALOG_POLICY})"
     )
     op.execute(_0115_VOID_FN)
     op.execute(
