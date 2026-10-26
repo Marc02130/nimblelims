@@ -91,6 +91,12 @@ class LimsRunUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     analysis_id: Optional[uuid.UUID] = None
+    instrument_type_id: Optional[uuid.UUID] = Field(
+        None,
+        description=(
+            "Locked after start. Use POST /v1/lims-runs/{id}/substitute-instrument-type."
+        ),
+    )
 
 
 class LimsRunStartRequest(BaseModel):
@@ -99,6 +105,15 @@ class LimsRunStartRequest(BaseModel):
         None,
         description="Cohort samples selected at start (scan plate/tube or queue). Required if no cohort yet.",
     )
+    instrument_type_id: Optional[uuid.UUID] = Field(
+        None,
+        description="Ad hoc runs only: optional instrument type snapshot at start.",
+    )
+
+
+class LimsRunSubstituteInstrumentTypeRequest(BaseModel):
+    instrument_type_id: uuid.UUID
+    reason: str = Field(..., min_length=1)
 
 
 class LimsRunCohort(BaseModel):
@@ -126,6 +141,9 @@ class LimsRunRead(BaseModel):
     created_at: datetime
     created_by: Optional[uuid.UUID]
     modified_at: datetime
+    instrument_type_id: Optional[uuid.UUID] = None
+    instrument_type_name: Optional[str] = None
+    can_substitute_instrument_type: bool = False
     # Convenience for UI lifecycle buttons
     lifecycle_type: Optional[str] = None
     # Any stored import row. Cancel is refused once this is true; fail instead.

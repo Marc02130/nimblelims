@@ -116,6 +116,9 @@ def _template(client, auth_headers) -> str:
                 "transfer_steps": [],
                 "result_columns": [],
                 "mandatory_review_count": 0,
+                "entries": __import__(
+                    "tests.test_flexible_experiment", fromlist=["VALID_TEMPLATE_DEF"]
+                ).VALID_TEMPLATE_DEF["entries"],
             },
         },
         headers=auth_headers,

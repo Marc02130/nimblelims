@@ -24,6 +24,7 @@ class MaintenanceScheduleUpdate(BaseModel):
 
 class FirstDueCreate(BaseModel):
     next_due: date
+    reason: Optional[str] = None
 
 
 class MaintenanceScheduleResponse(BaseModel):
@@ -59,6 +60,7 @@ class MaintenanceEventUpdate(BaseModel):
     active: Optional[bool] = None
     note: Optional[str] = None
     certificate_url: Optional[str] = Field(None, max_length=1024)
+    reason: Optional[str] = None
 
 
 class MaintenanceEventResponse(BaseModel):
@@ -117,6 +119,8 @@ class InstrumentUseCreate(BaseModel):
     lims_run_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
     analysis_id: Optional[UUID] = None
+    entry_id: Optional[UUID] = None
+    slot_key: Optional[str] = None
     used_on: Optional[date] = None
     note: Optional[str] = None
 
@@ -134,6 +138,8 @@ class InstrumentUseResponse(BaseModel):
     lims_run_id: Optional[UUID] = None
     experiment_id: Optional[UUID] = None
     analysis_id: Optional[UUID] = None
+    entry_id: Optional[UUID] = None
+    slot_key: Optional[str] = None
     used_on: date
     note: Optional[str] = None
     active: bool

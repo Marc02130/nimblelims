@@ -144,9 +144,17 @@ class LimsRun(Base):
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    # Per-run type snapshot taken at start. Ad hoc runs may leave this null.
+    instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('list_entries.id'),
+        nullable=True,
+        index=True,
+    )
 
     experiment_template = relationship("ExperimentTemplate")
     analysis = relationship("Analysis", foreign_keys=[analysis_id])
+    instrument_type = relationship("ListEntry", foreign_keys=[instrument_type_id])
     data_rows = relationship(
         "LimsRunData",
         back_populates="lims_run",
@@ -344,6 +352,7 @@ class LimsRunImport(Base):
         index=True,
     )
     filename = Column(String(512), nullable=True)
+    note = Column(Text, nullable=True)
     imported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     imported_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
@@ -352,6 +361,45 @@ class LimsRunImport(Base):
     cro_source = relationship("CroSource")
     parser = relationship("DataParser")
     importer = relationship("User", foreign_keys=[imported_by])
+
+
+class LimsRunTypeSubstitution(Base):
+    """Append-only audit when a run's instrument type is substituted."""
+
+    __tablename__ = "lims_run_type_substitutions"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("lims_runs.id"),
+        nullable=False,
+        index=True,
+    )
+    from_instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=True,
+    )
+    to_instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=False,
+    )
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+    lims_run = relationship("LimsRun")
+    from_instrument_type = relationship(
+        "ListEntry", foreign_keys=[from_instrument_type_id]
+    )
+    to_instrument_type = relationship(
+        "ListEntry", foreign_keys=[to_instrument_type_id]
+    )
 
 
 class RobotWorklistConfig(Base):

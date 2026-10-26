@@ -103,13 +103,9 @@ def template_id(client: TestClient, auth_headers):
         "/v1/experiment-templates",
         json={
             "name": f"Tpl {uuid4().hex[:8]}",
-            "template_definition": {
-                "experiment_name": "Promo",
-                "protocol_steps": ["a"],
-                "transfer_steps": [],
-                "result_columns": [],
-                "mandatory_review_count": 0,
-            },
+            "template_definition": __import__(
+                "tests.test_flexible_experiment", fromlist=["VALID_TEMPLATE_DEF"]
+            ).VALID_TEMPLATE_DEF,
         },
         headers=auth_headers,
     )

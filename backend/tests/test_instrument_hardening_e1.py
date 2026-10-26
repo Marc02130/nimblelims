@@ -735,6 +735,7 @@ def test_m3_admin_override_import(
     assert row.filename == "admin_override"
     assert row.parser_id is None
     assert row.imported_by == test_admin_user.id
+    assert row.note == "type not checked"
 
 
 def test_l4_l5_downgrade_guards():

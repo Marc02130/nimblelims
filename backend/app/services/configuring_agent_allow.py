@@ -53,6 +53,9 @@ INSTRUMENT_BENCH_GAP = (
 INSTRUMENT_SCHEDULE_GAP = (
     "Lab admins or managers set schedules and the first due date in the admin UI"
 )
+INSTRUMENT_SUBSTITUTE_GAP = (
+    "The configuring agent cannot substitute a run's instrument type."
+)
 _INSTRUMENT_BENCH = (
     "/v1/instrument-maintenance-events",
     "/v1/instrument-downtime",
@@ -133,8 +136,34 @@ def verb_for(method: str, path: str, body: Any) -> str:
     return "Update"
 
 
+def _template_sets_run_import_type(body: Any) -> bool:
+    if not isinstance(body, dict):
+        return False
+    definition = body.get("template_definition")
+    if not isinstance(definition, dict):
+        return False
+    entries = definition.get("entries") or []
+    if not isinstance(entries, list):
+        return False
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("entry_type") != "instrument" and entry.get("predefined_entry_key") != "instruments":
+            continue
+        config = entry.get("config") if isinstance(entry.get("config"), dict) else {}
+        for slot in config.get("slots") or []:
+            if not isinstance(slot, dict):
+                continue
+            if slot.get("run_import") is True and slot.get("instrument_type_id"):
+                return True
+    return False
+
+
 def needs_second_confirm(method: str, path: str, body: Any, kind: Optional[str]) -> bool:
     if (kind or "") in HIGH_IMPACT_KINDS:
+        return True
+    path = _norm_path(path)
+    if path.startswith("/v1/experiment-templates") and _template_sets_run_import_type(body):
         return True
     return verb_for(method, path, body) in ("Set inactive", "Amount \u2192 0")
 
@@ -250,6 +279,8 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
     for prefix in _INSTRUMENT_SCHEDULE:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, INSTRUMENT_SCHEDULE_GAP)
+    if "substitute-instrument-type" in path:
+        return Classified(False, "other", None, None, INSTRUMENT_SUBSTITUTE_GAP)
     for prefix, reason in _OUT_OF_SCOPE:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, reason)

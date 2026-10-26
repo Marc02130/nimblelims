@@ -182,8 +182,9 @@ PREDEFINED_ENTRY_DEFAULTS = {
     "instruments": {
         "entry_type": "instrument",
         "name": "Instruments",
-        "description": "Default catalog instruments; the lab tech can add any eligible instrument and record its use",
+        "description": "Named instrument slots. The run_import slot must have a type; other slots may omit it.",
         "config": {
+            "slots": [],
             "allowed_instrument_ids": [],
         },
     },

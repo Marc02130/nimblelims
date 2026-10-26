@@ -107,7 +107,12 @@ def _make_template(db: Session, user_id: uuid.UUID, dr_config: dict | None = Non
     }
     tmpl = ExperimentTemplate(
         name=f"tmpl_{uuid.uuid4().hex[:6]}",
-        template_definition={"dose_response_config": cfg},
+        template_definition={
+            **__import__(
+                "tests.test_flexible_experiment", fromlist=["VALID_TEMPLATE_DEF"]
+            ).VALID_TEMPLATE_DEF,
+            "dose_response_config": cfg,
+        },
         created_by=user_id,
         modified_by=user_id,
     )

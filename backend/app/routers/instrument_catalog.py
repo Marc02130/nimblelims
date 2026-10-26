@@ -241,6 +241,7 @@ def list_instruments(
     instrument_type_id: Optional[UUID] = Query(None),
     status: Optional[str] = Query(None),
     active: Optional[bool] = Query(None),
+    eligible: Optional[bool] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -260,7 +261,10 @@ def list_instruments(
             | (Instrument.asset_tag.ilike(term))
             | (Instrument.model.ilike(term))
         )
-    return [_instrument_response(r) for r in q.order_by(Instrument.name).all()]
+    rows = q.order_by(Instrument.name).all()
+    if eligible is True:
+        rows = [r for r in rows if instrument_block_reason(db, r.id) is None]
+    return [_instrument_response(r) for r in rows]
 
 
 @instruments_router.get("/{instrument_id}", response_model=InstrumentResponse)

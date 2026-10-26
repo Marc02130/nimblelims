@@ -30,6 +30,8 @@ from models.user import User, Role, Permission  # noqa: F401
 # Helpers / fixtures
 # ──────────────────────────────────────────────────────────────────────────────
 
+PLATE_READER_TYPE_ID = "a1000001-0002-4001-8001-000000000001"
+
 VALID_TEMPLATE_DEF = {
     "experiment_name": "Cell Viability",
     "description": "Live/dead cell count",
@@ -54,7 +56,40 @@ VALID_TEMPLATE_DEF = {
     ],
     "acceptance_criteria": "viability > 80%",
     "mandatory_review_count": 0,
+    "entries": [
+        {
+            "entry_type": "instrument",
+            "predefined_entry_key": "instruments",
+            "name": "Instruments",
+            "config": {
+                "slots": [
+                    {
+                        "key": "run_import",
+                        "label": "Import instrument",
+                        "instrument_type_id": PLATE_READER_TYPE_ID,
+                        "required": True,
+                        "run_import": True,
+                    }
+                ]
+            },
+        }
+    ],
 }
+
+
+def typed_run_template_def(base: dict | None = None) -> dict:
+    """Copy ``base`` and ensure a typed run_import slot is present."""
+    out = dict(base or VALID_TEMPLATE_DEF)
+    entries = [dict(e) if isinstance(e, dict) else e for e in (out.get("entries") or [])]
+    has_instrument = any(
+        isinstance(e, dict)
+        and (e.get("entry_type") == "instrument" or e.get("predefined_entry_key") == "instruments")
+        for e in entries
+    )
+    if not has_instrument:
+        entries.extend(VALID_TEMPLATE_DEF["entries"])
+    out["entries"] = entries
+    return out
 
 VALID_PARSER_CONFIG = {
     "columns": [

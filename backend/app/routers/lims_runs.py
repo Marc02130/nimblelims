@@ -33,6 +33,7 @@ from app.schemas.flexible_experiment import (
     LimsRunCreate,
     LimsRunUpdate,
     LimsRunStartRequest,
+    LimsRunSubstituteInstrumentTypeRequest,
     LimsRunRead,
     LimsRunListResponse,
     ImportDataRequest,
@@ -58,7 +59,29 @@ def _run_service(
     return LimsRunService(db, current_user=current_user)
 
 
-def _run_read(run: LimsRun, has_data: Optional[bool] = None) -> LimsRunRead:
+_TERMINAL_STATUSES = {
+    LimsRunStatus.published,
+    LimsRunStatus.failed,
+    LimsRunStatus.canceled,
+}
+
+
+def _can_substitute(run: LimsRun, user: Optional[User]) -> bool:
+    if run.status in _TERMINAL_STATUSES:
+        return False
+    if user is None:
+        return False
+    role = getattr(getattr(user, "role", None), "name", None)
+    if role in ("Administrator", "Lab Manager"):
+        return True
+    return run.created_by == user.id
+
+
+def _run_read(
+    run: LimsRun,
+    has_data: Optional[bool] = None,
+    user: Optional[User] = None,
+) -> LimsRunRead:
     data = LimsRunRead.model_validate(run)
     # Attach lifecycle_type from template for UI buttons
     lt = None
@@ -67,7 +90,17 @@ def _run_read(run: LimsRun, has_data: Optional[bool] = None) -> LimsRunRead:
     if has_data is None:
         session = object_session(run)
         has_data = has_imported_data(session, run.id) if session is not None else False
-    return data.model_copy(update={"lifecycle_type": lt, "has_imported_data": has_data})
+    type_name = None
+    if getattr(run, "instrument_type", None) is not None:
+        type_name = run.instrument_type.name
+    return data.model_copy(
+        update={
+            "lifecycle_type": lt,
+            "has_imported_data": has_data,
+            "instrument_type_name": type_name,
+            "can_substitute_instrument_type": _can_substitute(run, user),
+        }
+    )
 
 
 @router.get("", response_model=LimsRunListResponse)
@@ -89,7 +122,10 @@ def list_runs(
     pages = (total + size - 1) // size if size else 0
     with_data = runs_with_imported_data(service.db, [r.id for r in items])
     return LimsRunListResponse(
-        runs=[_run_read(r, has_data=r.id in with_data) for r in items],
+        runs=[
+            _run_read(r, has_data=r.id in with_data, user=service.current_user)
+            for r in items
+        ],
         total=total,
         page=page,
         size=size,
@@ -103,7 +139,7 @@ def create_run(
     service: LimsRunService = Depends(_run_service),
 ):
     run = service.create_run(data)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.get("/{run_id}", response_model=LimsRunRead)
@@ -112,7 +148,7 @@ def get_run(
     service: LimsRunService = Depends(_run_service),
 ):
     run = service.get_run(run_id)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.patch("/{run_id}", response_model=LimsRunRead)
@@ -123,7 +159,7 @@ def update_run(
 ):
     """Update run fields (e.g. analysis_id for promote-on-publish opt-in)."""
     run = service.update_run(run_id, data)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.patch("/{run_id}/order", response_model=LimsRunRead)
@@ -133,7 +169,7 @@ def order_run(
 ):
     """Transition: draft → ordered. CRO lifecycle only — sends experiment to external lab."""
     run = service.order_run(run_id)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.patch("/{run_id}/start", response_model=LimsRunRead)
@@ -150,8 +186,24 @@ def start_run(
     run = service.start_run(
         run_id,
         sample_ids=body.sample_ids,
+        instrument_type_id=body.instrument_type_id,
     )
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
+
+
+@router.post("/{run_id}/substitute-instrument-type", response_model=LimsRunRead)
+def substitute_instrument_type(
+    run_id: UUID,
+    body: LimsRunSubstituteInstrumentTypeRequest,
+    service: LimsRunService = Depends(_run_service),
+):
+    """Substitute the run's instrument type snapshot. Does not change the template."""
+    run = service.substitute_instrument_type(
+        run_id,
+        instrument_type_id=body.instrument_type_id,
+        reason=body.reason,
+    )
+    return _run_read(run, user=service.current_user)
 
 
 @router.put("/{run_id}/cohort", response_model=LimsRunRead)
@@ -168,7 +220,7 @@ def set_run_cohort(
             detail="sample_ids required",
         )
     run = service.set_cohort(run_id, body.sample_ids, lock=False)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.patch("/{run_id}/results-received", response_model=LimsRunRead)
@@ -178,7 +230,7 @@ def mark_results_received(
 ):
     """Transition: running → results_received. CRO lifecycle only — instrument data returned by CRO."""
     run = service.mark_results_received(run_id)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.patch("/{run_id}/review", response_model=LimsRunRead)
@@ -188,7 +240,7 @@ def submit_for_review(
 ):
     """Transition: running → complete (standard) or results_received → complete (CRO)."""
     run = service.move_to_review(run_id)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.patch("/{run_id}/complete", response_model=LimsRunRead)
@@ -205,7 +257,7 @@ def publish_run(
     """
     service = LimsRunService(db, current_user=publisher)
     run = service.publish_run(run_id)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.get("/{run_id}/promotion/preview")
@@ -231,7 +283,7 @@ def cancel_run(
     Fail it instead.
     """
     run = service.cancel_run(run_id)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.post("/{run_id}/fail", response_model=LimsRunRead)
@@ -245,7 +297,7 @@ def fail_run(
     SOP §13: when the plate fails, every sample on it is rerun. Nothing is deleted.
     """
     run = service.fail_run(run_id, body.reason)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.post("/{run_id}/reject", response_model=LimsRunRead)
@@ -256,7 +308,7 @@ def reject_run(
 ):
     """Same as POST /fail. Kept so existing clients keep working."""
     run = service.fail_run(run_id, body.reason)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.post("/{run_id}/rerun", response_model=LimsRunRead, status_code=201)
@@ -267,7 +319,7 @@ def create_rerun(
 ):
     """Create a draft run that replaces this one and copies its cohort."""
     run = service.create_rerun(run_id, body.name if body else None)
-    return _run_read(run)
+    return _run_read(run, user=service.current_user)
 
 
 @router.get("/{run_id}/value-choices", response_model=List[ValueChoiceRead])
