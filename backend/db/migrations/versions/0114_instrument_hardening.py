@@ -32,6 +32,8 @@ _DOWN_POLICY = """is_admin() OR has_experiment_access() OR EXISTS (
 
 
 def upgrade() -> None:
+    op.execute("GRANT SELECT ON instrument_maintenance_audits TO lims_app")
+    op.execute("GRANT SELECT ON instrument_type_defaults TO lims_app")
     op.execute("REVOKE UPDATE ON instrument_maintenance_audits FROM lims_app")
     op.execute("REVOKE INSERT, UPDATE ON instrument_type_defaults FROM lims_app")
     op.execute("REVOKE DELETE ON instrument_maintenance_audits FROM lims_app")
