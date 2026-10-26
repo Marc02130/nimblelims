@@ -100,6 +100,19 @@ interface Downtime {
   active: boolean;
 }
 
+interface MaintenanceEvent {
+  id: string;
+  instrument_id: string;
+  schedule_id?: string | null;
+  performed_on: string;
+  performed_by_user_id?: string | null;
+  performed_by_vendor_id?: string | null;
+  passed: boolean;
+  certificate_url?: string | null;
+  note?: string | null;
+  active: boolean;
+}
+
 interface ClientOption {
   id: string;
   name: string;
@@ -110,7 +123,7 @@ interface ListEntryOption {
   name: string;
 }
 
-type TabKey = 'types' | 'instances' | 'cro' | 'maintenance' | 'downtime';
+type TabKey = 'types' | 'instances' | 'cro' | 'maintenance' | 'events' | 'downtime';
 
 const emptyTypeForm = { name: '', description: '', active: true };
 const emptyInstrumentForm = {
@@ -146,6 +159,16 @@ const emptyDowntimeForm = {
   note: '',
   active: true,
 };
+const emptyEventForm = {
+  instrument_id: '',
+  schedule_id: '',
+  performed_on: '',
+  passed: true,
+  certificate_url: '',
+  note: '',
+  active: true,
+  reason: '',
+};
 
 const STATUSES = [
   { value: 'in_service', label: 'In service' },
@@ -155,15 +178,18 @@ const STATUSES = [
 
 const AWAITING_FIRST_DUE = 'Awaiting first due date';
 
-const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
-  maintenanceOnly = false,
-}) => {
+const InstrumentCatalogManagement: React.FC<{
+  maintenanceOnly?: boolean;
+  eventsOnly?: boolean;
+}> = ({ maintenanceOnly = false, eventsOnly = false }) => {
   const { hasPermission, user } = useUser();
   const canEdit = hasPermission('config:edit');
   const canBench = hasPermission('experiment:manage');
   const canManageSchedules = user?.role === 'Administrator' || user?.role === 'Lab Manager';
 
-  const [tab, setTab] = useState<TabKey>(maintenanceOnly ? 'maintenance' : 'types');
+  const [tab, setTab] = useState<TabKey>(
+    eventsOnly ? 'events' : maintenanceOnly ? 'maintenance' : 'types'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +199,7 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [croSources, setCroSources] = useState<CroSource[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [events, setEvents] = useState<MaintenanceEvent[]>([]);
   const [downtime, setDowntime] = useState<Downtime[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -186,6 +213,7 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
   const [croForm, setCroForm] = useState(emptyCroForm);
   const [scheduleForm, setScheduleForm] = useState(emptyScheduleForm);
   const [downtimeForm, setDowntimeForm] = useState(emptyDowntimeForm);
+  const [eventForm, setEventForm] = useState(emptyEventForm);
   const [submitting, setSubmitting] = useState(false);
   const [stopReason, setStopReason] = useState<string | null>(null);
   const [firstDueId, setFirstDueId] = useState<string | null>(null);
@@ -195,18 +223,27 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
     try {
       setLoading(true);
       setError(null);
-      const [typesData, instrumentsData, croData, schedData, downData, vendorData] = await Promise.all([
-        apiService.getInstrumentTypes(),
+      const optional = async <T,>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await fn();
+        } catch {
+          return fallback;
+        }
+      };
+      const [instrumentsData, schedData, eventData, typesData, croData, downData, vendorData] = await Promise.all([
         apiService.getInstruments(),
-        apiService.getCroSources(),
         apiService.getInstrumentMaintenanceSchedules({ include_inactive: true }),
-        apiService.getInstrumentDowntime({ include_inactive: true }),
-        apiService.getVendors({ active: true }),
+        apiService.getInstrumentMaintenanceEvents({ include_voided: true }),
+        optional(() => apiService.getInstrumentTypes(), []),
+        optional(() => apiService.getCroSources(), []),
+        optional(() => apiService.getInstrumentDowntime({ include_inactive: true }), []),
+        optional(() => apiService.getVendors({ active: true }), []),
       ]);
       setTypes(typesData || []);
       setInstruments(instrumentsData || []);
       setCroSources(croData || []);
       setSchedules(schedData || []);
+      setEvents(eventData || []);
       setDowntime(downData || []);
       setVendors((vendorData || []).map((v: any) => ({ id: v.id, name: v.name })));
       try {
@@ -280,6 +317,14 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
     () => filterBySearch(downtime, (d) => `${d.instrument_name || ''} ${d.reason_name || ''}`),
     [downtime, searchTerm]
   );
+  const filteredEvents = useMemo(
+    () =>
+      filterBySearch(events, (e) => {
+        const inst = instruments.find((i) => i.id === e.instrument_id);
+        return `${inst?.name || ''} ${e.note || ''} ${e.passed ? 'pass' : 'fail'}`;
+      }),
+    [events, instruments, searchTerm]
+  );
 
   const openCreate = () => {
     setEditingId(null);
@@ -288,6 +333,10 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
     setCroForm(emptyCroForm);
     setScheduleForm(emptyScheduleForm);
     setDowntimeForm(emptyDowntimeForm);
+    setEventForm({
+      ...emptyEventForm,
+      performed_on: new Date().toISOString().slice(0, 10),
+    });
     setStopReason(null);
     setDialogOpen(true);
   };
@@ -328,6 +377,17 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
         interval_days: String(row.interval_days),
         service_vendor_id: row.service_vendor_id || '',
         active: row.active,
+      });
+    } else if (tab === 'events') {
+      setEventForm({
+        instrument_id: row.instrument_id,
+        schedule_id: row.schedule_id || '',
+        performed_on: row.performed_on || '',
+        passed: Boolean(row.passed),
+        certificate_url: row.certificate_url || '',
+        note: row.note || '',
+        active: row.active,
+        reason: '',
       });
     } else {
       setDowntimeForm({
@@ -398,6 +458,33 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
         if (editingId) await apiService.updateInstrumentMaintenanceSchedule(editingId, payload);
         else await apiService.createInstrumentMaintenanceSchedule(payload);
         setSuccess(editingId ? 'Schedule updated' : 'Schedule created');
+      } else if (tab === 'events') {
+        if (editingId) {
+          if (!canManageSchedules) throw new Error('Only a Lab Manager or Administrator can edit an event');
+          await apiService.updateInstrumentMaintenanceEvent(editingId, {
+            note: eventForm.note || undefined,
+            certificate_url: eventForm.certificate_url.trim() || undefined,
+            active: eventForm.active,
+            reason: eventForm.reason.trim() || undefined,
+          });
+          setSuccess(eventForm.active ? 'Event updated' : 'Event voided');
+        } else {
+          if (!canBench) throw new Error('Permission experiment:manage is required to log an event');
+          if (!eventForm.instrument_id || !eventForm.performed_on) {
+            throw new Error('Instrument and performed on are required');
+          }
+          if (!user?.id) throw new Error('Sign in to log an event');
+          await apiService.createInstrumentMaintenanceEvent({
+            instrument_id: eventForm.instrument_id,
+            schedule_id: eventForm.schedule_id || undefined,
+            performed_on: eventForm.performed_on,
+            performed_by_user_id: user.id,
+            passed: eventForm.passed,
+            certificate_url: eventForm.certificate_url.trim() || undefined,
+            note: eventForm.note.trim() || undefined,
+          });
+          setSuccess('Event logged');
+        }
       } else {
         const payload = {
           instrument_id: downtimeForm.instrument_id,
@@ -473,7 +560,27 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
   };
 
   const canActOnTab =
-    tab === 'maintenance' ? canManageSchedules : tab === 'downtime' ? canBench || canEdit : canEdit;
+    tab === 'maintenance' || tab === 'events'
+      ? canManageSchedules
+      : tab === 'downtime'
+        ? canBench || canEdit
+        : canEdit;
+
+  const voidEvent = async (row: MaintenanceEvent) => {
+    if (!canManageSchedules) return;
+    try {
+      await apiService.updateInstrumentMaintenanceEvent(row.id, { active: false });
+      setSuccess('Event voided');
+      await loadAll();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(
+        (detail && typeof detail === 'object' && detail.message) ||
+          err.message ||
+          (typeof detail === 'string' ? detail : 'Could not void the event')
+      );
+    }
+  };
 
   const actionsCol = (
     onEdit: (p: GridRowParams) => void,
@@ -579,6 +686,33 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
     }),
   ];
 
+  const eventColumns: GridColDef[] = [
+    {
+      field: 'instrument_name',
+      headerName: 'Instrument',
+      flex: 1,
+      minWidth: 140,
+      valueGetter: (_value, row) => instruments.find((i) => i.id === row.instrument_id)?.name || '',
+    },
+    { field: 'performed_on', headerName: 'Performed on', width: 140 },
+    {
+      field: 'passed',
+      headerName: 'Result',
+      width: 110,
+      renderCell: (params) => (
+        <Chip size="small" label={params.value ? 'Pass' : 'Fail'} color={params.value ? 'success' : 'warning'} />
+      ),
+    },
+    { field: 'note', headerName: 'Note', flex: 1, minWidth: 140 },
+    activeCol,
+    actionsCol((p) => openEdit(p.row), (p) => {
+      if (!canManageSchedules || !p.row.active) return [];
+      return [
+        <GridActionsCellItem key="void" label="Void" showInMenu onClick={() => voidEvent(p.row)} />,
+      ];
+    }),
+  ];
+
   const downtimeColumns: GridColDef[] = [
     { field: 'instrument_name', headerName: 'Instrument', flex: 1, minWidth: 140 },
     { field: 'reason_name', headerName: 'Reason', width: 180 },
@@ -598,7 +732,9 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
           ? 'CRO sources'
           : tab === 'maintenance'
             ? 'Maintenance'
-            : 'Downtime';
+            : tab === 'events'
+              ? 'Events'
+              : 'Downtime';
 
   const rows =
     tab === 'types'
@@ -609,7 +745,9 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
           ? filteredCro
           : tab === 'maintenance'
             ? filteredSchedules
-            : filteredDowntime;
+            : tab === 'events'
+              ? filteredEvents
+              : filteredDowntime;
   const columns =
     tab === 'types'
       ? typeColumns
@@ -619,25 +757,37 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
           ? croColumns
           : tab === 'maintenance'
             ? scheduleColumns
-            : downtimeColumns;
+            : tab === 'events'
+              ? eventColumns
+              : downtimeColumns;
 
   const canCreate =
-    tab === 'maintenance' ? canManageSchedules : tab === 'downtime' ? canBench || canEdit : canEdit;
+    tab === 'events'
+      ? canBench
+      : tab === 'maintenance'
+        ? canManageSchedules
+        : tab === 'downtime'
+          ? canBench || canEdit
+          : canEdit;
 
   return (
     <FillHeightPage>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-        <Typography variant="h5">{maintenanceOnly ? 'Instrument maintenance' : 'Instruments'}</Typography>
+        <Typography variant="h5">
+          {eventsOnly ? 'Maintenance events' : maintenanceOnly ? 'Instrument maintenance' : 'Instruments'}
+        </Typography>
         {canCreate && (
           <Button startIcon={<Add />} variant="contained" onClick={openCreate}>
-            Add {title.replace(/s$/, '')}
+            {tab === 'events' ? 'Log event' : `Add ${title.replace(/s$/, '')}`}
           </Button>
         )}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {maintenanceOnly
-          ? 'Lab managers and administrators set schedules and the first due date. Retire a schedule with Active off; there is no delete.'
-          : 'Types are a configurable list. Add a type or retire it with Active off — there is no delete. A run is not locked to one type. Vendor and model live on each instrument.'}
+        {eventsOnly
+          ? 'Log a maintenance event. Edit and void are Lab Manager and Administrator only.'
+          : maintenanceOnly
+            ? 'Lab managers and administrators set schedules and the first due date. Retire a schedule with Active off; there is no delete. A technician may log an event and cannot edit or void one.'
+            : 'Types are a configurable list. Add a type or retire it with Active off — there is no delete. A run is not locked to one type. Vendor and model live on each instrument.'}
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError(null)}>
@@ -654,13 +804,20 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
           {success}
         </Alert>
       )}
-      {!maintenanceOnly && (
+      {!maintenanceOnly && !eventsOnly && (
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
           <Tab value="types" label="Types" />
           <Tab value="instances" label="Instruments" />
           <Tab value="cro" label="CRO sources" />
           <Tab value="maintenance" label="Maintenance" />
+          <Tab value="events" label="Events" />
           <Tab value="downtime" label="Downtime" />
+        </Tabs>
+      )}
+      {maintenanceOnly && (
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
+          <Tab value="maintenance" label="Maintenance" />
+          <Tab value="events" label="Events" />
         </Tabs>
       )}
       <TextField
@@ -683,7 +840,7 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingId ? 'Edit' : 'Add'} {title.replace(/s$/, '')}
+          {editingId ? 'Edit' : tab === 'events' ? 'Log' : 'Add'} {title.replace(/s$/, '')}
         </DialogTitle>
         <DialogContent>
           {tab === 'types' && (
@@ -895,6 +1052,99 @@ const InstrumentCatalogManagement: React.FC<{ maintenanceOnly?: boolean }> = ({
                 }
                 label="Active"
               />
+            </>
+          )}
+          {tab === 'events' && (
+            <>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Instrument</InputLabel>
+                <Select
+                  label="Instrument"
+                  value={eventForm.instrument_id}
+                  onChange={(e) =>
+                    setEventForm({ ...eventForm, instrument_id: String(e.target.value), schedule_id: '' })
+                  }
+                  disabled={Boolean(editingId)}
+                >
+                  {instruments.map((i) => (
+                    <MenuItem key={i.id} value={i.id}>
+                      {i.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Schedule</InputLabel>
+                <Select
+                  label="Schedule"
+                  value={eventForm.schedule_id}
+                  onChange={(e) => setEventForm({ ...eventForm, schedule_id: String(e.target.value) })}
+                  disabled={Boolean(editingId)}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {schedules
+                    .filter((s) => !eventForm.instrument_id || s.instrument_id === eventForm.instrument_id)
+                    .map((s) => (
+                      <MenuItem key={s.id} value={s.id}>
+                        {s.kind_name || s.id} ({s.instrument_name || s.instrument_id})
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Performed on"
+                type="date"
+                fullWidth
+                margin="normal"
+                InputLabelProps={{ shrink: true }}
+                value={eventForm.performed_on}
+                onChange={(e) => setEventForm({ ...eventForm, performed_on: e.target.value })}
+                disabled={Boolean(editingId)}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={eventForm.passed}
+                    onChange={(e) => setEventForm({ ...eventForm, passed: e.target.checked })}
+                    disabled={Boolean(editingId)}
+                  />
+                }
+                label="Passed"
+              />
+              <TextField
+                label="Certificate URL"
+                fullWidth
+                margin="normal"
+                value={eventForm.certificate_url}
+                onChange={(e) => setEventForm({ ...eventForm, certificate_url: e.target.value })}
+              />
+              <TextField
+                label="Note"
+                fullWidth
+                margin="normal"
+                value={eventForm.note}
+                onChange={(e) => setEventForm({ ...eventForm, note: e.target.value })}
+              />
+              {editingId && canManageSchedules && (
+                <>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={eventForm.active}
+                        onChange={(e) => setEventForm({ ...eventForm, active: e.target.checked })}
+                      />
+                    }
+                    label="Active"
+                  />
+                  <TextField
+                    label="Reason"
+                    fullWidth
+                    margin="normal"
+                    value={eventForm.reason}
+                    onChange={(e) => setEventForm({ ...eventForm, reason: e.target.value })}
+                  />
+                </>
+              )}
             </>
           )}
           {tab === 'downtime' && (

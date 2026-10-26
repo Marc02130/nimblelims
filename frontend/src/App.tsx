@@ -372,6 +372,16 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/instrument-events"
+          element={
+            hasPermission('experiment:manage') ? (
+              <InstrumentCatalogManagement eventsOnly />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          }
+        />
+        <Route
           path="/admin/reagents"
           element={
             hasPermission('config:edit') ? (

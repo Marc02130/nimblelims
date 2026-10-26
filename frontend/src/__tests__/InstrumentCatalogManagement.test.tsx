@@ -52,6 +52,9 @@ jest.mock('../services/apiService', () => ({
     getInstruments: jest.fn(),
     getCroSources: jest.fn(),
     getInstrumentMaintenanceSchedules: jest.fn(),
+    getInstrumentMaintenanceEvents: jest.fn(),
+    createInstrumentMaintenanceEvent: jest.fn(),
+    updateInstrumentMaintenanceEvent: jest.fn(),
     getInstrumentDowntime: jest.fn(),
     getVendors: jest.fn(),
     getClients: jest.fn(),
@@ -63,10 +66,20 @@ jest.mock('../services/apiService', () => ({
   },
 }));
 
+const userState = {
+  user: { id: '1', username: 'admin', role: 'Administrator', permissions: ['config:edit', 'experiment:manage'] } as {
+    id: string;
+    username: string;
+    role: string;
+    permissions: string[];
+  },
+  hasPermission: (_perm?: string) => true,
+};
+
 jest.mock('../contexts/UserContext', () => ({
   useUser: () => ({
-    user: { id: '1', username: 'admin', role: 'Administrator', permissions: ['config:edit'] },
-    hasPermission: () => true,
+    user: userState.user,
+    hasPermission: userState.hasPermission,
     loading: false,
   }),
 }));
@@ -92,7 +105,15 @@ beforeEach(() => {
   ]);
   api.getCroSources.mockResolvedValue([]);
   api.getInstrumentMaintenanceSchedules.mockResolvedValue([]);
+  api.getInstrumentMaintenanceEvents.mockResolvedValue([]);
   api.getInstrumentDowntime.mockResolvedValue([]);
+  userState.user = {
+    id: '1',
+    username: 'admin',
+    role: 'Administrator',
+    permissions: ['config:edit', 'experiment:manage'],
+  };
+  userState.hasPermission = () => true;
   api.getVendors.mockResolvedValue([{ id: 'v1', name: 'Thermo' }]);
   api.getClients.mockResolvedValue([]);
   api.getListEntries.mockImplementation(async (name: string) => {
@@ -111,6 +132,7 @@ describe('InstrumentCatalogManagement', () => {
     expect(screen.getByText('Thermo')).toBeInTheDocument();
     expect(screen.getByText('in_service')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Maintenance' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Downtime' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Add Instrument/i }));
@@ -172,5 +194,51 @@ describe('InstrumentCatalogManagement', () => {
     expect(screen.queryByRole('tab', { name: 'Instruments' })).not.toBeInTheDocument();
     expect(await screen.findByText('PR-1')).toBeInTheDocument();
     expect(screen.getByText('Awaiting first due date')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Events' })).toBeInTheDocument();
+  });
+
+  test('tech can log an event and does not see edit or void', async () => {
+    userState.user = {
+      id: 'tech-1',
+      username: 'lab-tech',
+      role: 'Lab Technician',
+      permissions: ['experiment:manage'],
+    };
+    userState.hasPermission = (perm?: string) => perm === 'experiment:manage';
+    api.getInstrumentMaintenanceEvents.mockResolvedValue([
+      {
+        id: 'e1',
+        instrument_id: 'i1',
+        performed_on: '2026-10-26',
+        passed: true,
+        note: 'PM done',
+        active: true,
+      },
+    ]);
+    wrap(<InstrumentCatalogManagement eventsOnly />);
+    expect(await screen.findByText('Maintenance events')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log event' })).toBeInTheDocument();
+    expect(screen.getByText('PM done')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Void' })).not.toBeInTheDocument();
+  });
+
+  test('manager can void an event from the events grid', async () => {
+    api.updateInstrumentMaintenanceEvent.mockResolvedValue({ id: 'e1', active: false });
+    api.getInstrumentMaintenanceEvents.mockResolvedValue([
+      {
+        id: 'e1',
+        instrument_id: 'i1',
+        performed_on: '2026-10-26',
+        passed: true,
+        note: 'PM done',
+        active: true,
+      },
+    ]);
+    wrap(<InstrumentCatalogManagement eventsOnly />);
+    expect(await screen.findByRole('button', { name: 'Void' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Void' }));
+    expect(await screen.findByText('Event voided')).toBeInTheDocument();
+    expect(api.updateInstrumentMaintenanceEvent).toHaveBeenCalledWith('e1', { active: false });
   });
 });

@@ -457,6 +457,43 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileClose, collapsed 
             </ListItem>
           );
         })()}
+        {hasExperimentsAccess && (() => {
+          const active = isActive('/instrument-events');
+          const listItemButton = (
+            <ListItemButton
+              selected={active}
+              onClick={() => handleNavigation('/instrument-events')}
+              aria-label="Navigate to Maintenance events"
+              aria-current={active ? 'page' : undefined}
+              sx={{
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                minHeight: 48,
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  color: active ? 'primary.main' : 'inherit',
+                  minWidth: collapsed ? 0 : 40,
+                  justifyContent: 'center',
+                }}
+              >
+                <PrecisionManufacturingIcon />
+              </ListItemIcon>
+              {!collapsed && <ListItemText primary="Maintenance events" />}
+            </ListItemButton>
+          );
+          return (
+            <ListItem key="instrument-events" disablePadding>
+              {collapsed ? (
+                <Tooltip title="Maintenance events" placement="right" arrow>
+                  {listItemButton}
+                </Tooltip>
+              ) : (
+                listItemButton
+              )}
+            </ListItem>
+          );
+        })()}
         {coreItems.filter((item) => !item.permission || hasPermission(item.permission)).length === 0 && (
           <ListItem disablePadding>
             <Typography variant="body2" sx={{ px: 2, py: 1, color: 'text.secondary', fontStyle: 'italic' }}>
