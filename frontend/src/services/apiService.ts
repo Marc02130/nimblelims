@@ -951,6 +951,7 @@ export class ApiService {
     instrument_type_id?: string;
     status?: string;
     active?: boolean;
+    eligible?: boolean;
   }) {
     const response: AxiosResponse = await this.api.get('/v1/instruments', { params });
     return response.data;
@@ -2501,7 +2502,11 @@ export class ApiService {
 
   async startLimsRun(
     id: string,
-    body?: { sample_ids?: string[]; acknowledge_no_analysis?: boolean },
+    body?: {
+      sample_ids?: string[];
+      instrument_type_id?: string;
+      acknowledge_no_analysis?: boolean;
+    },
   ) {
     const response: AxiosResponse = await this.api.patch(
       `/v1/lims-runs/${id}/start`,
@@ -2542,6 +2547,17 @@ export class ApiService {
 
   async cancelLimsRun(id: string) {
     const response: AxiosResponse = await this.api.patch(`/v1/lims-runs/${id}/cancel`);
+    return response.data;
+  }
+
+  async substituteLimsRunInstrumentType(
+    id: string,
+    data: { instrument_type_id: string; reason: string },
+  ) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/lims-runs/${id}/substitute-instrument-type`,
+      data,
+    );
     return response.data;
   }
 

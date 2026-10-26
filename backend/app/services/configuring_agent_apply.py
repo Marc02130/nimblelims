@@ -317,6 +317,17 @@ def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> 
         raise CannotExpress(
             "Lab admins or managers set schedules and the first due date in the admin UI"
         )
+    if "substitute-instrument-type" in path:
+        raise CannotExpress(
+            "The configuring agent cannot substitute a run's instrument type."
+        )
+    if path.startswith("/v1/lims-runs"):
+        raise CannotExpress("Run analysis and dose-response are not configuration.")
+    if path == "/v1/instrument-uses" or path.startswith("/v1/instrument-uses/"):
+        raise CannotExpress(
+            "Instrument maintenance events, downtime and instrument use are recorded at the bench, "
+            "not by this configuration run."
+        )
     if path.startswith("/users/"):
         return _user_role(db, user, path, body)
     if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):

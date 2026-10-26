@@ -105,6 +105,7 @@ class LimsRunImportRead(BaseModel):
     cro_source_id: Optional[UUID]
     parser_id: Optional[UUID]
     filename: Optional[str]
+    note: Optional[str] = None
     imported_at: datetime
     imported_by: Optional[UUID]
     parser_name: Optional[str] = None

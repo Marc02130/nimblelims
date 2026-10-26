@@ -60,6 +60,7 @@ from .flexible_experiment import (
     ParserAnalysis,
     ParserSetupFile,
     LimsRunImport,
+    LimsRunTypeSubstitution,
     RobotWorklistConfig,
     SopParseJob,
     SopParseJobStatus,

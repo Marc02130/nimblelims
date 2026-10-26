@@ -68,6 +68,7 @@ def test_schema_catalog_registers_new_tables_and_drops_types():
         "instrument_downtime",
         "instrument_uses",
         "instrument_type_defaults",
+        "lims_run_type_substitutions",
     ):
         assert name in schema_catalog.LAB_TABLES
         assert schema_catalog.shown_in_schema(name, schema_catalog.kind_for(name))
@@ -98,6 +99,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
                         "instrument_type_defaults",
                         "instrument_maintenance_audits",
                         "instrument_schedule_audits",
+                        "lims_run_type_substitutions",
                     ]
                 },
             ).all()
@@ -138,6 +140,7 @@ def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
         "instrument_types_legacy",
         "instrument_maintenance_audits",
         "instrument_schedule_audits",
+        "lims_run_type_substitutions",
     )
     with migrated_engine.connect() as conn:
         for table in tables:
@@ -554,6 +557,7 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
     with migrated_engine.begin() as conn:
         conn.execute(text("DELETE FROM instrument_maintenance_audits"))
         conn.execute(text("DELETE FROM instrument_schedule_audits"))
+        conn.execute(text("DELETE FROM lims_run_type_substitutions"))
         conn.execute(text("DELETE FROM lims_run_imports WHERE filename = 'admin_override'"))
     type_id = uuid.uuid4()
     inst_id = uuid.uuid4()

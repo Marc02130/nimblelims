@@ -3,8 +3,9 @@
 Schedule create, edit, and first-due need Administrator or Lab Manager.
 Events, downtime, and uses are bench work (experiment:manage). Passing
 events recompute next_due only after a lab admin or manager has set the
-first due date. Voiding the only passing event returns the item to
-awaiting first due date.
+first due date. Voiding the only passing event (which clears first due)
+is Administrator / Lab Manager only. A technician may still void a
+non-last passing event or a failed event.
 """
 from datetime import date, timedelta
 from typing import List, Optional
@@ -95,6 +96,7 @@ def _write_schedule_audit(
     previous_value=None,
     new_value=None,
     overdue: Optional[bool] = None,
+    reason: Optional[str] = None,
 ) -> None:
     db.add(
         InstrumentScheduleAudit(
@@ -105,9 +107,34 @@ def _write_schedule_audit(
             previous_value=_audit_text(previous_value),
             new_value=_audit_text(new_value),
             overdue=overdue,
+            reason=reason,
             created_by=user.id,
         )
     )
+
+
+def _void_clears_first_due(db: Session, event: InstrumentMaintenanceEvent) -> bool:
+    """True when voiding this event would return the item to awaiting first due."""
+    if event.passed is not True or event.active is not True or event.schedule_id is None:
+        return False
+    schedule = (
+        db.query(InstrumentMaintenanceSchedule)
+        .filter(InstrumentMaintenanceSchedule.id == event.schedule_id)
+        .first()
+    )
+    if schedule is None or (schedule.next_due is None and schedule.last_done is None):
+        return False
+    other = (
+        db.query(InstrumentMaintenanceEvent.id)
+        .filter(
+            InstrumentMaintenanceEvent.schedule_id == event.schedule_id,
+            InstrumentMaintenanceEvent.id != event.id,
+            InstrumentMaintenanceEvent.active.is_(True),
+            InstrumentMaintenanceEvent.passed.is_(True),
+        )
+        .first()
+    )
+    return other is None
 
 
 def _require_http_certificate(url: Optional[str]) -> None:
@@ -276,9 +303,30 @@ def update_schedule(
     current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
-    row = db.query(InstrumentMaintenanceSchedule).filter(
-        InstrumentMaintenanceSchedule.id == schedule_id
-    ).first()
+    from sqlalchemy.exc import OperationalError
+    from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
+
+    try:
+        row = (
+            db.query(InstrumentMaintenanceSchedule)
+            .filter(InstrumentMaintenanceSchedule.id == schedule_id)
+            .with_for_update()
+            .first()
+        )
+    except OperationalError as exc:
+        if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+            raise
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "schedule_busy",
+                "message": (
+                    "Another change to this schedule is in progress. "
+                    "Wait for it to finish, then try again."
+                ),
+            },
+        ) from exc
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
     data = explicit_updates(body, row, refuse_null={"active", "interval_days", "kind_id"})
@@ -290,6 +338,8 @@ def update_schedule(
     overdue_at_time = _schedule_overdue(row)
     previous_active = row.active
     previous_interval = row.interval_days
+    previous_kind = row.kind_id
+    previous_vendor = row.service_vendor_id
     for k, v in data.items():
         setattr(row, k, v)
     # A new interval applies from the next passing event. Recomputing now
@@ -316,6 +366,28 @@ def update_schedule(
             user=current_user,
             previous_value=previous_interval,
             new_value=row.interval_days,
+            overdue=overdue_at_time,
+        )
+    if "kind_id" in data and row.kind_id != previous_kind:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_kind",
+            user=current_user,
+            previous_value=previous_kind,
+            new_value=row.kind_id,
+            overdue=overdue_at_time,
+        )
+    if "service_vendor_id" in data and row.service_vendor_id != previous_vendor:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_vendor",
+            user=current_user,
+            previous_value=previous_vendor,
+            new_value=row.service_vendor_id,
             overdue=overdue_at_time,
         )
     row.modified_by = current_user.id
@@ -357,6 +429,7 @@ def set_first_due(
         previous_value=None,
         new_value=body.next_due,
         overdue=_schedule_overdue(row),
+        reason=body.reason,
     )
     _commit(db, row, "Could not set the first due date")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
@@ -461,11 +534,25 @@ def update_event(
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance event not found")
     data = explicit_updates(body, row, refuse_null={"active"})
+    data.pop("reason", None)
     if "certificate_url" in data:
         _require_http_certificate(data["certificate_url"])
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
     voiding = "active" in data and data["active"] is False and row.active is True
+    if voiding and _void_clears_first_due(db, row):
+        role = getattr(getattr(current_user, "role", None), "name", None)
+        if role not in ("Administrator", "Lab Manager"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "only_passing_event_void_forbidden",
+                    "message": (
+                        "Only an Administrator or Lab Manager can void the "
+                        "only passing event (that clears the first due date)."
+                    ),
+                },
+            )
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -492,6 +579,7 @@ def update_event(
                     previous_value=prior_next_due,
                     new_value=schedule.next_due,
                     overdue=overdue_at_time,
+                    reason=body.reason,
                 )
     elif voiding:
         _write_schedule_audit(
@@ -504,6 +592,7 @@ def update_event(
             previous_value=None,
             new_value=None,
             overdue=None,
+            reason=body.reason,
         )
     try:
         db.commit()
@@ -799,6 +888,76 @@ def update_experiment_instrument(
 
 # -------------------------------------------------------------------- uses ---
 
+def _slots_for_use(db: Session, body: InstrumentUseCreate):
+    from app.services.instrument_slots import slots_from_config, slots_from_template
+
+    if body.experiment_id is not None:
+        entry = None
+        if body.entry_id is not None:
+            entry = (
+                db.query(Entry)
+                .filter(Entry.id == body.entry_id, Entry.experiment_id == body.experiment_id)
+                .first()
+            )
+        if entry is None:
+            entry = _instrument_entry_for(db, body.experiment_id)
+        if entry is None:
+            return []
+        return slots_from_config(entry.config)
+    if body.lims_run_id is not None:
+        run = db.query(LimsRun).filter(LimsRun.id == body.lims_run_id).first()
+        if run is None or run.experiment_template is None:
+            return []
+        return slots_from_template(run.experiment_template.template_definition)
+    return []
+
+
+def _assert_use_slot(db: Session, body: InstrumentUseCreate) -> None:
+    from app.services.instrument_slots import (
+        INSTRUMENT_SLOT_NOT_FOUND,
+        assert_slot_type_matches_instrument,
+    )
+
+    slots = _slots_for_use(db, body)
+    if not slots:
+        return
+    if not body.slot_key:
+        _refuse(
+            INSTRUMENT_SLOT_NOT_FOUND,
+            "This experiment or run uses instrument slots. Send slot_key.",
+        )
+    slot = next((s for s in slots if str(s.get("key") or "") == body.slot_key), None)
+    if slot is None:
+        _refuse(
+            INSTRUMENT_SLOT_NOT_FOUND,
+            f"Instrument slot '{body.slot_key}' is not on this template.",
+        )
+    assert_slot_type_matches_instrument(db, slot=slot, instrument_id=body.instrument_id)
+
+
+def _void_previous_slot_pick(db: Session, body: InstrumentUseCreate, user_id: UUID) -> None:
+    if not body.slot_key:
+        return
+    q = db.query(InstrumentUse).filter(
+        InstrumentUse.slot_key == body.slot_key,
+        InstrumentUse.active.is_(True),
+    )
+    if body.entry_id is not None:
+        q = q.filter(InstrumentUse.entry_id == body.entry_id)
+    elif body.experiment_id is not None:
+        q = q.filter(InstrumentUse.experiment_id == body.experiment_id)
+    elif body.lims_run_id is not None:
+        q = q.filter(InstrumentUse.lims_run_id == body.lims_run_id)
+    else:
+        return
+    rows = q.all()
+    for old in rows:
+        old.active = False
+        old.modified_by = user_id
+    if rows:
+        db.flush()
+
+
 def _use_out(row: InstrumentUse) -> InstrumentUseResponse:
     out = InstrumentUseResponse.model_validate(row)
     out.instrument_name = row.instrument.name if row.instrument else None
@@ -843,7 +1002,9 @@ def record_instrument_use(
         raise HTTPException(status_code=404, detail="Experiment not found")
     if body.experiment_id is not None:
         _refuse_instrument_not_on_experiment(db, body.experiment_id, body.instrument_id)
+    _assert_use_slot(db, body)
     refuse_ineligible_instrument(db, body.instrument_id)
+    _void_previous_slot_pick(db, body, current_user.id)
     payload = body.model_dump()
     payload["used_on"] = current_lab_day()
     row = InstrumentUse(

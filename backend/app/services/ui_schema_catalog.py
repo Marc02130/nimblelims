@@ -55,6 +55,7 @@ LAB_TABLES: tuple[str, ...] = (
     "instrument_downtime",
     "instrument_uses",
     "instrument_type_defaults",
+    "lims_run_type_substitutions",
     # Reviewer pick of which run's value is accepted (ELISA rerun).
     "result_acceptances",
 )
@@ -130,6 +131,7 @@ DISPLAY_NAMES: Mapping[str, str] = {
     "instrument_downtime": "Instrument downtime",
     "instrument_uses": "Instrument uses",
     "instrument_type_defaults": "Instrument type defaults",
+    "lims_run_type_substitutions": "LIMS run type substitutions",
     "result_acceptances": "Result acceptances",
     "container_types": "Container types",
     "sample_type_transitions": "Sample type transitions",

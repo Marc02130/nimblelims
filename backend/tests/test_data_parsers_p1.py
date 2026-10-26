@@ -131,7 +131,9 @@ def test_create_run_requires_analysis(client, auth_headers, db_session):
 
     tpl = ExperimentTemplate(
         name=f"Tpl-{uuid.uuid4().hex[:6]}",
-        template_definition={"lifecycle_type": "standard", "protocol_steps": []},
+        template_definition=__import__(
+            "tests.test_flexible_experiment", fromlist=["VALID_TEMPLATE_DEF"]
+        ).VALID_TEMPLATE_DEF,
     )
     db_session.add(tpl)
     db_session.commit()

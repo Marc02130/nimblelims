@@ -333,6 +333,7 @@ class DataParserService:
         instrument_id: Optional[uuid.UUID],
         cro_source_id: Optional[uuid.UUID],
         parser_id: Optional[uuid.UUID],
+        run_instrument_type_id: Optional[uuid.UUID] = None,
     ) -> DataParser:
         has_i = instrument_id is not None
         has_c = cro_source_id is not None
@@ -349,6 +350,7 @@ class DataParserService:
             p = self.get(parser_id)
             if not p.active:
                 raise HTTPException(400, "Parser version is not active")
+            self._refuse_parser_type_mismatch(p, run_instrument_type_id)
             if instrument_id:
                 exact = p.instrument_id == instrument_id
                 type_match = (
@@ -392,8 +394,42 @@ class DataParserService:
                 "No active data parser for this analysis and instrument/CRO",
             )
         # Prefer is_default for this analysis
+        chosen = candidates[0]
         for p in candidates:
             for link in p.analyses_links:
                 if link.analysis_id == analysis_id and link.is_default:
-                    return p
-        return candidates[0]
+                    chosen = p
+                    break
+            else:
+                continue
+            break
+        self._refuse_parser_type_mismatch(chosen, run_instrument_type_id)
+        return chosen
+
+    def _refuse_parser_type_mismatch(
+        self,
+        parser: DataParser,
+        run_instrument_type_id: Optional[uuid.UUID],
+    ) -> None:
+        if run_instrument_type_id is None:
+            return
+        if parser.instrument_type_id is not None and parser.instrument_type_id != run_instrument_type_id:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "instrument_type_mismatch",
+                    "message": "This parser's instrument type does not match the run's instrument type.",
+                },
+            )
+        if parser.instrument_id is not None:
+            scoped = self.db.query(Instrument).filter(Instrument.id == parser.instrument_id).first()
+            if scoped is not None and scoped.instrument_type_id != run_instrument_type_id:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "instrument_type_mismatch",
+                        "message": (
+                            "This parser's instrument is not of the run's instrument type."
+                        ),
+                    },
+                )

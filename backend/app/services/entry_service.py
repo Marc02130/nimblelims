@@ -251,9 +251,72 @@ class EntryService:
                             },
                         )
                 kwargs[field] = val
+        if "config" in kwargs:
+            self._apply_instrument_entry_slots(entry, kwargs["config"])
         self.repo.update_entry(entry, **kwargs)
         self._commit_refresh(entry)
         return self.get_entry(entry_id)
+
+    def _apply_instrument_entry_slots(
+        self, entry: Entry, next_config: Dict[str, Any]
+    ) -> None:
+        """Validate slot edits on the entry and void uses for changed slots.
+
+        Types change on this entry's config, not the template. Uses are voided
+        and re-recorded; rows are never deleted.
+        """
+        from app.services.instrument_slots import (
+            is_instrument_entry,
+            reject_invalid_instrument_slots,
+            slots_from_config,
+        )
+        from models.instrument import InstrumentUse
+
+        if not is_instrument_entry(
+            {
+                "entry_type": entry.entry_type,
+                "predefined_entry_key": entry.predefined_entry_key,
+            }
+        ):
+            return
+        reject_invalid_instrument_slots(
+            self.db,
+            {
+                "entries": [
+                    {
+                        "entry_type": "instrument",
+                        "predefined_entry_key": "instruments",
+                        "config": next_config,
+                    }
+                ]
+            },
+        )
+        old_slots = {str(s.get("key") or ""): s for s in slots_from_config(entry.config)}
+        new_slots = {str(s.get("key") or ""): s for s in slots_from_config(next_config)}
+        changed = [
+            key
+            for key, old in old_slots.items()
+            if key
+            and (
+                key not in new_slots
+                or str(old.get("instrument_type_id") or "")
+                != str(new_slots[key].get("instrument_type_id") or "")
+            )
+        ]
+        if not changed:
+            return
+        rows = (
+            self.db.query(InstrumentUse)
+            .filter(
+                InstrumentUse.entry_id == entry.id,
+                InstrumentUse.slot_key.in_(changed),
+                InstrumentUse.active.is_(True),
+            )
+            .all()
+        )
+        for row in rows:
+            row.active = False
+            row.modified_by = self._user_id()
 
     def delete_entry(self, entry_id: UUID) -> None:
         entry = self.get_entry(entry_id)

@@ -28,7 +28,10 @@ class LimsRunRepository:
         from sqlalchemy.orm import joinedload
         return (
             self.db.query(LimsRun)
-            .options(joinedload(LimsRun.experiment_template))
+            .options(
+                joinedload(LimsRun.experiment_template),
+                joinedload(LimsRun.instrument_type),
+            )
             .filter(LimsRun.id == run_id)
             .first()
         )
@@ -54,7 +57,10 @@ class LimsRunRepository:
         total = q.count()
         from sqlalchemy.orm import selectinload
         items = (
-            q.options(selectinload(LimsRun.experiment_template))
+            q.options(
+                selectinload(LimsRun.experiment_template),
+                selectinload(LimsRun.instrument_type),
+            )
             .order_by(LimsRun.created_at.desc())
             .offset((page - 1) * size)
             .limit(size)

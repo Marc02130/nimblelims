@@ -20,19 +20,7 @@ from models.user import User, Role, Permission  # noqa: F401 (ensure models load
 # Helpers / fixtures
 # ──────────────────────────────────────────────────────────────────────────────
 
-VALID_TEMPLATE_DEF = {
-    "experiment_name": "Process Test",
-    "description": "test",
-    "protocol_steps": ["step 1"],
-    "plate_layout": {
-        "plate_type": "96",
-        "wells": {"A1": {"condition": "sample", "role": "unknown"}},
-    },
-    "transfer_steps": [],
-    "result_columns": [],
-    "acceptance_criteria": "",
-    "mandatory_review_count": 0,
-}
+from tests.test_flexible_experiment import VALID_TEMPLATE_DEF
 
 
 @pytest.fixture

@@ -58,6 +58,7 @@ from models.flexible_experiment import (
     LimsRunStatus,
     LimsRunData,
     LimsRunImport,
+    LimsRunTypeSubstitution,
     VALID_TRANSITIONS,
     LIFECYCLE_TRANSITIONS,
 )
@@ -109,6 +110,21 @@ class LimsRunService:
                 detail="analysis_id is required on every LIMS run",
             )
         self._require_analysis(data.analysis_id)
+        if data.experiment_template_id:
+            from models.experiment import ExperimentTemplate
+            from app.services.instrument_slots import require_typed_run_import
+
+            template = (
+                self.db.query(ExperimentTemplate)
+                .filter(ExperimentTemplate.id == data.experiment_template_id)
+                .first()
+            )
+            if template is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Experiment template not found",
+                )
+            require_typed_run_import(template.template_definition)
         run = self.run_repo.create(
             name=data.name,
             experiment_template_id=data.experiment_template_id,
@@ -133,6 +149,19 @@ class LimsRunService:
 
     def update_run(self, run_id: uuid.UUID, data: LimsRunUpdate) -> LimsRun:
         run = self._get_run_for_update(run_id)
+        if getattr(data, "instrument_type_id", None) is not None:
+            from app.services.instrument_slots import RUN_TYPE_LOCKED
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": RUN_TYPE_LOCKED,
+                    "message": (
+                        "The run instrument type is locked. "
+                        "Use POST /v1/lims-runs/{id}/substitute-instrument-type."
+                    ),
+                },
+            )
         kwargs: dict = {"modified_by": self._user_id()}
         if data.name is not None:
             other = self.run_repo.get_by_name(data.name)
@@ -270,6 +299,7 @@ class LimsRunService:
         run_id: uuid.UUID,
         *,
         sample_ids: Optional[List[uuid.UUID]] = None,
+        instrument_type_id: Optional[uuid.UUID] = None,
         acknowledge_no_analysis: bool = False,  # ignored; analysis always required
     ) -> LimsRun:
         """
@@ -350,8 +380,127 @@ class LimsRunService:
             run.modified_by = self._user_id()
             self.db.flush()
 
+        self._apply_start_instrument_type(run, instrument_type_id=instrument_type_id)
         self._mint_tests_at_start(run)
         return self._transition(run, LimsRunStatus.running)
+
+    def _apply_start_instrument_type(
+        self,
+        run: LimsRun,
+        *,
+        instrument_type_id: Optional[uuid.UUID] = None,
+    ) -> None:
+        """Snapshot the run type at start. Template copies the run_import slot."""
+        from app.services.instrument_slots import (
+            RUN_TYPE_REQUIRED,
+            require_active_instrument_type,
+            require_typed_run_import,
+        )
+
+        if run.experiment_template_id:
+            template = run.experiment_template
+            if template is None:
+                from models.experiment import ExperimentTemplate
+
+                template = (
+                    self.db.query(ExperimentTemplate)
+                    .filter(ExperimentTemplate.id == run.experiment_template_id)
+                    .first()
+                )
+            if template is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Experiment template not found",
+                )
+            run.instrument_type_id = require_typed_run_import(template.template_definition)
+            run.modified_by = self._user_id()
+            self.db.flush()
+            return
+        if instrument_type_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": RUN_TYPE_REQUIRED,
+                    "message": (
+                        "An ad hoc LIMS run must send instrument_type_id at start."
+                    ),
+                },
+            )
+        require_active_instrument_type(self.db, instrument_type_id)
+        run.instrument_type_id = instrument_type_id
+        run.modified_by = self._user_id()
+        self.db.flush()
+
+    def substitute_instrument_type(
+        self,
+        run_id: uuid.UUID,
+        *,
+        instrument_type_id: uuid.UUID,
+        reason: str,
+    ) -> LimsRun:
+        """Person running the experiment may substitute the type on this run.
+
+        Ownership is ``lims_runs.created_by`` (the run). LIMS runs have no
+        ``experiment_id`` and no ``started_by``. The person who created the
+        run may substitute, whether Lab Technician or Lab Manager.
+        Administrator and Lab Manager may also substitute any non-terminal run.
+        """
+        from app.services.instrument_slots import (
+            RUN_TERMINAL,
+            require_active_instrument_type,
+        )
+
+        run = self._get_run_for_update(run_id)
+        terminal = {
+            LimsRunStatus.published,
+            LimsRunStatus.failed,
+            LimsRunStatus.canceled,
+        }
+        if run.status in terminal:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": RUN_TERMINAL,
+                    "message": "A terminal run cannot change its instrument type.",
+                },
+            )
+        role = getattr(getattr(self.current_user, "role", None), "name", None)
+        if role not in ("Administrator", "Lab Manager"):
+            if run.created_by != self._user_id():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "substitute_not_own_run",
+                        "message": (
+                            "Only the person who created this run "
+                            "(lims_runs.created_by) can substitute its type, "
+                            "unless they are an Administrator or Lab Manager."
+                        ),
+                    },
+                )
+        require_active_instrument_type(self.db, instrument_type_id)
+        if not (reason or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "substitute_reason_required",
+                    "message": "A reason is required to substitute the instrument type.",
+                },
+            )
+        previous = run.instrument_type_id
+        run.instrument_type_id = instrument_type_id
+        run.modified_by = self._user_id()
+        self.db.add(
+            LimsRunTypeSubstitution(
+                lims_run_id=run.id,
+                from_instrument_type_id=previous,
+                to_instrument_type_id=instrument_type_id,
+                reason=reason.strip(),
+                created_by=self._user_id(),
+            )
+        )
+        self._commit_refresh(run)
+        return run
 
     def _mint_tests_at_start(self, run: LimsRun) -> None:
         """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
@@ -874,6 +1023,7 @@ class LimsRunService:
                 cro_source_id=None,
                 parser_id=None,
                 filename="admin_override",
+                note="type not checked",
             )
             import_id = imp.id
         if instrument_id or cro_source_id or parser_id:
@@ -887,9 +1037,11 @@ class LimsRunService:
                 instrument_id=instrument_id,
                 cro_source_id=cro_source_id,
                 parser_id=parser_id,
+                run_instrument_type_id=self._run_type_for_import(run),
             )
             resolved_instrument = instrument_id or parser.instrument_id
             if resolved_instrument:
+                self._assert_import_instrument_type(run, resolved_instrument)
                 from app.services.instrument_eligibility import refuse_ineligible_instrument
 
                 refuse_ineligible_instrument(self.db, resolved_instrument)
@@ -974,9 +1126,11 @@ class LimsRunService:
             instrument_id=instrument_id,
             cro_source_id=cro_source_id,
             parser_id=parser_id,
+            run_instrument_type_id=self._run_type_for_import(run),
         )
         resolved_instrument = instrument_id or parser.instrument_id
         if resolved_instrument:
+            self._assert_import_instrument_type(run, resolved_instrument)
             from app.services.instrument_eligibility import refuse_ineligible_instrument
 
             refuse_ineligible_instrument(self.db, resolved_instrument)
@@ -1003,6 +1157,7 @@ class LimsRunService:
 
             refuse_ineligible_instrument(self.db, instrument_id)
         if resolved_instrument:
+            self._assert_import_instrument_type(run, resolved_instrument)
             from app.services.instrument_eligibility import refuse_ineligible_instrument
 
             refuse_ineligible_instrument(self.db, resolved_instrument)
@@ -1068,6 +1223,7 @@ class LimsRunService:
                     cro_source_id=r.cro_source_id,
                     parser_id=r.parser_id,
                     filename=r.filename,
+                    note=r.note,
                     imported_at=r.imported_at,
                     imported_by=r.imported_by,
                     parser_name=r.parser.name if r.parser else None,
@@ -1089,6 +1245,29 @@ class LimsRunService:
                 ),
             )
 
+    def _run_type_for_import(self, run: LimsRun) -> Optional[uuid.UUID]:
+        from app.services.instrument_slots import run_is_cro
+
+        if run_is_cro(run):
+            return None
+        return run.instrument_type_id
+
+    def _assert_import_instrument_type(
+        self, run: LimsRun, instrument_id: uuid.UUID
+    ) -> None:
+        from app.services.instrument_slots import (
+            assert_run_instrument_type,
+            run_is_cro,
+        )
+
+        if run_is_cro(run):
+            return
+        assert_run_instrument_type(
+            self.db,
+            run_type_id=run.instrument_type_id,
+            instrument_id=instrument_id,
+        )
+
     def _create_import_event(
         self,
         *,
@@ -1097,6 +1276,7 @@ class LimsRunService:
         cro_source_id: Optional[uuid.UUID],
         parser_id: Optional[uuid.UUID],
         filename: Optional[str],
+        note: Optional[str] = None,
     ) -> LimsRunImport:
         imp = LimsRunImport(
             id=uuid.uuid4(),
@@ -1105,6 +1285,7 @@ class LimsRunService:
             cro_source_id=cro_source_id,
             parser_id=parser_id,
             filename=filename,
+            note=note,
             imported_by=self._user_id(),
         )
         self.db.add(imp)

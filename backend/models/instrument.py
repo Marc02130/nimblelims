@@ -149,7 +149,8 @@ class InstrumentScheduleAudit(Base):
     __tablename__ = "instrument_schedule_audits"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('first_due', 'schedule_active', 'schedule_interval', 'event_void')",
+            "action IN ('first_due', 'schedule_active', 'schedule_interval', "
+            "'schedule_kind', 'schedule_vendor', 'event_void')",
             name="ck_instrument_schedule_audits_action",
         ),
     )
@@ -173,6 +174,7 @@ class InstrumentScheduleAudit(Base):
     previous_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
     overdue = Column(Boolean, nullable=True)
+    reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
@@ -341,6 +343,10 @@ class InstrumentUse(Base):
     analysis_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("analyses.id"), nullable=True
     )
+    entry_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("entries.id"), nullable=True, index=True
+    )
+    slot_key = Column(String(64), nullable=True)
     used_on = Column(Date, nullable=False)
     note = Column(Text, nullable=True)
     active = Column(Boolean, nullable=False, default=True, server_default="true")
