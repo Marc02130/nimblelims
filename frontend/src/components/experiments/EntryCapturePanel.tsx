@@ -105,6 +105,13 @@ interface Entry {
     removed_reagent_ids?: string[];
     allowed_instrument_ids?: string[];
     removed_instrument_ids?: string[];
+    slots?: Array<{
+      key: string;
+      label?: string;
+      instrument_type_id?: string | null;
+      required?: boolean;
+      run_import?: boolean;
+    }>;
   } | null;
   field_definition_links: FieldLink[];
   values: EntryValue[];

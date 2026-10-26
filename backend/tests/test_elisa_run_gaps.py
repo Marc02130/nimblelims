@@ -128,18 +128,14 @@ def _template(client, auth_headers) -> str:
 
 
 def _parser(client, auth_headers, db_session, analysis) -> tuple[str, str]:
-    instrument_type = client.post(
-        "/v1/instrument-types",
-        headers=auth_headers,
-        json={"name": f"T-{uuid.uuid4().hex[:6]}"},
-    )
-    assert instrument_type.status_code == 201, instrument_type.text
+    from tests.test_flexible_experiment import PLATE_READER_TYPE_ID
+
     instrument = client.post(
         "/v1/instruments",
         headers=auth_headers,
         json={
             "name": f"I-{uuid.uuid4().hex[:6]}",
-            "instrument_type_id": instrument_type.json()["id"],
+            "instrument_type_id": PLATE_READER_TYPE_ID,
         },
     )
     assert instrument.status_code == 201, instrument.text
