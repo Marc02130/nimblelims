@@ -124,7 +124,7 @@ def _waits_on_run_lock(Session, run_id) -> bool:
             waiting = s.execute(
                 text(
                     "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
-                    "AND query ILIKE '%lims_runs%FOR UPDATE%' AND pid <> pg_backend_pid()"
+                    "AND query ILIKE '%lims_runs%FOR%UPDATE%' AND pid <> pg_backend_pid()"
                 )
             ).scalar()
             s.rollback()

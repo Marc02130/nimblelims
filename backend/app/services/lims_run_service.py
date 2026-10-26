@@ -32,8 +32,10 @@ logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
 from app.repositories.flexible_experiment_repository import (
     LimsRunDataRepository,
     LimsRunRepository,
@@ -130,7 +132,7 @@ class LimsRunService:
             )
 
     def update_run(self, run_id: uuid.UUID, data: LimsRunUpdate) -> LimsRun:
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         kwargs: dict = {"modified_by": self._user_id()}
         if data.name is not None:
             other = self.run_repo.get_by_name(data.name)
@@ -156,17 +158,41 @@ class LimsRunService:
         return run
 
     def _get_run_for_update(self, run_id: uuid.UUID) -> LimsRun:
-        """Row-lock the run until commit so cancel, fail and import serialize.
+        """Row-lock the run until commit so status changes and imports serialize.
 
         populate_existing() refreshes a run already in the session, so callers
         see the status committed by whoever held the lock before them.
+
+        FOR NO KEY UPDATE (key_share) still conflicts with itself and with
+        UPDATE, so these paths serialize. It does not block the KEY SHARE lock
+        a foreign key check takes, so rows that reference the run (reagent
+        uses, a rerun's replaces_run_id) can be inserted meanwhile. lims_runs.id
+        is never updated, so nothing needs the stronger lock.
+
+        A wait that hits lock_timeout (55P03), or statement_timeout (57014)
+        when lock_timeout is disabled, is a 409 ``run_busy``.
         """
-        run = self.db.execute(
-            select(LimsRun)
-            .where(LimsRun.id == run_id)
-            .with_for_update(of=LimsRun)
-            .execution_options(populate_existing=True)
-        ).scalar_one_or_none()
+        try:
+            run = self.db.execute(
+                select(LimsRun)
+                .where(LimsRun.id == run_id)
+                .with_for_update(of=LimsRun, key_share=True)
+                .execution_options(populate_existing=True)
+            ).scalar_one_or_none()
+        except OperationalError as exc:
+            if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+                raise
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "run_busy",
+                    "message": (
+                        "Another change to this run is in progress. "
+                        "Wait for it to finish, then try again."
+                    ),
+                },
+            ) from exc
         if not run:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="LIMS run not found")
         return run
@@ -195,7 +221,7 @@ class LimsRunService:
         lifecycle = getattr(run.experiment_template, "lifecycle_type", "standard") or "standard"
         return LIFECYCLE_TRANSITIONS.get(lifecycle, VALID_TRANSITIONS)
 
-    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+    def _assert_can_transition(self, run: LimsRun, new_status: LimsRunStatus) -> None:
         current = LimsRunStatus(run.status)
         transitions = self._lifecycle_transitions(run)
         if new_status not in transitions.get(current, set()):
@@ -203,13 +229,40 @@ class LimsRunService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot transition from '{current.value}' to '{new_status.value}'",
             )
-        self.run_repo.update_status(run, new_status, self._user_id())
+
+    def _write_status(self, run: LimsRun, new_status: LimsRunStatus) -> None:
+        """The only status write. update_status locks and checks the transition."""
+        try:
+            self.run_repo.update_status(run, new_status, self._user_id())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        except OperationalError as exc:
+            if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+                raise
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "run_busy",
+                    "message": (
+                        "Another change to this run is in progress. "
+                        "Wait for it to finish, then try again."
+                    ),
+                },
+            ) from exc
+
+    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+        self._assert_can_transition(run, new_status)
+        self._write_status(run, new_status)
         self._commit_refresh(run)
         return run
 
     def order_run(self, run_id: uuid.UUID) -> LimsRun:
         """draft → ordered (CRO lifecycle only)"""
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         return self._transition(run, LimsRunStatus.ordered)
 
     def start_run(
@@ -223,7 +276,7 @@ class LimsRunService:
         draft → running (standard) or ordered → running (CRO).
         Requires analysis_id. Locks sample cohort at start (queue / scan).
         """
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         if run.analysis_id is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -493,7 +546,7 @@ class LimsRunService:
         lock: bool = False,
     ) -> LimsRun:
         """Set cohort while draft/ordered; lock optional until start."""
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         if run.status not in (LimsRunStatus.draft, LimsRunStatus.ordered):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -531,12 +584,12 @@ class LimsRunService:
 
     def mark_results_received(self, run_id: uuid.UUID) -> LimsRun:
         """running → results_received (CRO lifecycle only)"""
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         return self._transition(run, LimsRunStatus.results_received)
 
     def move_to_review(self, run_id: uuid.UUID) -> LimsRun:
         """running → complete (standard) or results_received → complete (CRO)"""
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         return self._transition(run, LimsRunStatus.complete)
 
     def publish_run(self, run_id: uuid.UUID) -> LimsRun:
@@ -546,7 +599,7 @@ class LimsRunService:
         When analysis_id is set, promotes lims_run_data → tests/results in the same
         transaction (P3). Conflicts with other runs abort publish.
         """
-        run = self.get_run(run_id)
+        run = self._get_run_for_update(run_id)
         current = LimsRunStatus(run.status)
         transitions = self._lifecycle_transitions(run)
         if LimsRunStatus.published not in transitions.get(current, set()):
@@ -593,7 +646,7 @@ class LimsRunService:
             )
         promo.apply_plan(run, plan)
 
-        self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
+        self._write_status(run, LimsRunStatus.published)
         self._commit_refresh(run)
         return run
 
@@ -691,13 +744,18 @@ class LimsRunService:
                 detail="A reason is required to fail the run",
             )
         run = self._get_run_for_update(run_id)
+        self._assert_can_transition(run, LimsRunStatus.failed)
         from datetime import datetime, timezone
 
+        # Write status first. update_status reloads the row; setting the fail
+        # fields afterwards keeps them from being wiped by that refresh.
+        self._write_status(run, LimsRunStatus.failed)
         run.status_reason = text
         run.rejected_at = datetime.now(timezone.utc)
         run.failed_by = self._user_id()
         run.modified_by = self._user_id()
-        return self._transition(run, LimsRunStatus.failed)
+        self._commit_refresh(run)
+        return run
 
     def create_rerun(self, run_id: uuid.UUID, name: Optional[str] = None) -> LimsRun:
         """Draft run that replaces this one, with the same cohort samples.
@@ -888,18 +946,24 @@ class LimsRunService:
         parser_id: Optional[uuid.UUID] = None,
         filename: Optional[str] = None,
     ) -> ImportFileResponse:
-        """Parse file with resolved data parser and import rows."""
-        run = self._get_run_for_update(run_id)
+        """Parse file with resolved data parser and import rows.
+
+        The file is parsed before the run row is locked, so a slow parse does
+        not hold up cancel or fail. The status and analysis are checked again
+        under the lock.
+        """
+        run = self.get_run(run_id)
         self._assert_import_allowed(run)
         if not run.analysis_id:
             raise HTTPException(400, "Run requires analysis_id before import")
+        analysis_id = run.analysis_id
 
         if instrument_id:
             from app.services.instrument_eligibility import refuse_ineligible_instrument
 
             refuse_ineligible_instrument(self.db, instrument_id)
         parser = self.data_parser_svc.resolve_for_import(
-            analysis_id=run.analysis_id,
+            analysis_id=analysis_id,
             instrument_id=instrument_id,
             cro_source_id=cro_source_id,
             parser_id=parser_id,
@@ -914,6 +978,27 @@ class LimsRunService:
         )
         if not rows:
             raise HTTPException(422, "No rows imported")
+
+        run = self._get_run_for_update(run_id)
+        self._assert_import_allowed(run)
+        if run.analysis_id != analysis_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "run_changed",
+                    "message": "The run's analysis changed while the file was parsed. Import again.",
+                },
+            )
+        # The instrument may have gone down, retired, or overdue while the
+        # file was parsed or while this caller waited on the run lock.
+        if instrument_id:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, instrument_id)
+        if resolved_instrument:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, resolved_instrument)
 
         imp = self._create_import_event(
             run_id=run_id,

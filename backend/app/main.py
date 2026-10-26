@@ -3,7 +3,7 @@ FastAPI application for NimbleLims
 """
 from contextlib import asynccontextmanager
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import validate_security_config
@@ -181,6 +181,28 @@ async def _unique_violation_is_409(request: Request, exc: IntegrityError):
     if is_unique_violation(exc):
         return JSONResponse(status_code=409, content={"detail": "That record already exists."})
     return JSONResponse(status_code=400, content={"detail": "The change conflicts with existing data."})
+
+
+@app.exception_handler(OperationalError)
+async def _lock_timeout_is_409(request: Request, exc: OperationalError):
+    """A lock wait that hit lock_timeout is a 409 the caller can retry, never a 500.
+
+    Waits on a lims_runs row are ``run_busy``; any other row is ``row_busy``.
+    Other operational errors (connection lost, a slow query cut off by
+    statement_timeout) are not a busy row and stay a 500.
+    """
+    from fastapi.responses import JSONResponse
+    from app.core.db_errors import is_lock_timeout
+
+    if not is_lock_timeout(exc):
+        raise exc
+    diag = getattr(getattr(exc, "orig", None), "diag", None)
+    where = f"{getattr(diag, 'context', '') or ''} {getattr(diag, 'message_primary', '') or ''}"
+    if '"lims_runs"' in where:
+        code, message = "run_busy", "Another change to this run is in progress. Wait for it to finish, then try again."
+    else:
+        code, message = "row_busy", "Another change to this record is in progress. Wait for it to finish, then try again."
+    return JSONResponse(status_code=409, content={"detail": {"code": code, "message": message}})
 
 
 @app.get("/health")

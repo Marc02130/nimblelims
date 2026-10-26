@@ -6,6 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.lab_time import current_lab_day
@@ -33,8 +34,16 @@ def _stop(code: str, message: str) -> HTTPException:
 def instrument_block_reason(
     db: Session, instrument_id: UUID, today: Optional[date] = None
 ) -> Optional[dict]:
-    """Return the first 422 payload that blocks this instrument, or None."""
-    row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
+    """Return the first 422 payload that blocks this instrument, or None.
+
+    populate_existing() picks up a status or active change committed by
+    another transaction (for example while import_file was parsing).
+    """
+    row = db.execute(
+        select(Instrument)
+        .where(Instrument.id == instrument_id)
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
     if row is None:
         return {"code": "instrument_not_found", "message": "Instrument not found."}
     label = row.name or "This instrument"
@@ -111,8 +120,8 @@ def instrument_block_reason(
 
 
 def refuse_ineligible_instrument(db: Session, instrument_id: UUID) -> Instrument:
-    row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
     reason = instrument_block_reason(db, instrument_id)
+    row = db.get(Instrument, instrument_id)
     if reason is None and row is not None:
         return row
     if reason and reason.get("code") == "instrument_not_found":
