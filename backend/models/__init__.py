@@ -36,6 +36,7 @@ from .instrument import (
     InstrumentMaintenanceEvent,
     InstrumentDowntime,
     InstrumentUse,
+    InstrumentTemplateInactivation,
     INSTRUMENT_TYPES_LIST_ID,
     MAINTENANCE_TYPES_LIST_ID,
     DOWNTIME_REASONS_LIST_ID,

@@ -141,6 +141,29 @@ class EntryService:
                 )
         config = dict(data.config or {})
         config.setdefault("status", "draft")
+        from app.services.instrument_slots import (
+            is_instrument_entry,
+            reject_invalid_instrument_slots,
+        )
+
+        if is_instrument_entry(
+            {
+                "entry_type": entry_type,
+                "predefined_entry_key": data.predefined_entry_key,
+            }
+        ):
+            reject_invalid_instrument_slots(
+                self.db,
+                {
+                    "entries": [
+                        {
+                            "entry_type": "instrument",
+                            "predefined_entry_key": "instruments",
+                            "config": config,
+                        }
+                    ]
+                },
+            )
         entry = self.repo.create_entry(
             experiment_id=data.experiment_id,
             entry_type=entry_type,

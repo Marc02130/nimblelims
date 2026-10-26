@@ -499,7 +499,42 @@ def upgrade() -> None:
     _sync_new_columns()
 
 
+def refuse_downgrade_if_slot_data(conn=None) -> None:
+    """0114-style guard: refuse when E2 columns or substitution rows hold data."""
+    conn = conn or op.get_bind()
+    substitutions = conn.exec_driver_sql(
+        "SELECT count(*) FROM lims_run_type_substitutions"
+    ).scalar()
+    if substitutions:
+        raise RuntimeError(
+            "0115 downgrade refuses: lims_run_type_substitutions has rows"
+        )
+    typed_runs = conn.exec_driver_sql(
+        "SELECT count(*) FROM lims_runs WHERE instrument_type_id IS NOT NULL"
+    ).scalar()
+    if typed_runs:
+        raise RuntimeError(
+            "0115 downgrade refuses: lims_runs.instrument_type_id is set"
+        )
+    slotted_uses = conn.exec_driver_sql(
+        "SELECT count(*) FROM instrument_uses "
+        "WHERE entry_id IS NOT NULL OR slot_key IS NOT NULL"
+    ).scalar()
+    if slotted_uses:
+        raise RuntimeError(
+            "0115 downgrade refuses: instrument_uses.entry_id/slot_key is set"
+        )
+    reasons = conn.exec_driver_sql(
+        "SELECT count(*) FROM instrument_schedule_audits WHERE reason IS NOT NULL"
+    ).scalar()
+    if reasons:
+        raise RuntimeError(
+            "0115 downgrade refuses: instrument_schedule_audits.reason is set"
+        )
+
+
 def downgrade() -> None:
+    refuse_downgrade_if_slot_data()
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
         "ON instrument_maintenance_events"

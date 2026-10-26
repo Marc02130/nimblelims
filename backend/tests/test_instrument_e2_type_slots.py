@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
+from app.core.db_errors import pgcode
 from app.services import configuring_agent_allow as allow
 from app.services.configuring_agent_apply import CannotExpress, execute_step
 from models.flexible_experiment import LimsRunImport, LimsRunTypeSubstitution
@@ -981,8 +982,9 @@ def test_audit_insert_created_by_must_match_session(migrated_engine):
         (insert_sched, {"id": uuid.uuid4(), "i": inst, "u": None}),
         (insert_sub, {"id": uuid.uuid4(), "r": run_id, "t": type_id, "u": None}),
     ):
-        with pytest.raises((ProgrammingError, Exception)):
+        with pytest.raises(ProgrammingError) as raised:
             _run_as_lims_app(migrated_engine, uid, sql, params)
+        assert pgcode(raised.value) == "42501"
     _run_as_lims_app(
         migrated_engine,
         uid,

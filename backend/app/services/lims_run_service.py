@@ -1027,6 +1027,9 @@ class LimsRunService:
             )
             import_id = imp.id
         if instrument_id or cro_source_id or parser_id:
+            self._refuse_cro_source_on_standard_run(
+                run, cro_source_id=cro_source_id, instrument_id=instrument_id
+            )
             resolved_instrument = instrument_id
             if resolved_instrument:
                 from app.services.instrument_eligibility import refuse_ineligible_instrument
@@ -1038,6 +1041,12 @@ class LimsRunService:
                 cro_source_id=cro_source_id,
                 parser_id=parser_id,
                 run_instrument_type_id=self._run_type_for_import(run),
+            )
+            self._refuse_cro_source_on_standard_run(
+                run,
+                cro_source_id=cro_source_id,
+                instrument_id=instrument_id,
+                parser=parser,
             )
             resolved_instrument = instrument_id or parser.instrument_id
             if resolved_instrument:
@@ -1117,6 +1126,9 @@ class LimsRunService:
             raise HTTPException(400, "Run requires analysis_id before import")
         analysis_id = run.analysis_id
 
+        self._refuse_cro_source_on_standard_run(
+            run, cro_source_id=cro_source_id, instrument_id=instrument_id
+        )
         if instrument_id:
             from app.services.instrument_eligibility import refuse_ineligible_instrument
 
@@ -1127,6 +1139,12 @@ class LimsRunService:
             cro_source_id=cro_source_id,
             parser_id=parser_id,
             run_instrument_type_id=self._run_type_for_import(run),
+        )
+        self._refuse_cro_source_on_standard_run(
+            run,
+            cro_source_id=cro_source_id,
+            instrument_id=instrument_id,
+            parser=parser,
         )
         resolved_instrument = instrument_id or parser.instrument_id
         if resolved_instrument:
@@ -1251,6 +1269,39 @@ class LimsRunService:
         if run_is_cro(run):
             return None
         return run.instrument_type_id
+
+    def _refuse_cro_source_on_standard_run(
+        self,
+        run: LimsRun,
+        *,
+        cro_source_id: Optional[uuid.UUID],
+        instrument_id: Optional[uuid.UUID] = None,
+        parser=None,
+    ) -> None:
+        """CRO-source import on a non-CRO run is 422 unless a typed instrument is present.
+
+        CRO-lifecycle runs keep skipping the type and eligibility gates.
+        """
+        from app.services.instrument_slots import (
+            CRO_IMPORT_REQUIRES_CRO_RUN,
+            run_is_cro,
+        )
+
+        if run_is_cro(run):
+            return
+        cro = cro_source_id or getattr(parser, "cro_source_id", None)
+        resolved = instrument_id or getattr(parser, "instrument_id", None)
+        if cro and not resolved:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": CRO_IMPORT_REQUIRES_CRO_RUN,
+                    "message": (
+                        "A CRO source import is allowed only on a CRO-lifecycle "
+                        "run, or together with a typed instrument."
+                    ),
+                },
+            )
 
     def _assert_import_instrument_type(
         self, run: LimsRun, instrument_id: uuid.UUID
