@@ -64,7 +64,7 @@ def upgrade() -> None:
 
     op.execute(
         """
-        CREATE OR REPLACE FUNCTION is_lab_manager_or_admin()
+        CREATE OR REPLACE FUNCTION public.is_lab_manager_or_admin()
         RETURNS BOOLEAN
         LANGUAGE plpgsql
         SECURITY DEFINER
@@ -74,16 +74,21 @@ def upgrade() -> None:
             user_role_name TEXT;
         BEGIN
             SELECT r.name INTO user_role_name
-            FROM users u
-            JOIN roles r ON u.role_id = r.id
-            WHERE u.id = current_user_id();
+            FROM public.users u
+            JOIN public.roles r ON u.role_id = r.id
+            WHERE u.id = public.current_user_id();
             RETURN user_role_name IN ('Administrator', 'Lab Manager');
         END;
         $$;
         """
     )
-    op.execute("REVOKE EXECUTE ON FUNCTION is_lab_manager_or_admin() FROM PUBLIC")
-    op.execute("GRANT EXECUTE ON FUNCTION is_lab_manager_or_admin() TO lims_app")
+    op.execute("ALTER FUNCTION public.is_lab_manager_or_admin() SECURITY DEFINER")
+    op.execute(
+        "ALTER FUNCTION public.is_lab_manager_or_admin() "
+        "SET search_path = pg_catalog, public"
+    )
+    op.execute("REVOKE EXECUTE ON FUNCTION public.is_lab_manager_or_admin() FROM PUBLIC")
+    op.execute("GRANT EXECUTE ON FUNCTION public.is_lab_manager_or_admin() TO lims_app")
 
     op.execute(
         "DROP POLICY IF EXISTS instrument_maintenance_schedules_access "
@@ -107,7 +112,7 @@ def upgrade() -> None:
 
     op.execute(
         """
-        CREATE OR REPLACE FUNCTION instrument_maintenance_schedules_guard()
+        CREATE OR REPLACE FUNCTION public.instrument_maintenance_schedules_guard()
         RETURNS trigger
         LANGUAGE plpgsql
         SECURITY DEFINER
@@ -116,7 +121,7 @@ def upgrade() -> None:
         DECLARE
             derived_last date;
         BEGIN
-            IF is_lab_manager_or_admin() THEN
+            IF public.is_lab_manager_or_admin() THEN
                 RETURN NEW;
             END IF;
             IF NEW.instrument_id IS DISTINCT FROM OLD.instrument_id
@@ -129,7 +134,7 @@ def upgrade() -> None:
             END IF;
             SELECT e.performed_on
               INTO derived_last
-              FROM instrument_maintenance_events e
+              FROM public.instrument_maintenance_events e
              WHERE e.schedule_id = NEW.id
                AND e.active IS TRUE
                AND e.passed IS TRUE
@@ -161,10 +166,11 @@ def upgrade() -> None:
         """
     )
     op.execute(
-        "REVOKE EXECUTE ON FUNCTION instrument_maintenance_schedules_guard() FROM PUBLIC"
+        "ALTER FUNCTION public.instrument_maintenance_schedules_guard() SECURITY DEFINER"
     )
     op.execute(
-        "GRANT EXECUTE ON FUNCTION instrument_maintenance_schedules_guard() TO lims_app"
+        "ALTER FUNCTION public.instrument_maintenance_schedules_guard() "
+        "SET search_path = pg_catalog, public"
     )
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_maintenance_schedules_guard "

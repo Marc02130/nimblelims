@@ -803,6 +803,13 @@ def test_first_due_waits_on_held_schedule_lock(migrated_engine):
 
     Session = sessionmaker(bind=migrated_engine, autoflush=False)
     with migrated_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO lab_settings (id, timezone) "
+                "VALUES ('b1a16ae0-0000-4000-8000-000000000001', 'UTC') "
+                "ON CONFLICT (id) DO UPDATE SET timezone = 'UTC'"
+            )
+        )
         admin = conn.execute(text("SELECT id FROM roles WHERE name = 'Administrator'")).scalar()
         client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
         type_id = conn.execute(
@@ -875,6 +882,8 @@ def test_first_due_waits_on_held_schedule_lock(migrated_engine):
                 )
             except HTTPException as exc:
                 box["error"] = exc
+            except Exception as exc:
+                box["unexpected"] = exc
 
     holder = threading.Thread(target=hold_and_set, daemon=True)
     waiter = threading.Thread(target=do_first_due, daemon=True)
@@ -900,6 +909,7 @@ def test_first_due_waits_on_held_schedule_lock(migrated_engine):
     release.set()
     holder.join(5)
     waiter.join(5)
+    assert "unexpected" not in box, box.get("unexpected")
     assert "error" in box
     assert box["error"].status_code == 422
     assert box["error"].detail["code"] == "first_due_already_set"
