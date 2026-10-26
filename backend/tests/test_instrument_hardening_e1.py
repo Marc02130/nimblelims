@@ -3,8 +3,9 @@ import uuid
 from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, InternalError, ProgrammingError
+from sqlalchemy.exc import DataError, IntegrityError, InternalError, ProgrammingError
 
 from app.services import configuring_agent_allow as allow
 from app.services import configuring_agent_catalog as cat
@@ -20,6 +21,11 @@ from tests.test_instrument_tracking import (
 )
 
 BACKEND = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture
+def admin_h(client, test_admin_user):
+    return _login(client, "admin", "adminpassword")
 
 
 def _role_user(db_session, test_org, role_name, extra_perms=()):
@@ -521,76 +527,64 @@ def test_db_schedule_enforcement_as_lims_app(migrated_engine):
             {"id": event, "i": inst, "s": sched, "u": users["admin"]},
         )
 
-    def as_role(user_id):
-        s = migrated_engine.connect()
-        s.execute(text("SET ROLE lims_app"))
-        s.execute(
-            text("SELECT set_config('app.current_user_id', :u, false)"),
-            {"u": str(user_id)},
-        )
-        return s
+    refused = (DataError, IntegrityError, InternalError, ProgrammingError)
 
-    def insert_schedule(session, instrument_id):
-        session.execute(
-            text(
-                "INSERT INTO instrument_maintenance_schedules "
-                "(id, instrument_id, kind_id, interval_days, active, created_by, modified_by) "
-                "VALUES (:id, :i, :k, 30, true, :u, :u)"
-            ),
-            {
-                "id": uuid.uuid4(),
-                "i": instrument_id,
-                "k": kind_id,
-                "u": users["admin"],
-            },
-        )
+    def run_as(user_id, sql, params):
+        with migrated_engine.connect() as s:
+            s.execute(text("SET ROLE lims_app"))
+            s.execute(
+                text("SELECT set_config('app.current_user_id', :u, true)"),
+                {"u": str(user_id)},
+            )
+            s.execute(text(sql), params)
+            s.commit()
 
-    with as_role(users["tech"]) as s:
-        try:
-            insert_schedule(s, inst)
-            s.commit()
-            raise AssertionError("technician INSERT should fail")
-        except (IntegrityError, InternalError, ProgrammingError):
-            s.rollback()
-        try:
-            s.execute(
-                text(
-                    "UPDATE instrument_maintenance_schedules SET interval_days = 99 WHERE id = :id"
-                ),
-                {"id": sched},
-            )
-            s.commit()
-            raise AssertionError("technician interval UPDATE should fail")
-        except (IntegrityError, InternalError, ProgrammingError):
-            s.rollback()
-        try:
-            s.execute(
-                text(
-                    "UPDATE instrument_maintenance_schedules SET next_due = CURRENT_DATE + 99 WHERE id = :id"
-                ),
-                {"id": sched},
-            )
-            s.commit()
-            raise AssertionError("technician arbitrary next_due UPDATE should fail")
-        except (IntegrityError, InternalError, ProgrammingError):
-            s.rollback()
-        s.execute(
-            text(
-                "UPDATE instrument_maintenance_schedules "
-                "SET last_done = CURRENT_DATE - 2, next_due = (CURRENT_DATE - 2) + 10 "
-                "WHERE id = :id"
-            ),
+    insert_sql = (
+        "INSERT INTO instrument_maintenance_schedules "
+        "(id, instrument_id, kind_id, interval_days, active, created_by, modified_by) "
+        "VALUES (:id, :i, :k, 30, true, :u, :u)"
+    )
+    insert_params = {
+        "id": uuid.uuid4(),
+        "i": inst,
+        "k": kind_id,
+        "u": users["admin"],
+    }
+    try:
+        run_as(users["tech"], insert_sql, insert_params)
+        raise AssertionError("technician INSERT should fail")
+    except refused:
+        pass
+    try:
+        run_as(
+            users["tech"],
+            "UPDATE instrument_maintenance_schedules SET interval_days = 99 WHERE id = :id",
             {"id": sched},
         )
-        s.commit()
-
-    with as_role(users["editor"]) as s:
-        try:
-            insert_schedule(s, inst)
-            s.commit()
-            raise AssertionError("configuration editor INSERT should fail")
-        except (IntegrityError, InternalError, ProgrammingError):
-            s.rollback()
+        raise AssertionError("technician interval UPDATE should fail")
+    except refused:
+        pass
+    try:
+        run_as(
+            users["tech"],
+            "UPDATE instrument_maintenance_schedules SET next_due = CURRENT_DATE + 99 WHERE id = :id",
+            {"id": sched},
+        )
+        raise AssertionError("technician arbitrary next_due UPDATE should fail")
+    except refused:
+        pass
+    run_as(
+        users["tech"],
+        "UPDATE instrument_maintenance_schedules "
+        "SET last_done = CURRENT_DATE - 2, next_due = (CURRENT_DATE - 2) + 10 "
+        "WHERE id = :id",
+        {"id": sched},
+    )
+    try:
+        run_as(users["editor"], insert_sql, {**insert_params, "id": uuid.uuid4()})
+        raise AssertionError("configuration editor INSERT should fail")
+    except refused:
+        pass
 
     extra = uuid.uuid4()
     with migrated_engine.begin() as conn:
@@ -603,9 +597,11 @@ def test_db_schedule_enforcement_as_lims_app(migrated_engine):
             {"id": extra, "n": f"E1m-{extra.hex[:6]}", "t": type_id, "u": users["admin"]},
         )
     for key in ("manager", "admin"):
-        with as_role(users[key]) as s:
-            insert_schedule(s, extra)
-            s.commit()
+        run_as(
+            users[key],
+            insert_sql,
+            {"id": uuid.uuid4(), "i": extra, "k": kind_id, "u": users[key]},
+        )
 
 
 def test_m2_audits_append_only_as_lims_app(migrated_engine):
@@ -648,26 +644,31 @@ def test_m2_audits_append_only_as_lims_app(migrated_engine):
             {"id": audit, "i": inst, "u": uid},
         )
     with migrated_engine.connect() as conn:
+        for privilege in ("UPDATE", "DELETE"):
+            allowed = conn.execute(
+                text("SELECT has_table_privilege('lims_app', 'instrument_maintenance_audits', :p)"),
+                {"p": privilege},
+            ).scalar()
+            assert allowed is False, privilege
         conn.execute(text("SET ROLE lims_app"))
-        conn.execute(text("SELECT set_config('app.current_user_id', :u, false)"), {"u": str(uid)})
-        try:
-            conn.execute(
-                text("UPDATE instrument_maintenance_audits SET new_value = true WHERE id = :id"),
-                {"id": audit},
-            )
-            conn.commit()
-            raise AssertionError("audit UPDATE should fail")
-        except (IntegrityError, InternalError, ProgrammingError):
-            conn.rollback()
-        try:
-            conn.execute(
-                text("DELETE FROM instrument_maintenance_audits WHERE id = :id"),
-                {"id": audit},
-            )
-            conn.commit()
-            raise AssertionError("audit DELETE should fail")
-        except (IntegrityError, InternalError, ProgrammingError):
-            conn.rollback()
+        conn.execute(text("SELECT set_config('app.current_user_id', :u, true)"), {"u": str(uid)})
+        updated = conn.execute(
+            text("UPDATE instrument_maintenance_audits SET new_value = true WHERE id = :id"),
+            {"id": audit},
+        )
+        deleted = conn.execute(
+            text("DELETE FROM instrument_maintenance_audits WHERE id = :id"),
+            {"id": audit},
+        )
+        assert updated.rowcount == 0
+        assert deleted.rowcount == 0
+        conn.rollback()
+    with migrated_engine.connect() as conn:
+        left = conn.execute(
+            text("SELECT new_value FROM instrument_maintenance_audits WHERE id = :id"),
+            {"id": audit},
+        ).scalar()
+        assert left is False
 
 
 def test_m3_admin_override_import(

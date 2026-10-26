@@ -852,6 +852,7 @@ class LimsRunService:
             raise HTTPException(400, "Run requires analysis_id before import")
 
         import_id = None
+        parser = None
         if not (instrument_id or cro_source_id or parser_id):
             role = getattr(getattr(self.current_user, "role", None), "name", None)
             if role != "Administrator":
@@ -923,10 +924,8 @@ class LimsRunService:
             }
             for row in rows
         ]
-        parser_config = None
-        if import_id is not None:
-            parser_config = parser.parser_config
-        elif rows and any(r.sample_key for r in rows):
+        parser_config = parser.parser_config if parser is not None else None
+        if parser_config is None and rows and any(r.sample_key for r in rows):
             parser_config = {"sample_col": "__explicit__", "columns": []}
         link_rows(
             self.db,
