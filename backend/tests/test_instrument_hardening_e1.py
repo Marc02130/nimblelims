@@ -4,8 +4,9 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DataError, IntegrityError, InternalError, ProgrammingError
+from sqlalchemy.pool import NullPool
 
 from app.services import configuring_agent_allow as allow
 from app.services import configuring_agent_catalog as cat
@@ -24,14 +25,17 @@ BACKEND = Path(__file__).resolve().parents[1]
 
 
 def _run_as_lims_app(engine, user_id, sql, params=None):
-    """Run one statement as lims_app, then RESET ROLE so the pool stays clean.
+    """Run one statement as lims_app on a throwaway connection.
 
-    A failed statement aborts the transaction; rollback first or RESET ROLE
-    cannot run. Session-level SET ROLE survives commit and would otherwise
-    leak onto the next test that borrows this connection.
+    SET ROLE is transactional. A pooled RESET ROLE that is then rolled back
+    on return leaves the next checkout as lims_app with an empty
+    current_user_id, which current_user_id() cannot cast. NullPool + dispose
+    closes the session instead of returning it.
     """
-    with engine.connect() as conn:
-        try:
+    url = engine.url.render_as_string(hide_password=False)
+    isolated = create_engine(url, poolclass=NullPool)
+    try:
+        with isolated.connect() as conn:
             conn.execute(text("SET ROLE lims_app"))
             conn.execute(
                 text("SELECT set_config('app.current_user_id', :u, true)"),
@@ -40,15 +44,8 @@ def _run_as_lims_app(engine, user_id, sql, params=None):
             result = conn.execute(text(sql), params or {})
             conn.commit()
             return result
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            try:
-                conn.execute(text("RESET ROLE"))
-            except Exception:
-                conn.rollback()
-                conn.execute(text("RESET ROLE"))
+    finally:
+        isolated.dispose()
 
 
 @pytest.fixture
