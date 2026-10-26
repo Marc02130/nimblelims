@@ -40,9 +40,18 @@ interface CatalogInstrument {
   maintenance_tracked?: boolean;
 }
 
+interface InstrumentSlot {
+  key: string;
+  label?: string;
+  instrument_type_id?: string | null;
+}
+
 interface Props {
   experimentId?: string;
   limsRunId?: string;
+  entryId?: string;
+  slots?: InstrumentSlot[];
+  instrumentTypeId?: string;
   defaultInstrumentIds?: string[];
   onInstrumentsChanged?: () => void;
 }
@@ -57,6 +66,9 @@ const apiErrorMsg = (err: any, fallback: string): string => {
 const InstrumentUsePanel: React.FC<Props> = ({
   experimentId,
   limsRunId,
+  entryId,
+  slots,
+  instrumentTypeId,
   defaultInstrumentIds,
   onInstrumentsChanged,
 }) => {
@@ -65,9 +77,12 @@ const InstrumentUsePanel: React.FC<Props> = ({
   const [chosenIds, setChosenIds] = useState<string[]>(defaultInstrumentIds ?? []);
   const [usedOn, setUsedOn] = useState(localDateString());
   const [note, setNote] = useState('');
+  const [slotKey, setSlotKey] = useState(slots?.[0]?.key || '');
   const [error, setError] = useState<string | null>(null);
   const [stop, setStop] = useState<string | null>(null);
   const snapshotKey = defaultInstrumentIds === undefined ? '' : defaultInstrumentIds.join('\n');
+  const selectedSlot = (slots || []).find((s) => s.key === slotKey);
+  const pickerTypeId = selectedSlot?.instrument_type_id || instrumentTypeId;
 
   const target = limsRunId ? { lims_run_id: limsRunId } : experimentId ? { experiment_id: experimentId } : {};
 
@@ -85,11 +100,21 @@ const InstrumentUsePanel: React.FC<Props> = ({
   }, [snapshotKey]);
 
   useEffect(() => {
+    if (slots && slots.length && !slotKey) {
+      setSlotKey(slots[0].key);
+    }
+  }, [slots, slotKey]);
+
+  useEffect(() => {
     apiService
-      .getInstruments({ active: true })
+      .getInstruments({
+        active: true,
+        eligible: true,
+        instrument_type_id: pickerTypeId,
+      })
       .then((rows) => setCatalog(rows || []))
       .catch(() => setCatalog([]));
-  }, []);
+  }, [pickerTypeId]);
 
   const addInstrument = async (instrumentId: string) => {
     if (!experimentId || !instrumentId) return;
@@ -124,10 +149,16 @@ const InstrumentUsePanel: React.FC<Props> = ({
         setStop(`${awaiting}${tracked}${elig.message || 'This instrument cannot be used.'}`);
         return;
       }
+      if ((slots || []).length > 0 && !slotKey) {
+        setError('Pick an instrument slot first.');
+        return;
+      }
       await apiService.recordInstrumentUse({
         instrument_id: instrumentId,
         lims_run_id: limsRunId,
         experiment_id: experimentId,
+        entry_id: entryId,
+        slot_key: slotKey || undefined,
         used_on: usedOn || localDateString(),
         note: note || undefined,
       });
@@ -171,6 +202,22 @@ const InstrumentUsePanel: React.FC<Props> = ({
         <Alert severity="error" sx={{ my: 1 }} onClose={() => setError(null)}>
           {error}
         </Alert>
+      )}
+      {(slots || []).length > 0 && (
+        <FormControl size="small" sx={{ minWidth: 220, my: 1, mr: 1 }}>
+          <InputLabel>Slot</InputLabel>
+          <Select
+            label="Slot"
+            value={slotKey}
+            onChange={(event) => setSlotKey(String(event.target.value || ''))}
+          >
+            {(slots || []).map((slot) => (
+              <MenuItem key={slot.key} value={slot.key}>
+                {slot.label || slot.key}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       )}
       {experimentId && (
         <FormControl size="small" sx={{ minWidth: 280, my: 1 }}>

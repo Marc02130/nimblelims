@@ -799,6 +799,8 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                 ) : isInstrumentEntry ? (
                   <InstrumentUsePanel
                     experimentId={experimentId}
+                    entryId={entry.id}
+                    slots={Array.isArray(entry.config?.slots) ? entry.config.slots : []}
                     defaultInstrumentIds={defaultInstrumentIds}
                     onInstrumentsChanged={load}
                   />

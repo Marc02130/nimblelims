@@ -21,6 +21,7 @@ jest.mock('../services/apiService', () => ({
     getFieldDefinitions: jest.fn(),
     getReagents: jest.fn(),
     getInstruments: jest.fn(),
+    getInstrumentTypes: jest.fn(),
     getInstrumentEligibility: jest.fn(),
     getInstrumentUses: jest.fn(),
     recordInstrumentUse: jest.fn(),
@@ -53,6 +54,7 @@ beforeEach(() => {
   api.getFieldDefinitions.mockResolvedValue({ items: [] });
   api.getReagents.mockResolvedValue([]);
   api.getInstruments.mockResolvedValue([{ id: 'i1', name: 'PR-1', active: true }]);
+  api.getInstrumentTypes.mockResolvedValue([{ id: 't1', name: 'Plate reader', active: true }]);
   api.getInstrumentEligibility.mockResolvedValue({ allowed: true, instrument_id: 'i1' });
   api.getInstrumentUses.mockResolvedValue([]);
   api.recordInstrumentUse.mockResolvedValue({ id: 'u1' });
@@ -70,6 +72,17 @@ describe('Experiment template Instruments entry', () => {
     fireEvent.mouseDown(typeSelects[0]);
     expect(await screen.findByRole('option', { name: 'Instruments' })).toBeInTheDocument();
   });
+
+  test('Instruments entry edits slots and requires a type on run_import', async () => {
+    wrap(<ExperimentTemplatesManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: /New Template/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /Tables & forms/i }));
+    fireEvent.click(screen.getByRole('button', { name: /\+ Instruments/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Add slot/i }));
+    expect(screen.getByLabelText('Run import')).toBeInTheDocument();
+    expect(screen.getByLabelText('Instrument type')).toBeInTheDocument();
+    await waitFor(() => expect(api.getInstrumentTypes).toHaveBeenCalled());
+  });
 });
 
 describe('Experiment instrument capture', () => {
@@ -84,7 +97,18 @@ describe('Experiment instrument capture', () => {
           predefined_entry_key: 'instruments',
           sort_order: 0,
           active: true,
-          config: { allowed_instrument_ids: ['i1'], status: 'draft' },
+          config: {
+            allowed_instrument_ids: ['i1'],
+            slots: [
+              {
+                key: 'reader',
+                label: 'Reader',
+                instrument_type_id: 't1',
+                required: true,
+              },
+            ],
+            status: 'draft',
+          },
           field_definition_links: [],
           values: [],
         },
@@ -98,6 +122,8 @@ describe('Experiment instrument capture', () => {
     expect(api.recordInstrumentUse.mock.calls[0][0]).toMatchObject({
       instrument_id: 'i1',
       experiment_id: 'exp1',
+      entry_id: 'e1',
+      slot_key: 'reader',
     });
   });
 });

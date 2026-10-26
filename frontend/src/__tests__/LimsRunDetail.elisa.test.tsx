@@ -12,6 +12,8 @@ const mockImportLimsRunFile = jest.fn();
 const mockFailLimsRun = jest.fn();
 const mockCreateLimsRunRerun = jest.fn();
 const mockGetLimsRunValueChoices = jest.fn();
+const mockGetInstrumentTypes = jest.fn();
+const mockSubstituteLimsRunInstrumentType = jest.fn();
 
 jest.mock('../services/apiService', () => ({
   apiService: {
@@ -23,6 +25,9 @@ jest.mock('../services/apiService', () => ({
     failLimsRun: (...args: any[]) => mockFailLimsRun(...args),
     createLimsRunRerun: (...args: any[]) => mockCreateLimsRunRerun(...args),
     getLimsRunValueChoices: (...args: any[]) => mockGetLimsRunValueChoices(...args),
+    getInstrumentTypes: (...args: any[]) => mockGetInstrumentTypes(...args),
+    substituteLimsRunInstrumentType: (...args: any[]) =>
+      mockSubstituteLimsRunInstrumentType(...args),
     acceptLimsRunValue: jest.fn(),
     updateLimsRun: jest.fn(),
     startLimsRun: jest.fn(),
@@ -85,6 +90,15 @@ describe('LimsRunDetail ELISA gaps', () => {
       },
     ]);
     mockGetLimsRunValueChoices.mockResolvedValue([]);
+    mockGetInstrumentTypes.mockResolvedValue([
+      { id: 't-plate', name: 'Plate reader', active: true },
+      { id: 't-qpcr', name: 'qPCR', active: true },
+    ]);
+    mockSubstituteLimsRunInstrumentType.mockResolvedValue({
+      ...runningRun,
+      instrument_type_id: 't-qpcr',
+      instrument_type_name: 'qPCR',
+    });
     mockImportLimsRunFile.mockResolvedValue({
       imported: 96,
       linked: 2,
@@ -218,6 +232,42 @@ describe('LimsRunDetail ELISA gaps', () => {
     renderRun();
     expect(await screen.findByTestId('cancel-run-button')).toHaveTextContent('Cancel Run');
     expect(screen.getByTestId('fail-run-button')).toBeInTheDocument();
+  });
+
+  test('tech can substitute the instrument type on their own run', async () => {
+    mockGetLimsRun.mockResolvedValue({
+      ...runningRun,
+      instrument_type_id: 't-plate',
+      instrument_type_name: 'Plate reader',
+      can_substitute_instrument_type: true,
+    });
+    renderRun();
+    expect(await screen.findByText('Instrument type')).toBeInTheDocument();
+    expect(screen.getByText('Plate reader')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('substitute-instrument-type-button'));
+    expect(await screen.findByText('Substitute instrument type')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('Instrument type'));
+    fireEvent.click(await screen.findByRole('option', { name: 'qPCR' }));
+    fireEvent.change(screen.getByLabelText('Reason'), {
+      target: { value: 'backup reader' },
+    });
+    fireEvent.click(screen.getByTestId('substitute-instrument-type-confirm'));
+    await waitFor(() => {
+      expect(mockSubstituteLimsRunInstrumentType).toHaveBeenCalledWith('run-1', {
+        instrument_type_id: 't-qpcr',
+        reason: 'backup reader',
+      });
+    });
+  });
+
+  test('a tech does not see substitute on another person\'s run', async () => {
+    mockGetLimsRun.mockResolvedValue({
+      ...runningRun,
+      can_substitute_instrument_type: false,
+    });
+    renderRun();
+    expect(await screen.findByRole('heading', { name: 'IL6 plate' })).toBeInTheDocument();
+    expect(screen.queryByTestId('substitute-instrument-type-button')).not.toBeInTheDocument();
   });
 
   test('a run with imported data offers Fail and no Cancel', async () => {

@@ -22,6 +22,7 @@ jest.mock('../services/apiService', () => ({
     getFieldDefinitions: jest.fn(),
     getReagents: jest.fn(),
     getInstruments: jest.fn(),
+    getInstrumentTypes: jest.fn(),
     getInstrumentEligibility: jest.fn(),
     getInstrumentUses: jest.fn(),
     recordInstrumentUse: jest.fn(),
@@ -62,6 +63,7 @@ beforeEach(() => {
     { id: 'r2', name: 'Ethanol', active: true },
   ]);
   api.getInstruments.mockResolvedValue([]);
+  api.getInstrumentTypes.mockResolvedValue([]);
   api.getInstrumentEligibility.mockResolvedValue({ allowed: true });
   api.getInstrumentUses.mockResolvedValue([]);
   api.createExperimentTemplate.mockResolvedValue({ id: 't1' });

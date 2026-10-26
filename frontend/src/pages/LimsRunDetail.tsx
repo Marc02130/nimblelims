@@ -29,6 +29,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  TextField,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -93,6 +94,9 @@ interface RunDetail {
   failed_by?: string | null;
   replaces_run_id?: string | null;
   has_imported_data?: boolean;
+  instrument_type_id?: string | null;
+  instrument_type_name?: string | null;
+  can_substitute_instrument_type?: boolean;
   created_at: string;
   modified_at?: string;
 }
@@ -145,6 +149,11 @@ const LimsRunDetail: React.FC = () => {
   const [failing, setFailing] = useState(false);
   const [failError, setFailError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const [substituteOpen, setSubstituteOpen] = useState(false);
+  const [substituteTypes, setSubstituteTypes] = useState<{ id: string; name: string }[]>([]);
+  const [substituteTypeId, setSubstituteTypeId] = useState('');
+  const [substituteReason, setSubstituteReason] = useState('');
+  const [substituting, setSubstituting] = useState(false);
 
   useEffect(() => {
     if (!runId) return;
@@ -456,6 +465,15 @@ const LimsRunDetail: React.FC = () => {
         ) : (
           <Chip size="small" color="warning" variant="outlined" label="Analysis required" />
         )}
+        <Chip
+          size="small"
+          variant="outlined"
+          label={
+            run.instrument_type_name
+              ? `Instrument type: ${run.instrument_type_name}`
+              : 'Instrument type: not set'
+          }
+        />
       </Box>
       {run.description && (
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
@@ -592,6 +610,35 @@ const LimsRunDetail: React.FC = () => {
             Create rerun
           </Button>
         )}
+        {run.can_substitute_instrument_type && (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={transitioning || substituting}
+            data-testid="substitute-instrument-type-button"
+            onClick={() => {
+              setSubstituteReason('');
+              setSubstituteTypeId(run.instrument_type_id || '');
+              setSubstituteOpen(true);
+              apiService
+                .getInstrumentTypes({ active: true })
+                .then((raw) => {
+                  const list = (Array.isArray(raw) ? raw : raw?.items || []) as Array<{
+                    id?: string;
+                    name?: string;
+                  }>;
+                  setSubstituteTypes(
+                    list
+                      .filter((row) => row?.id && row?.name)
+                      .map((row) => ({ id: String(row.id), name: String(row.name) })),
+                  );
+                })
+                .catch(() => setSubstituteTypes([]));
+            }}
+          >
+            Substitute instrument type
+          </Button>
+        )}
       </Box>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -703,6 +750,12 @@ const LimsRunDetail: React.FC = () => {
               </ListItem>
               <ListItem>
                 <ListItemText primary="Template ID" secondary={run.experiment_template_id} />
+              </ListItem>
+              <ListItem>
+                <ListItemText
+                  primary="Instrument type"
+                  secondary={run.instrument_type_name || 'Not set (ad hoc runs may leave this empty)'}
+                />
               </ListItem>
               <ListItem>
                 <ListItemText
@@ -819,7 +872,12 @@ const LimsRunDetail: React.FC = () => {
       )}
 
       {runId && <ReagentUsePanel limsRunId={runId} analysisId={run.analysis_id} />}
-      {runId && <InstrumentUsePanel limsRunId={runId} />}
+      {runId && (
+        <InstrumentUsePanel
+          limsRunId={runId}
+          instrumentTypeId={run.instrument_type_id || undefined}
+        />
+      )}
 
       <RunImportDialog
         open={importOpen}
@@ -832,6 +890,75 @@ const LimsRunDetail: React.FC = () => {
         }}
         onSubmit={(parser, file) => void submitImport(parser, file)}
       />
+      <Dialog
+        open={substituteOpen}
+        onClose={() => {
+          if (!substituting) setSubstituteOpen(false);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Substitute instrument type</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Changes this run only. The template is not updated. Existing imports keep the type they
+            were checked against; new imports use the new type.
+          </DialogContentText>
+          <FormControl fullWidth size="small" sx={{ mb: 2 }} required>
+            <InputLabel>Instrument type</InputLabel>
+            <Select
+              label="Instrument type"
+              value={substituteTypeId}
+              onChange={(e) => setSubstituteTypeId(e.target.value as string)}
+            >
+              {substituteTypes.map((row) => (
+                <MenuItem key={row.id} value={row.id}>
+                  {row.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            label="Reason"
+            required
+            fullWidth
+            multiline
+            minRows={2}
+            value={substituteReason}
+            onChange={(e) => setSubstituteReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSubstituteOpen(false)} disabled={substituting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            data-testid="substitute-instrument-type-confirm"
+            disabled={substituting || !substituteTypeId || !substituteReason.trim()}
+            onClick={async () => {
+              if (!runId) return;
+              setSubstituting(true);
+              setError(null);
+              try {
+                await apiService.substituteLimsRunInstrumentType(runId, {
+                  instrument_type_id: substituteTypeId,
+                  reason: substituteReason.trim(),
+                });
+                setSubstituteOpen(false);
+                setSuccessMsg('Instrument type substituted for this run.');
+                await loadRun();
+              } catch (err: any) {
+                setError(apiErrorMsg(err, 'Could not substitute instrument type'));
+              } finally {
+                setSubstituting(false);
+              }
+            }}
+          >
+            Substitute
+          </Button>
+        </DialogActions>
+      </Dialog>
       <FailRunDialog
         open={failOpen}
         submitting={failing}
