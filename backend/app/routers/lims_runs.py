@@ -74,7 +74,7 @@ def _can_substitute(run: LimsRun, user: Optional[User]) -> bool:
     role = getattr(getattr(user, "role", None), "name", None)
     if role in ("Administrator", "Lab Manager"):
         return True
-    return run.created_by == user.id
+    return run.created_by == user.id  # lims_runs.created_by (the run)
 
 
 def _run_read(

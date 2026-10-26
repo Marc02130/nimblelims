@@ -301,7 +301,7 @@ def test_update_run_cannot_change_instrument_type(
     assert locked.json()["detail"]["code"] == "run_type_locked"
 
 
-def test_ad_hoc_run_may_have_null_type(
+def test_ad_hoc_run_requires_type_at_start(
     client, admin_h, run_analysis_id, cohort_sample_id
 ):
     created = client.post(
@@ -310,9 +310,18 @@ def test_ad_hoc_run_may_have_null_type(
         json={"name": _name("Adhoc"), "analysis_id": run_analysis_id},
     )
     assert created.status_code == 201, created.text
-    started = _start_run(client, admin_h, created.json()["id"], cohort_sample_id)
+    missing = _start_run(client, admin_h, created.json()["id"], cohort_sample_id)
+    assert missing.status_code == 422, missing.text
+    assert missing.json()["detail"]["code"] == "run_type_required"
+    started = _start_run(
+        client,
+        admin_h,
+        created.json()["id"],
+        cohort_sample_id,
+        instrument_type_id=PLATE_READER_TYPE_ID,
+    )
     assert started.status_code == 200, started.text
-    assert started.json()["instrument_type_id"] is None
+    assert started.json()["instrument_type_id"] == PLATE_READER_TYPE_ID
 
 
 def test_eligible_picker_filters_server_side(client, admin_h):
@@ -396,6 +405,92 @@ def test_changing_slot_pick_voids_old_row(
     assert active[0]["instrument_id"] == second["id"]
     assert len(voided) == 1
     assert voided[0]["instrument_id"] == first["id"]
+
+
+def test_entry_slot_type_change_voids_use_and_does_not_change_template(
+    client, admin_h, db_session, test_admin_user
+):
+    from models.experiment import Experiment, ExperimentTemplate
+    from models.entry import Entry
+    from models.instrument import InstrumentUse
+
+    plate = _seeded_type(client, admin_h, "Plate reader")
+    qpcr = _seeded_type(client, admin_h, "qPCR")
+    reader = _instrument(client, admin_h, instrument_type_id=plate["id"])
+    template = ExperimentTemplate(
+        name=_name("Keep"),
+        template_definition=_typed_def(plate["id"]),
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(template)
+    db_session.flush()
+    exp = Experiment(
+        name=_name("ExpSlots"),
+        experiment_template_id=template.id,
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(exp)
+    db_session.flush()
+    entry = Entry(
+        experiment_id=exp.id,
+        entry_type="instrument",
+        name="Instruments",
+        predefined_entry_key="instruments",
+        sort_order=0,
+        config={
+            "slots": [
+                {
+                    "key": "reader",
+                    "label": "Reader",
+                    "instrument_type_id": plate["id"],
+                    "required": True,
+                    "run_import": False,
+                }
+            ],
+            "allowed_instrument_ids": [reader["id"]],
+        },
+        created_by=test_admin_user.id,
+        modified_by=test_admin_user.id,
+    )
+    db_session.add(entry)
+    db_session.commit()
+    used = client.post(
+        "/v1/instrument-uses",
+        headers=admin_h,
+        json={
+            "instrument_id": reader["id"],
+            "experiment_id": str(exp.id),
+            "entry_id": str(entry.id),
+            "slot_key": "reader",
+        },
+    )
+    assert used.status_code == 201, used.text
+    patched = client.patch(
+        f"/v1/entries/{entry.id}",
+        headers=admin_h,
+        json={
+            "config": {
+                "slots": [
+                    {
+                        "key": "reader",
+                        "label": "Cycler",
+                        "instrument_type_id": qpcr["id"],
+                        "required": True,
+                        "run_import": False,
+                    }
+                ],
+                "allowed_instrument_ids": [reader["id"]],
+            }
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    db_session.expire_all()
+    use_row = db_session.query(InstrumentUse).filter(InstrumentUse.id == used.json()["id"]).one()
+    assert use_row.active is False
+    kept = db_session.query(ExperimentTemplate).filter(ExperimentTemplate.id == template.id).one()
+    assert kept.template_definition["entries"][0]["config"]["slots"][0]["instrument_type_id"] == plate["id"]
 
 
 def test_use_type_mismatch_and_missing_slot(
@@ -956,6 +1051,136 @@ def test_first_due_and_void_accept_reason(client, admin_h, db_session):
     voids = [a for a in audits if a.action == "event_void"]
     assert first_due and first_due[0].reason == "initial due"
     assert voids and voids[0].reason == "void reason"
+
+
+def test_update_schedule_audits_kind_and_service_vendor(client, admin_h, db_session):
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    kinds = client.get("/lists/maintenance_types/entries", headers=admin_h).json()
+    if isinstance(kinds, dict):
+        kinds = kinds.get("entries") or kinds.get("items") or []
+    pm = next(row["id"] for row in kinds if row["name"] == "PM")
+    cal = next(row["id"] for row in kinds if row["name"] == "calibration")
+    vendor = client.post("/v1/vendors", headers=admin_h, json={"name": _name("Metrology")})
+    assert vendor.status_code == 201, vendor.text
+    sched = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={"instrument_id": inst["id"], "kind_id": pm, "interval_days": 30},
+    )
+    assert sched.status_code == 201, sched.text
+    changed = client.patch(
+        f"/v1/instrument-maintenance-schedules/{sched.json()['id']}",
+        headers=admin_h,
+        json={"kind_id": cal, "service_vendor_id": vendor.json()["id"]},
+    )
+    assert changed.status_code == 200, changed.text
+    audits = (
+        db_session.query(InstrumentScheduleAudit)
+        .filter(InstrumentScheduleAudit.schedule_id == sched.json()["id"])
+        .all()
+    )
+    kind_rows = [a for a in audits if a.action == "schedule_kind"]
+    vendor_rows = [a for a in audits if a.action == "schedule_vendor"]
+    assert len(kind_rows) == 1
+    assert kind_rows[0].previous_value == pm
+    assert kind_rows[0].new_value == cal
+    assert kind_rows[0].created_by is not None
+    assert kind_rows[0].created_at is not None
+    assert len(vendor_rows) == 1
+    assert vendor_rows[0].previous_value is None
+    assert vendor_rows[0].new_value == vendor.json()["id"]
+
+
+def test_tech_cannot_void_only_passing_event_manager_can(
+    client, admin_h, db_session, test_org
+):
+    from models.user import User
+
+    tech = _role_user(db_session, test_org, "Lab Technician", extra_perms=("experiment:manage",))
+    manager = _role_user(db_session, test_org, "Lab Manager", extra_perms=("experiment:manage",))
+    tech_h = _login(client, tech.username, "pass-word-1")
+    mgr_h = _login(client, manager.username, "pass-word-1")
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    kinds = client.get("/lists/maintenance_types/entries", headers=admin_h).json()
+    if isinstance(kinds, dict):
+        kinds = kinds.get("entries") or kinds.get("items") or []
+    kind_id = next(row["id"] for row in kinds if row["name"] == "PM")
+    sched = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={"instrument_id": inst["id"], "kind_id": kind_id, "interval_days": 10},
+    ).json()
+    client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": date.today().isoformat()},
+    )
+    admin = db_session.query(User).filter(User.username == "admin").first()
+    only = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(admin.id),
+            "passed": True,
+        },
+    )
+    assert only.status_code == 201, only.text
+    refused = client.patch(
+        f"/v1/instrument-maintenance-events/{only.json()['id']}",
+        headers=tech_h,
+        json={"active": False},
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"]["code"] == "only_passing_event_void_forbidden"
+    other_inst = _instrument(client, admin_h, maintenance_tracked=True)
+    other_sched = client.post(
+        "/v1/instrument-maintenance-schedules",
+        headers=admin_h,
+        json={"instrument_id": other_inst["id"], "kind_id": kind_id, "interval_days": 10},
+    ).json()
+    client.post(
+        f"/v1/instrument-maintenance-schedules/{other_sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": date.today().isoformat()},
+    )
+    first = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": other_inst["id"],
+            "schedule_id": other_sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(admin.id),
+            "passed": True,
+        },
+    )
+    second = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": other_inst["id"],
+            "schedule_id": other_sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(admin.id),
+            "passed": True,
+        },
+    )
+    assert first.status_code == 201 and second.status_code == 201
+    non_last = client.patch(
+        f"/v1/instrument-maintenance-events/{first.json()['id']}",
+        headers=tech_h,
+        json={"active": False},
+    )
+    assert non_last.status_code == 200, non_last.text
+    ok = client.patch(
+        f"/v1/instrument-maintenance-events/{only.json()['id']}",
+        headers=mgr_h,
+        json={"active": False},
+    )
+    assert ok.status_code == 200, ok.text
 
 
 def test_update_schedule_waits_on_held_lock(migrated_engine):

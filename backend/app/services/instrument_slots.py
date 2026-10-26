@@ -21,6 +21,7 @@ INSTRUMENT_TYPE_MISMATCH = "instrument_type_mismatch"
 INSTRUMENT_SLOT_NOT_FOUND = "instrument_slot_not_found"
 RUN_IMPORT_TYPE_LOCKED = "run_import_type_locked"
 RUN_TEMPLATE_TYPE_REQUIRED = "run_template_type_required"
+RUN_TYPE_REQUIRED = "run_type_required"
 RUN_TYPE_LOCKED = "run_type_locked"
 RUN_TERMINAL = "run_terminal"
 INACTIVE_INSTRUMENT_TYPE = "instrument_type_inactive"
@@ -261,9 +262,12 @@ def assert_run_instrument_type(
     run_type_id: Optional[UUID],
     instrument_id: UUID,
 ) -> None:
-    """Null snapshot is unchecked (ad hoc runs only)."""
+    """Every new LIMS run has a type. A leftover null snapshot is 422."""
     if run_type_id is None:
-        return
+        _stop(
+            RUN_TYPE_REQUIRED,
+            "A LIMS run must have an instrument type before import.",
+        )
     row = db.query(Instrument).filter(Instrument.id == instrument_id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Instrument not found")

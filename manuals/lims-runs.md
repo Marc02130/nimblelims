@@ -44,7 +44,7 @@ Operator SoT: [HOWTO.md](HOWTO.md) § Later execution. **X-1** (2026-09-11).
 - `replaces_run_id` on a rerun points at the run it replaces. The replaced run is not removed.
 - Special field: `fit_in_progress` (mutex for curve fitting).
 - **`analysis_id`** (required FK → `analyses`): assay this run is for. Set on create/edit; required to start, import, and publish. On publish, instrument data is promoted to Tests/Results for that analysis.
-- **`instrument_type_id`** (nullable FK → `list_entries` on `instrument_types`): per-run type snapshot taken at start. A template run copies the template's typed `run_import` slot. An ad hoc run (no template) may leave it null or set it on `PATCH /start`. Changing it on any route other than `POST /v1/lims-runs/{id}/substitute-instrument-type` is **409** `run_type_locked`. `create_run` on a template without a typed `run_import` slot is **422** `run_template_type_required`.
+- **`instrument_type_id`** (nullable FK → `list_entries` on `instrument_types` for leftover rows only): per-run type snapshot taken at start. A template run copies the template's typed `run_import` slot. An ad hoc run (no template) must send it on `PATCH /start` (**422** `run_type_required` if missing). New runs do not have a null snapshot. Changing it on any route other than `POST /v1/lims-runs/{id}/substitute-instrument-type` is **409** `run_type_locked`. `create_run` on a template without a typed `run_import` slot is **422** `run_template_type_required`.
 
 ### Lifecycle and Status (Current)
 

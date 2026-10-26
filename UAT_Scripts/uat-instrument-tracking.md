@@ -1,7 +1,7 @@
 # UAT: Instrument tracking
 
 **Stem:** `instrument-tracking`
-**Bars:** IT-1..IT-31
+**Bars:** IT-1..IT-32
 **UI:** Admin → **Instruments** (`/admin/instruments`) · **Instrument maintenance** (`/instrument-maintenance`, Administrator or Lab Manager) · LIMS run detail → **Instruments used** · Experiment template **Type → Instruments** · experiment entry instrument picker
 **API:** `/v1/instrument-types`, `/v1/instruments`, `/v1/cro-sources`, `/v1/instrument-maintenance-schedules`, `/v1/instrument-maintenance-events`, `/v1/instrument-downtime`, `/v1/instrument-uses`, `/v1/experiments/{id}/instruments` (see `manuals/api-endpoints.md`)
 **Actors:** `config-editor` (config:edit; does not author templates), `lab-manager` and `admin` (experiment:manage; author templates), `lab-tech` (experiment:manage), `client` (client user)
@@ -54,15 +54,16 @@ Create vendor **Agilent** if it is not already in `/v1/vendors`. Create instrume
 | IT-20 | Track maintenance on | Turn tracking on with no schedule. POST a use. Add a schedule (no first due). Set the first due date in the past. Log a passing event today. Open downtime. | No schedule **422** `instrument_no_schedule`. Schedule without first due **422** `instrument_awaiting_first_due`. After first-due + event, allowed. Open downtime **422** `instrument_down`. |
 | IT-21 | Type default refused and agent OFF | POST a type with `maintenance_tracked`. Create an instrument without sending the flag. Confirm-before-apply PATCH `maintenance_tracked` false on a tracked instrument. | Type **422**. New instrument is untracked. Apply writes the OFF. `instrument_maintenance_audits.previous_value` is true. |
 | IT-22 | First due date | As `lab-manager`, open Instrument maintenance. Set first due on GC-UAT-1's schedule. Repeat the same POST. As `lab-tech`, the same POST. | First call **200**. Second **422** `first_due_already_set`. lab-tech **403**. |
-| IT-23 | Voided-only event | After IT-4, void the remaining passing event. GET eligibility. As admin, set first due again. | Eligibility `instrument_awaiting_first_due`. First-due **200** and the item is eligible again. |
+| IT-23 | Voided-only event | After IT-4, as `lab-tech` void the remaining passing event. As `lab-manager`, void it. GET eligibility. As admin, set first due again. | Tech **403** `only_passing_event_void_forbidden`. Manager **200**. Eligibility `instrument_awaiting_first_due`. First-due **200** and the item is eligible again. |
 | IT-24 | Add and retire a type | As `config-editor`, add type **Pipette**. Create an instrument of that type. PATCH the type `{"active":false}`. There is no Delete. | Type create **201**. Retire is Active off. DELETE **405**. A run template still requires a typed `run_import` slot; labs retire types with Active off, they do not delete them. |
 | IT-25 | Typed run_import slot | Create a LIMS run template with a `run_import` slot and no type. Create one with two `run_import` slots. Create one with a typed `run_import` slot and an untyped extra slot. | No type **422** `instrument_entry_invalid`. Two run_import **422**. Typed + optional extra **201**. |
 | IT-26 | create_run requires typed slot | `POST /v1/lims-runs` with a template that has no `run_import` slot. Then with a typed template. | Untyped **422** `run_template_type_required`. Typed **201**. |
 | IT-27 | Start snapshots type | Start the typed-template run. GET the run. | `instrument_type_id` equals the template `run_import` type. Overview shows **Instrument type**. |
 | IT-28 | Type mismatch on import | Start `RUN`. Import with an instrument whose type is not the snapshot. Then import with a matching type. | First **422** `instrument_type_mismatch` and no `lims_run_imports` row. Second **200**. |
-| IT-29 | Tech substitutes own run | As `lab-tech` who created `RUN`, **Substitute instrument type** with a reason. As the same tech on a run created by someone else. As `lab-manager` on that other run. | Own run **200** and an audit row (who, when, from, to, reason). Other run **403**. Manager **200**. Template unchanged. |
+| IT-29 | Creator substitutes own run | As `lab-tech` who created `RUN` (`lims_runs.created_by`), **Substitute instrument type** with a reason. As the same tech on a run created by someone else. As `lab-manager` on that other run. | Own run **200** and an audit row (who, when, from, to, reason). Other run **403**. Manager **200**. Template unchanged. |
 | IT-30 | Import after substitution | After IT-29, import with an instrument of the old type, then the new type. | Old type **422** `instrument_type_mismatch`. New type **200**. |
-| IT-31 | Ad hoc null type | Create a run with no template. Start it without `instrument_type_id`. Import an eligible instrument. | Start **200**, `instrument_type_id` null. Import is not type-checked (eligibility still applies). |
+| IT-31 | Ad hoc type required | Create a run with no template. Start it without `instrument_type_id`. Start again with an active type. | First start **422** `run_type_required`. Second **200** and `instrument_type_id` is set. |
+| IT-32 | Entry slot type change | On an experiment Instruments entry, change a slot type. | Old `instrument_uses` row is voided (`active` false). Template slots are unchanged. |
 
 ---
 

@@ -107,7 +107,10 @@ class LimsRunStartRequest(BaseModel):
     )
     instrument_type_id: Optional[uuid.UUID] = Field(
         None,
-        description="Ad hoc runs only: optional instrument type snapshot at start.",
+        description=(
+            "Required at start for ad hoc runs (no template). "
+            "Template runs copy the typed run_import slot."
+        ),
     )
 
 

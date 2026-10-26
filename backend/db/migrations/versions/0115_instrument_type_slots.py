@@ -398,6 +398,59 @@ def upgrade() -> None:
         f"WITH CHECK ({_CATALOG_INSERT})"
     )
 
+    op.execute(
+        "ALTER TABLE instrument_schedule_audits "
+        "DROP CONSTRAINT IF EXISTS ck_instrument_schedule_audits_action"
+    )
+    op.execute(
+        "ALTER TABLE instrument_schedule_audits "
+        "ADD CONSTRAINT ck_instrument_schedule_audits_action "
+        "CHECK (action IN ("
+        "'first_due', 'schedule_active', 'schedule_interval', "
+        "'schedule_kind', 'schedule_vendor', 'event_void'))"
+    )
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION public.refuse_void_only_passing_event()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+            IF NEW.active IS FALSE AND OLD.active IS TRUE AND OLD.passed IS TRUE
+               AND OLD.schedule_id IS NOT NULL
+               AND NOT EXISTS (
+                    SELECT 1 FROM instrument_maintenance_events e
+                     WHERE e.schedule_id = OLD.schedule_id
+                       AND e.id <> OLD.id
+                       AND e.active IS TRUE
+                       AND e.passed IS TRUE
+               )
+               AND EXISTS (
+                    SELECT 1 FROM instrument_maintenance_schedules s
+                     WHERE s.id = OLD.schedule_id
+                       AND (s.next_due IS NOT NULL OR s.last_done IS NOT NULL)
+               )
+            THEN
+                IF NOT public.is_lab_manager_or_admin() THEN
+                    RAISE EXCEPTION 'only_passing_event_void_forbidden'
+                        USING ERRCODE = '42501';
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+        """
+    )
+    op.execute(
+        "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
+        "ON instrument_maintenance_events"
+    )
+    op.execute(
+        "CREATE TRIGGER instrument_events_refuse_only_passing_void "
+        "BEFORE UPDATE ON instrument_maintenance_events "
+        "FOR EACH ROW EXECUTE FUNCTION public.refuse_void_only_passing_event()"
+    )
+
     # LIMS run templates = referenced by lims_runs OR carrying a run_import slot.
     # Untyped ones (no slot with run_import true AND a non-null instrument_type_id)
     # are set inactive. Rows are never deleted. Runs that reference them keep
@@ -447,6 +500,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(
+        "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
+        "ON instrument_maintenance_events"
+    )
+    op.execute("DROP FUNCTION IF EXISTS public.refuse_void_only_passing_event()")
+    op.execute(
+        "ALTER TABLE instrument_schedule_audits "
+        "DROP CONSTRAINT IF EXISTS ck_instrument_schedule_audits_action"
+    )
+    op.execute(
+        "ALTER TABLE instrument_schedule_audits "
+        "ADD CONSTRAINT ck_instrument_schedule_audits_action "
+        "CHECK (action IN ("
+        "'first_due', 'schedule_active', 'schedule_interval', 'event_void'))"
+    )
     _unregister()
     op.execute(
         "DROP POLICY IF EXISTS lims_run_type_substitutions_select "

@@ -44,6 +44,8 @@ interface InstrumentSlot {
   key: string;
   label?: string;
   instrument_type_id?: string | null;
+  required?: boolean;
+  run_import?: boolean;
 }
 
 interface Props {
@@ -80,8 +82,10 @@ const InstrumentUsePanel: React.FC<Props> = ({
   const [slotKey, setSlotKey] = useState(slots?.[0]?.key || '');
   const [error, setError] = useState<string | null>(null);
   const [stop, setStop] = useState<string | null>(null);
+  const [localSlots, setLocalSlots] = useState<InstrumentSlot[]>(slots || []);
+  const [typeOptions, setTypeOptions] = useState<{ id: string; name: string }[]>([]);
   const snapshotKey = defaultInstrumentIds === undefined ? '' : defaultInstrumentIds.join('\n');
-  const selectedSlot = (slots || []).find((s) => s.key === slotKey);
+  const selectedSlot = (localSlots || []).find((s) => s.key === slotKey);
   const pickerTypeId = selectedSlot?.instrument_type_id || instrumentTypeId;
 
   const target = limsRunId ? { lims_run_id: limsRunId } : experimentId ? { experiment_id: experimentId } : {};
@@ -100,10 +104,33 @@ const InstrumentUsePanel: React.FC<Props> = ({
   }, [snapshotKey]);
 
   useEffect(() => {
+    setLocalSlots(slots || []);
     if (slots && slots.length && !slotKey) {
       setSlotKey(slots[0].key);
     }
   }, [slots, slotKey]);
+
+  useEffect(() => {
+    if (!experimentId || !entryId) return;
+    apiService
+      .getInstrumentTypes()
+      .then((rows: any) => setTypeOptions((rows || []).filter((t: any) => t.active !== false)))
+      .catch(() => setTypeOptions([]));
+  }, [experimentId, entryId]);
+
+  const persistSlots = async (next: InstrumentSlot[]) => {
+    if (!entryId) return;
+    setError(null);
+    try {
+      await apiService.updateEntry(entryId, {
+        config: { slots: next, allowed_instrument_ids: chosenIds },
+      });
+      setLocalSlots(next);
+      if (onInstrumentsChanged) await onInstrumentsChanged();
+    } catch (err: any) {
+      setError(apiErrorMsg(err, 'Could not update instrument slots'));
+    }
+  };
 
   useEffect(() => {
     apiService
@@ -203,7 +230,7 @@ const InstrumentUsePanel: React.FC<Props> = ({
           {error}
         </Alert>
       )}
-      {(slots || []).length > 0 && (
+      {(localSlots || []).length > 0 && (
         <FormControl size="small" sx={{ minWidth: 220, my: 1, mr: 1 }}>
           <InputLabel>Slot</InputLabel>
           <Select
@@ -211,13 +238,79 @@ const InstrumentUsePanel: React.FC<Props> = ({
             value={slotKey}
             onChange={(event) => setSlotKey(String(event.target.value || ''))}
           >
-            {(slots || []).map((slot) => (
+            {(localSlots || []).map((slot) => (
               <MenuItem key={slot.key} value={slot.key}>
                 {slot.label || slot.key}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
+      )}
+      {experimentId && entryId && (
+        <Box sx={{ my: 1 }}>
+          <Typography variant="subtitle2">Slots on this entry</Typography>
+          <Typography variant="caption" color="text.secondary" display="block">
+            Types change on this entry, not the template. Changing a type voids the old use.
+          </Typography>
+          {localSlots.map((slot, si) => (
+            <Box key={`${slot.key}-${si}`} display="flex" gap={1} flexWrap="wrap" sx={{ my: 0.5 }}>
+              <TextField
+                size="small"
+                label="Key"
+                value={slot.key}
+                onChange={(e) => {
+                  const next = localSlots.map((s, i) => (i === si ? { ...s, key: e.target.value } : s));
+                  setLocalSlots(next);
+                }}
+                onBlur={() => persistSlots(localSlots)}
+              />
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Type</InputLabel>
+                <Select
+                  label="Type"
+                  value={slot.instrument_type_id || ''}
+                  onChange={(e) => {
+                    const next = localSlots.map((s, i) =>
+                      i === si ? { ...s, instrument_type_id: String(e.target.value || '') || null } : s,
+                    );
+                    void persistSlots(next);
+                  }}
+                  inputProps={{ 'aria-label': `Slot ${slot.key} type` }}
+                >
+                  {!slot.run_import && <MenuItem value="">None</MenuItem>}
+                  {typeOptions.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Button
+                size="small"
+                onClick={() => void persistSlots(localSlots.filter((_, i) => i !== si))}
+              >
+                Remove slot
+              </Button>
+            </Box>
+          ))}
+          <Button
+            size="small"
+            onClick={() =>
+              void persistSlots([
+                ...localSlots,
+                {
+                  key: `slot_${localSlots.length + 1}`,
+                  label: '',
+                  instrument_type_id: null,
+                  required: false,
+                  run_import: false,
+                },
+              ])
+            }
+          >
+            Add slot
+          </Button>
+        </Box>
       )}
       {experimentId && (
         <FormControl size="small" sx={{ minWidth: 280, my: 1 }}>

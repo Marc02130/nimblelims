@@ -11,6 +11,21 @@ jest.mock('@mui/x-data-grid', () => ({
       {rows.map((row) => (
         <div key={row.id}>
           {columns.map((c) => {
+            if (c.getActions) {
+              return (
+                <span key={c.field}>
+                  {c.getActions({ row, id: row.id }).map((item: any, i: number) => (
+                    <button
+                      key={item.key || i}
+                      type="button"
+                      onClick={item.props?.onClick}
+                    >
+                      {item.props?.label || 'action'}
+                    </button>
+                  ))}
+                </span>
+              );
+            }
             if (c.renderCell) {
               return <span key={c.field}>{c.renderCell({ value: row[c.field], row })}</span>;
             }
@@ -20,7 +35,11 @@ jest.mock('@mui/x-data-grid', () => ({
       ))}
     </div>
   ),
-  GridActionsCellItem: () => null,
+  GridActionsCellItem: ({ label, onClick }: { label?: string; onClick?: () => void }) => (
+    <button type="button" onClick={onClick}>
+      {label}
+    </button>
+  ),
 }));
 
 import InstrumentCatalogManagement from '../pages/admin/InstrumentCatalogManagement';
@@ -39,6 +58,7 @@ jest.mock('../services/apiService', () => ({
     getListEntries: jest.fn(),
     createInstrument: jest.fn(),
     updateInstrument: jest.fn(),
+    updateInstrumentType: jest.fn(),
     setInstrumentScheduleFirstDue: jest.fn(),
   },
 }));
@@ -98,6 +118,38 @@ describe('InstrumentCatalogManagement', () => {
     expect(screen.getByLabelText('Status')).toBeInTheDocument();
     expect(screen.getByLabelText('Track maintenance')).toBeInTheDocument();
     expect(screen.queryByLabelText('Track maintenance by default')).not.toBeInTheDocument();
+  });
+
+  test('Save turns maintenance tracking off with no extra prompt', async () => {
+    api.getInstruments.mockResolvedValue([
+      {
+        id: 'i1',
+        name: 'PR-1',
+        instrument_type_id: 't1',
+        instrument_type_name: 'Plate reader',
+        vendor_id: 'v1',
+        vendor_name: 'Thermo',
+        model: 'M1',
+        status: 'in_service',
+        active: true,
+        maintenance_tracked: true,
+      },
+    ]);
+    api.updateInstrument.mockResolvedValue({ id: 'i1', maintenance_tracked: false });
+    wrap(<InstrumentCatalogManagement />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Instruments' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const track = await screen.findByLabelText('Track maintenance');
+    expect(track).toBeChecked();
+    fireEvent.click(track);
+    expect(screen.queryByRole('dialog', { name: /confirm/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Instrument updated');
+    expect(api.updateInstrument).toHaveBeenCalledWith(
+      'i1',
+      expect.objectContaining({ maintenance_tracked: false }),
+    );
+    expect(screen.queryByText(/are you sure/i)).not.toBeInTheDocument();
   });
 
   test('maintenance-only view hides catalog tabs and shows the first-due empty state', async () => {

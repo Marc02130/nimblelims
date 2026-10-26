@@ -3,8 +3,9 @@
 Schedule create, edit, and first-due need Administrator or Lab Manager.
 Events, downtime, and uses are bench work (experiment:manage). Passing
 events recompute next_due only after a lab admin or manager has set the
-first due date. Voiding the only passing event returns the item to
-awaiting first due date.
+first due date. Voiding the only passing event (which clears first due)
+is Administrator / Lab Manager only. A technician may still void a
+non-last passing event or a failed event.
 """
 from datetime import date, timedelta
 from typing import List, Optional
@@ -110,6 +111,30 @@ def _write_schedule_audit(
             created_by=user.id,
         )
     )
+
+
+def _void_clears_first_due(db: Session, event: InstrumentMaintenanceEvent) -> bool:
+    """True when voiding this event would return the item to awaiting first due."""
+    if event.passed is not True or event.active is not True or event.schedule_id is None:
+        return False
+    schedule = (
+        db.query(InstrumentMaintenanceSchedule)
+        .filter(InstrumentMaintenanceSchedule.id == event.schedule_id)
+        .first()
+    )
+    if schedule is None or (schedule.next_due is None and schedule.last_done is None):
+        return False
+    other = (
+        db.query(InstrumentMaintenanceEvent.id)
+        .filter(
+            InstrumentMaintenanceEvent.schedule_id == event.schedule_id,
+            InstrumentMaintenanceEvent.id != event.id,
+            InstrumentMaintenanceEvent.active.is_(True),
+            InstrumentMaintenanceEvent.passed.is_(True),
+        )
+        .first()
+    )
+    return other is None
 
 
 def _require_http_certificate(url: Optional[str]) -> None:
@@ -313,6 +338,8 @@ def update_schedule(
     overdue_at_time = _schedule_overdue(row)
     previous_active = row.active
     previous_interval = row.interval_days
+    previous_kind = row.kind_id
+    previous_vendor = row.service_vendor_id
     for k, v in data.items():
         setattr(row, k, v)
     # A new interval applies from the next passing event. Recomputing now
@@ -339,6 +366,28 @@ def update_schedule(
             user=current_user,
             previous_value=previous_interval,
             new_value=row.interval_days,
+            overdue=overdue_at_time,
+        )
+    if "kind_id" in data and row.kind_id != previous_kind:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_kind",
+            user=current_user,
+            previous_value=previous_kind,
+            new_value=row.kind_id,
+            overdue=overdue_at_time,
+        )
+    if "service_vendor_id" in data and row.service_vendor_id != previous_vendor:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.id,
+            action="schedule_vendor",
+            user=current_user,
+            previous_value=previous_vendor,
+            new_value=row.service_vendor_id,
             overdue=overdue_at_time,
         )
     row.modified_by = current_user.id
@@ -491,6 +540,19 @@ def update_event(
     if "active" in data and data["active"] is False and row.active is False:
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
     voiding = "active" in data and data["active"] is False and row.active is True
+    if voiding and _void_clears_first_due(db, row):
+        role = getattr(getattr(current_user, "role", None), "name", None)
+        if role not in ("Administrator", "Lab Manager"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "only_passing_event_void_forbidden",
+                    "message": (
+                        "Only an Administrator or Lab Manager can void the "
+                        "only passing event (that clears the first due date)."
+                    ),
+                },
+            )
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id

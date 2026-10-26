@@ -154,6 +154,8 @@ const LimsRunDetail: React.FC = () => {
   const [substituteTypeId, setSubstituteTypeId] = useState('');
   const [substituteReason, setSubstituteReason] = useState('');
   const [substituting, setSubstituting] = useState(false);
+  const [startTypeId, setStartTypeId] = useState('');
+  const [startTypes, setStartTypes] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (!runId) return;
@@ -175,6 +177,15 @@ const LimsRunDetail: React.FC = () => {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (run?.experiment_template_id) return;
+    if (run && run.status !== 'draft' && run.status !== 'ordered') return;
+    apiService
+      .getInstrumentTypes()
+      .then((rows: any) => setStartTypes((rows || []).filter((t: any) => t.active !== false)))
+      .catch(() => setStartTypes([]));
+  }, [run?.experiment_template_id, run?.status]);
 
   const loadRun = async () => {
     if (!runId) return;
@@ -237,10 +248,17 @@ const LimsRunDetail: React.FC = () => {
       );
       return;
     }
+    if (!run.experiment_template_id && !startTypeId) {
+      setError('Pick an instrument type before starting an ad hoc run.');
+      return;
+    }
     setTransitioning(true);
     setError(null);
     try {
-      await apiService.startLimsRun(runId, { sample_ids: ids });
+      await apiService.startLimsRun(runId, {
+        sample_ids: ids,
+        instrument_type_id: run.experiment_template_id ? undefined : startTypeId || undefined,
+      });
       setNoAnalysisDialog(false);
       await loadRun();
     } catch (err: any) {
@@ -701,6 +719,23 @@ const LimsRunDetail: React.FC = () => {
               Manage analytes / aliases
             </Button>
 
+            {(run.status === 'draft' || run.status === 'ordered') && !run.experiment_template_id && (
+              <FormControl fullWidth sx={{ mb: 2 }} required>
+                <InputLabel>Instrument type</InputLabel>
+                <Select
+                  label="Instrument type"
+                  value={startTypeId}
+                  onChange={(e) => setStartTypeId(String(e.target.value || ''))}
+                  inputProps={{ 'aria-label': 'Ad hoc instrument type' }}
+                >
+                  {startTypes.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             {(run.status === 'draft' || run.status === 'ordered') && (
               <Box sx={{ mb: 3 }}>
                 <StartCohortPanel
@@ -714,7 +749,16 @@ const LimsRunDetail: React.FC = () => {
                       setNoAnalysisDialog(true);
                       throw new Error('Analysis required');
                     }
-                    await apiService.startLimsRun(runId!, { sample_ids: ids });
+                    if (!run.experiment_template_id && !startTypeId) {
+                      setError('Pick an instrument type before starting an ad hoc run.');
+                      throw new Error('Instrument type required');
+                    }
+                    await apiService.startLimsRun(runId!, {
+                      sample_ids: ids,
+                      instrument_type_id: run.experiment_template_id
+                        ? undefined
+                        : startTypeId || undefined,
+                    });
                   }}
                   onStarted={() => void loadRun()}
                 />
@@ -754,7 +798,7 @@ const LimsRunDetail: React.FC = () => {
               <ListItem>
                 <ListItemText
                   primary="Instrument type"
-                  secondary={run.instrument_type_name || 'Not set (ad hoc runs may leave this empty)'}
+                  secondary={run.instrument_type_name || 'Required at start'}
                 />
               </ListItem>
               <ListItem>

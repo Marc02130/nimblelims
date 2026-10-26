@@ -392,6 +392,7 @@ class LimsRunService:
     ) -> None:
         """Snapshot the run type at start. Template copies the run_import slot."""
         from app.services.instrument_slots import (
+            RUN_TYPE_REQUIRED,
             require_active_instrument_type,
             require_typed_run_import,
         )
@@ -415,11 +416,20 @@ class LimsRunService:
             run.modified_by = self._user_id()
             self.db.flush()
             return
-        if instrument_type_id is not None:
-            require_active_instrument_type(self.db, instrument_type_id)
-            run.instrument_type_id = instrument_type_id
-            run.modified_by = self._user_id()
-            self.db.flush()
+        if instrument_type_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": RUN_TYPE_REQUIRED,
+                    "message": (
+                        "An ad hoc LIMS run must send instrument_type_id at start."
+                    ),
+                },
+            )
+        require_active_instrument_type(self.db, instrument_type_id)
+        run.instrument_type_id = instrument_type_id
+        run.modified_by = self._user_id()
+        self.db.flush()
 
     def substitute_instrument_type(
         self,
@@ -430,9 +440,10 @@ class LimsRunService:
     ) -> LimsRun:
         """Person running the experiment may substitute the type on this run.
 
-        Ownership is ``LimsRun.created_by`` (there is no started_by). A Lab
-        Technician may substitute only when they created the run.
-        Administrator and Lab Manager may substitute any non-terminal run.
+        Ownership is ``lims_runs.created_by`` (the run). LIMS runs have no
+        ``experiment_id`` and no ``started_by``. The person who created the
+        run may substitute, whether Lab Technician or Lab Manager.
+        Administrator and Lab Manager may also substitute any non-terminal run.
         """
         from app.services.instrument_slots import (
             RUN_TERMINAL,
@@ -461,8 +472,9 @@ class LimsRunService:
                     detail={
                         "code": "substitute_not_own_run",
                         "message": (
-                            "A lab technician can substitute the instrument type "
-                            "only on a run they created."
+                            "Only the person who created this run "
+                            "(lims_runs.created_by) can substitute its type, "
+                            "unless they are an Administrator or Lab Manager."
                         ),
                     },
                 )

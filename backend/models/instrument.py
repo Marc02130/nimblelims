@@ -149,7 +149,8 @@ class InstrumentScheduleAudit(Base):
     __tablename__ = "instrument_schedule_audits"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('first_due', 'schedule_active', 'schedule_interval', 'event_void')",
+            "action IN ('first_due', 'schedule_active', 'schedule_interval', "
+            "'schedule_kind', 'schedule_vendor', 'event_void')",
             name="ck_instrument_schedule_audits_action",
         ),
     )
