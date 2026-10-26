@@ -859,6 +859,10 @@ def test_first_due_waits_on_held_schedule_lock(migrated_engine):
 
     def hold_and_set():
         with Session() as s:
+            s.execute(
+                text("SELECT set_config('app.current_user_id', :u, true)"),
+                {"u": str(uid)},
+            )
             row = (
                 s.query(InstrumentMaintenanceSchedule)
                 .filter(InstrumentMaintenanceSchedule.id == sched)
@@ -872,6 +876,10 @@ def test_first_due_waits_on_held_schedule_lock(migrated_engine):
 
     def do_first_due():
         with Session() as s:
+            s.execute(
+                text("SELECT set_config('app.current_user_id', :u, true)"),
+                {"u": str(uid)},
+            )
             user = s.get(User, uid)
             try:
                 box["value"] = set_first_due(
@@ -1039,6 +1047,7 @@ def test_lab_manager_function_search_path_and_execute_revoked(migrated_engine):
     names = (
         "is_lab_manager_or_admin",
         "instrument_maintenance_schedules_guard",
+        "has_config_edit",
     )
     with migrated_engine.connect() as conn:
         for name in names:

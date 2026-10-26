@@ -21,14 +21,14 @@ down_revision = "0113_maintenance_tracked"
 branch_labels = None
 depends_on = None
 
-_CONFIG_EDIT = """EXISTS (
+_CATALOG_POLICY = "is_admin() OR has_experiment_access() OR has_config_edit()"
+_AUDIT_INSERT = "is_admin() OR has_config_edit()"
+_DOWN_POLICY = """is_admin() OR has_experiment_access() OR EXISTS (
     SELECT 1 FROM users u
     JOIN role_permissions rp ON rp.role_id = u.role_id
     JOIN permissions p ON p.id = rp.permission_id
     WHERE u.id = current_user_id() AND p.name = 'config:edit' AND p.active = true
 )"""
-_CATALOG_POLICY = f"is_admin() OR has_experiment_access() OR {_CONFIG_EDIT}"
-_AUDIT_INSERT = f"is_admin() OR {_CONFIG_EDIT}"
 
 
 def upgrade() -> None:
@@ -41,25 +41,6 @@ def upgrade() -> None:
         "COMMENT ON TABLE instrument_type_defaults IS "
         "'Retired. Maintenance tracking is per instrument. "
         "Rows are kept as history. Unused.'"
-    )
-
-    op.execute("DROP POLICY IF EXISTS instrument_maintenance_audits_access ON instrument_maintenance_audits")
-    op.execute(
-        "CREATE POLICY instrument_maintenance_audits_select "
-        "ON instrument_maintenance_audits FOR SELECT "
-        f"USING ({_CATALOG_POLICY})"
-    )
-    op.execute(
-        "CREATE POLICY instrument_maintenance_audits_insert "
-        "ON instrument_maintenance_audits FOR INSERT "
-        f"WITH CHECK ({_AUDIT_INSERT})"
-    )
-
-    op.execute("DROP POLICY IF EXISTS instrument_type_defaults_access ON instrument_type_defaults")
-    op.execute(
-        "CREATE POLICY instrument_type_defaults_select "
-        "ON instrument_type_defaults FOR SELECT "
-        f"USING ({_CATALOG_POLICY})"
     )
 
     op.execute(
@@ -89,6 +70,54 @@ def upgrade() -> None:
     )
     op.execute("REVOKE EXECUTE ON FUNCTION public.is_lab_manager_or_admin() FROM PUBLIC")
     op.execute("GRANT EXECUTE ON FUNCTION public.is_lab_manager_or_admin() TO lims_app")
+
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION public.has_config_edit()
+        RETURNS BOOLEAN
+        LANGUAGE plpgsql
+        SECURITY DEFINER
+        SET search_path = pg_catalog, public
+        AS $$
+        BEGIN
+            RETURN EXISTS (
+                SELECT 1
+                FROM public.users u
+                JOIN public.role_permissions rp ON rp.role_id = u.role_id
+                JOIN public.permissions p ON p.id = rp.permission_id
+                WHERE u.id = public.current_user_id()
+                  AND p.name = 'config:edit'
+                  AND p.active = true
+            );
+        END;
+        $$;
+        """
+    )
+    op.execute("ALTER FUNCTION public.has_config_edit() SECURITY DEFINER")
+    op.execute(
+        "ALTER FUNCTION public.has_config_edit() SET search_path = pg_catalog, public"
+    )
+    op.execute("REVOKE EXECUTE ON FUNCTION public.has_config_edit() FROM PUBLIC")
+    op.execute("GRANT EXECUTE ON FUNCTION public.has_config_edit() TO lims_app")
+
+    op.execute("DROP POLICY IF EXISTS instrument_maintenance_audits_access ON instrument_maintenance_audits")
+    op.execute(
+        "CREATE POLICY instrument_maintenance_audits_select "
+        "ON instrument_maintenance_audits FOR SELECT "
+        f"USING ({_CATALOG_POLICY})"
+    )
+    op.execute(
+        "CREATE POLICY instrument_maintenance_audits_insert "
+        "ON instrument_maintenance_audits FOR INSERT "
+        f"WITH CHECK ({_AUDIT_INSERT})"
+    )
+
+    op.execute("DROP POLICY IF EXISTS instrument_type_defaults_access ON instrument_type_defaults")
+    op.execute(
+        "CREATE POLICY instrument_type_defaults_select "
+        "ON instrument_type_defaults FOR SELECT "
+        f"USING ({_CATALOG_POLICY})"
+    )
 
     op.execute(
         "DROP POLICY IF EXISTS instrument_maintenance_schedules_access "
@@ -351,13 +380,14 @@ def downgrade() -> None:
     op.execute(
         "CREATE POLICY instrument_maintenance_schedules_access "
         "ON instrument_maintenance_schedules FOR ALL "
-        f"USING ({_CATALOG_POLICY}) WITH CHECK ({_CATALOG_POLICY})"
+        f"USING ({_DOWN_POLICY}) WITH CHECK ({_DOWN_POLICY})"
     )
     op.execute("DROP FUNCTION IF EXISTS is_lab_manager_or_admin()")
+    op.execute("DROP FUNCTION IF EXISTS has_config_edit()")
     op.execute("DROP POLICY IF EXISTS instrument_type_defaults_select ON instrument_type_defaults")
     op.execute(
         "CREATE POLICY instrument_type_defaults_access ON instrument_type_defaults FOR ALL "
-        f"USING ({_CATALOG_POLICY}) WITH CHECK ({_CATALOG_POLICY})"
+        f"USING ({_DOWN_POLICY}) WITH CHECK ({_DOWN_POLICY})"
     )
     op.execute(
         "DROP POLICY IF EXISTS instrument_maintenance_audits_select "
@@ -370,7 +400,7 @@ def downgrade() -> None:
     op.execute(
         "CREATE POLICY instrument_maintenance_audits_access "
         "ON instrument_maintenance_audits FOR ALL "
-        f"USING ({_CATALOG_POLICY}) WITH CHECK ({_CATALOG_POLICY})"
+        f"USING ({_DOWN_POLICY}) WITH CHECK ({_DOWN_POLICY})"
     )
     op.execute("COMMENT ON TABLE instrument_type_defaults IS NULL")
     op.execute("GRANT INSERT, UPDATE ON instrument_type_defaults TO lims_app")
