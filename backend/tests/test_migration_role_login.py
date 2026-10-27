@@ -47,6 +47,8 @@ def test_existing_nologin_lims_migrate_is_altered_to_login(migrated_engine):
     finally:
         os.environ["DATABASE_URL"] = url
         os.environ["MIGRATE_DATABASE_URL"] = url
+        with migrated_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text("ALTER ROLE lims_migrate LOGIN"))
         command.upgrade(cfg, "head")
         if previous_database is None:
             os.environ.pop("DATABASE_URL", None)

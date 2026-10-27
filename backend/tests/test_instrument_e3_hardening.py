@@ -116,14 +116,13 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
         "SET active = false, void_reason = 'db reason' WHERE id = :id",
         {"id": ids["event"]},
     )
-    with migrated_engine.begin() as conn:
-        conn.execute(
-            text(
-                "UPDATE instrument_maintenance_events "
-                "SET active = true, void_reason = NULL WHERE id = :id"
-            ),
-            {"id": ids["event"]},
-        )
+    _run_as_lims_app(
+        migrated_engine,
+        ids["uid"],
+        "UPDATE instrument_maintenance_events "
+        "SET active = true, void_reason = NULL WHERE id = :id",
+        {"id": ids["event"]},
+    )
 
 
 def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(
@@ -454,6 +453,14 @@ def test_reason_length_check_on_substitution(migrated_engine):
             )
 
 
+def test_blank_current_user_id_guc_is_sentinel(migrated_engine):
+    with migrated_engine.connect() as conn:
+        conn.execute(text("RESET ROLE"))
+        conn.execute(text("SELECT set_config('app.current_user_id', '', true)"))
+        value = conn.execute(text("SELECT current_user_id()")).scalar()
+        assert str(value) == "00000000-0000-0000-0000-000000000000"
+
+
 def test_0117_revision_id_and_single_head():
     from pathlib import Path
 
@@ -463,6 +470,7 @@ def test_0117_revision_id_and_single_head():
     assert len("0117_e3_hardening") <= 32
     assert 'down_revision = "0116_e2_review_fixes"' in text_src
     assert "GRANT DELETE" not in text_src
+    assert "NULLIF(current_setting('app.current_user_id', true), '')" in text_src
     assert "REVOKE UPDATE ON lims_run_imports FROM lims_app" in text_src
     assert "REVOKE DELETE ON lims_run_imports FROM lims_app" in text_src
     heads = [p.name for p in (backend / "db/migrations/versions").glob("0117*.py")]

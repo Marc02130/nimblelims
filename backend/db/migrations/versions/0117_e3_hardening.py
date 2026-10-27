@@ -66,6 +66,8 @@ def _register() -> None:
     if not cataloged:
         return
     admin = m._bind_admin(conn)
+    if admin is None:
+        return
     roles = {r[1]: r[0] for r in conn.execute(sa.text("SELECT id, name FROM roles")).all()}
     for client in cataloged:
         registered = {
@@ -274,6 +276,39 @@ def _unregister() -> None:
     )
 
 
+# current_setting(..., true) returns '' when unset. 0003's COALESCE never
+# saw NULL because the cast threw first. Treat blank like NULL.
+_CURRENT_USER_ID_FN = """
+CREATE OR REPLACE FUNCTION public.current_user_id()
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    RETURN COALESCE(
+        NULLIF(current_setting('app.current_user_id', true), '')::UUID,
+        '00000000-0000-0000-0000-000000000000'::UUID
+    );
+END;
+$$;
+"""
+
+_0003_CURRENT_USER_ID_FN = """
+CREATE OR REPLACE FUNCTION public.current_user_id()
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN COALESCE(
+        current_setting('app.current_user_id', true)::UUID,
+        '00000000-0000-0000-0000-000000000000'::UUID
+    );
+END;
+$$;
+"""
+
 _VOID_FN = """
 CREATE OR REPLACE FUNCTION public.refuse_void_only_passing_event()
 RETURNS trigger
@@ -282,6 +317,9 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
+    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
+        RETURN NEW;
+    END IF;
     IF NOT public.is_lab_manager_or_admin() THEN
         RAISE EXCEPTION 'maintenance_event_update_forbidden'
             USING ERRCODE = '42501';
@@ -554,6 +592,13 @@ def upgrade() -> None:
     _register()
     _register_new_columns()
 
+    op.execute(_CURRENT_USER_ID_FN)
+    op.execute("ALTER FUNCTION public.current_user_id() SECURITY DEFINER")
+    op.execute(
+        "ALTER FUNCTION public.current_user_id() "
+        "SET search_path = pg_catalog, public"
+    )
+    op.execute("GRANT EXECUTE ON FUNCTION public.current_user_id() TO lims_app")
     _install_fn(_VOID_FN, "refuse_void_only_passing_event")
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
@@ -665,6 +710,7 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS public.can_substitute_run(uuid)")
 
     op.execute(_0116_VOID_FN)
+    op.execute(_0003_CURRENT_USER_ID_FN)
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
         "ON instrument_maintenance_events"

@@ -27,10 +27,27 @@ from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
 
+def reset_migrated_engine_sessions(engine) -> None:
+    """Drop pooled connections that leaked SET ROLE lims_app.
+
+    SET ROLE is transactional. A pooled RESET ROLE that then rolls back
+    leaves the next checkout as lims_app with a blank current_user_id.
+    """
+    engine.dispose()
+
+
 def clear_0117_downgrade_blockers(engine) -> None:
     """Void-reason and slot-audit rows refuse 0117 downgrade. Tests that walk
     through 0117 must clear them first on the shared migrated_engine."""
+    reset_migrated_engine_sessions(engine)
     with engine.begin() as conn:
+        conn.execute(text("RESET ROLE"))
+        conn.execute(
+            text(
+                "SELECT set_config('app.current_user_id', "
+                "'00000000-0000-0000-0000-000000000000', false)"
+            )
+        )
         if conn.execute(
             text(
                 "SELECT 1 FROM information_schema.tables "
@@ -355,6 +372,17 @@ def _reset_published_lab_zone():
     clear_published_lab_zone()
     yield
     clear_published_lab_zone()
+
+
+@pytest.fixture(autouse=True)
+def _reset_migrated_engine_sessions(request):
+    """Close leaked SET ROLE sessions before a migrated_engine test."""
+    if "migrated_engine" not in request.fixturenames:
+        yield
+        return
+    engine = request.getfixturevalue("migrated_engine")
+    reset_migrated_engine_sessions(engine)
+    yield
 
 
 @pytest.fixture(scope="function")
