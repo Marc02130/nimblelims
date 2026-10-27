@@ -241,4 +241,35 @@ describe('InstrumentCatalogManagement', () => {
     expect(await screen.findByText('Event voided')).toBeInTheDocument();
     expect(api.updateInstrumentMaintenanceEvent).toHaveBeenCalledWith('e1', { active: false });
   });
+
+  test('kind and downtime reason pickers omit removed entries', async () => {
+    api.getListEntries.mockImplementation(async (name: string) => {
+      if (name === 'maintenance_types') {
+        return [
+          { id: 'k1', name: 'PM', active: true },
+          { id: 'k-retired', name: 'Retired kind', active: false },
+        ];
+      }
+      if (name === 'downtime_reasons') {
+        return [
+          { id: 'r1', name: 'Breakdown', active: true },
+          { id: 'r-retired', name: 'Retired reason', active: false },
+        ];
+      }
+      return [];
+    });
+    const first = wrap(<InstrumentCatalogManagement />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Maintenance' }));
+    fireEvent.click(screen.getByRole('button', { name: /Add Maintenance/i }));
+    fireEvent.mouseDown(await screen.findByLabelText('Kind'));
+    expect(await screen.findByRole('option', { name: 'PM' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Retired kind' })).not.toBeInTheDocument();
+    first.unmount();
+    wrap(<InstrumentCatalogManagement />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Downtime' }));
+    fireEvent.click(screen.getByRole('button', { name: /Add Downtime/i }));
+    fireEvent.mouseDown(await screen.findByLabelText('Reason'));
+    expect(await screen.findByRole('option', { name: 'Breakdown' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Retired reason' })).not.toBeInTheDocument();
+  });
 });

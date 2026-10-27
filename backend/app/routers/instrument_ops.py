@@ -145,7 +145,14 @@ def _commit(db: Session, row, fail: str):
         raise HTTPException(status_code=400, detail=fail)
 
 
-def _list_entry(db: Session, list_name: str, entry_id: UUID, label: str) -> ListEntry:
+def _list_entry(
+    db: Session,
+    list_name: str,
+    entry_id: UUID,
+    label: str,
+    *,
+    allow_inactive: bool = False,
+) -> ListEntry:
     lst = db.query(ListModel).filter(ListModel.name == list_name).first()
     if lst is None:
         raise HTTPException(status_code=500, detail="A required list is not seeded")
@@ -156,6 +163,11 @@ def _list_entry(db: Session, list_name: str, entry_id: UUID, label: str) -> List
     )
     if row is None:
         raise HTTPException(status_code=400, detail=f"Invalid {label}")
+    if row.active is not True and not allow_inactive:
+        _refuse(
+            "list_entry_inactive",
+            f"That {label} is inactive and cannot be used.",
+        )
     return row
 
 
@@ -307,7 +319,13 @@ def update_schedule(
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
     data = explicit_updates(body, row, refuse_null={"active", "interval_days", "kind_id"})
     if "kind_id" in data:
-        _list_entry(db, "maintenance_types", data["kind_id"], "maintenance type")
+        _list_entry(
+            db,
+            "maintenance_types",
+            data["kind_id"],
+            "maintenance type",
+            allow_inactive=data["kind_id"] == row.kind_id,
+        )
     if "service_vendor_id" in data and data["service_vendor_id"] is not None:
         if not db.query(Vendor).filter(Vendor.id == data["service_vendor_id"]).first():
             raise HTTPException(status_code=400, detail="Invalid service vendor")
@@ -677,7 +695,13 @@ def update_downtime(
         raise HTTPException(status_code=404, detail="Downtime not found")
     data = explicit_updates(body, row, refuse_null={"active"})
     if "reason_id" in data:
-        _list_entry(db, "downtime_reasons", data["reason_id"], "downtime reason")
+        _list_entry(
+            db,
+            "downtime_reasons",
+            data["reason_id"],
+            "downtime reason",
+            allow_inactive=data["reason_id"] == row.reason_id,
+        )
     if "maintenance_event_id" in data and data["maintenance_event_id"] is not None:
         ev = (
             db.query(InstrumentMaintenanceEvent)
