@@ -273,7 +273,7 @@ def test_db_refuses_foreign_substitution_and_cancel_after_import(migrated_engine
         ):
             _grant_if_missing(conn, table, privilege)
 
-    with pytest.raises((ProgrammingError, InternalError)) as sub:
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as sub:
         _run_as_lims_app(
             migrated_engine,
             tech,
@@ -284,7 +284,7 @@ def test_db_refuses_foreign_substitution_and_cancel_after_import(migrated_engine
         )
     assert "substitute_not_own_run" in str(sub.value.orig)
 
-    with pytest.raises((ProgrammingError, InternalError)) as apply:
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as apply:
         _run_as_lims_app(
             migrated_engine,
             tech,
@@ -293,7 +293,7 @@ def test_db_refuses_foreign_substitution_and_cancel_after_import(migrated_engine
         )
     assert "substitute_not_own_run" in str(apply.value.orig)
 
-    with pytest.raises((ProgrammingError, InternalError)) as cancel:
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as cancel:
         _run_as_lims_app(
             migrated_engine,
             tech,
