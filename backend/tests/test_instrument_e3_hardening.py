@@ -116,6 +116,14 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
         "SET active = false, void_reason = 'db reason' WHERE id = :id",
         {"id": ids["event"]},
     )
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE instrument_maintenance_events "
+                "SET active = true, void_reason = NULL WHERE id = :id"
+            ),
+            {"id": ids["event"]},
+        )
 
 
 def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(

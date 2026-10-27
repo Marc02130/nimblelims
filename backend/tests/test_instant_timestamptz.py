@@ -120,6 +120,9 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        with migrated_engine.begin() as conn:
+            conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
+            conn.execute(text("UPDATE instrument_maintenance_events SET void_reason = NULL"))
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             targets = _stamp_sample(conn)
@@ -348,6 +351,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "instrument_schedule_audits",
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
+        "instrument_entry_slot_audits",
     }
     assert extra <= allowed_extra
     for name in extra:
