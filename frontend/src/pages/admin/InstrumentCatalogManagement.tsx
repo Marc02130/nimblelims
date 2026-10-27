@@ -222,6 +222,8 @@ const InstrumentCatalogManagement: React.FC<{
   const [stopReason, setStopReason] = useState<string | null>(null);
   const [firstDueId, setFirstDueId] = useState<string | null>(null);
   const [firstDueDate, setFirstDueDate] = useState('');
+  const [voidEventId, setVoidEventId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState('');
 
   const loadAll = useCallback(async () => {
     try {
@@ -469,6 +471,9 @@ const InstrumentCatalogManagement: React.FC<{
       } else if (tab === 'events') {
         if (editingId) {
           if (!canManageSchedules) throw new Error('Only a Lab Manager or Administrator can edit an event');
+          if (!eventForm.active && !eventForm.reason.trim()) {
+            throw new Error('A reason is required to void a maintenance event');
+          }
           await apiService.updateInstrumentMaintenanceEvent(editingId, {
             note: eventForm.note || undefined,
             certificate_url: eventForm.certificate_url.trim() || undefined,
@@ -574,11 +579,18 @@ const InstrumentCatalogManagement: React.FC<{
         ? canBench || canEdit
         : canEdit;
 
-  const voidEvent = async (row: MaintenanceEvent) => {
-    if (!canManageSchedules) return;
+  const submitVoidEvent = async () => {
+    if (!voidEventId || !voidReason.trim()) return;
+    setSubmitting(true);
+    setError(null);
     try {
-      await apiService.updateInstrumentMaintenanceEvent(row.id, { active: false });
+      await apiService.updateInstrumentMaintenanceEvent(voidEventId, {
+        active: false,
+        reason: voidReason.trim(),
+      });
       setSuccess('Event voided');
+      setVoidEventId(null);
+      setVoidReason('');
       await loadAll();
     } catch (err: any) {
       const detail = err.response?.data?.detail;
@@ -587,6 +599,8 @@ const InstrumentCatalogManagement: React.FC<{
           err.message ||
           (typeof detail === 'string' ? detail : 'Could not void the event')
       );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -716,7 +730,15 @@ const InstrumentCatalogManagement: React.FC<{
     actionsCol((p) => openEdit(p.row), (p) => {
       if (!canManageSchedules || !p.row.active) return [];
       return [
-        <GridActionsCellItem key="void" label="Void" showInMenu onClick={() => voidEvent(p.row)} />,
+        <GridActionsCellItem
+          key="void"
+          label="Void"
+          showInMenu
+          onClick={() => {
+            setVoidEventId(p.row.id);
+            setVoidReason('');
+          }}
+        />,
       ];
     }),
   ];
@@ -1149,8 +1171,14 @@ const InstrumentCatalogManagement: React.FC<{
                     label="Reason"
                     fullWidth
                     margin="normal"
+                    required={!eventForm.active}
                     value={eventForm.reason}
                     onChange={(e) => setEventForm({ ...eventForm, reason: e.target.value })}
+                    helperText={
+                      eventForm.active
+                        ? 'Required when voiding. Trimmed length 1–1000.'
+                        : 'Required to void. Trimmed length 1–1000.'
+                    }
                   />
                 </>
               )}
@@ -1219,6 +1247,51 @@ const InstrumentCatalogManagement: React.FC<{
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={submitting} variant="contained">
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(voidEventId)}
+        onClose={() => {
+          if (!submitting) {
+            setVoidEventId(null);
+            setVoidReason('');
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Void maintenance event</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Reason"
+            fullWidth
+            margin="normal"
+            required
+            value={voidReason}
+            onChange={(e) => setVoidReason(e.target.value)}
+            helperText="Required. Trimmed length 1–1000."
+            inputProps={{ 'data-testid': 'void-event-reason' }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setVoidEventId(null);
+              setVoidReason('');
+            }}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={submitVoidEvent}
+            disabled={submitting || !voidReason.trim()}
+            variant="contained"
+            data-testid="void-event-confirm"
+          >
+            Void
           </Button>
         </DialogActions>
       </Dialog>

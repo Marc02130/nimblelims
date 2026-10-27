@@ -238,8 +238,15 @@ describe('InstrumentCatalogManagement', () => {
     wrap(<InstrumentCatalogManagement eventsOnly />);
     expect(await screen.findByRole('button', { name: 'Void' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Void' }));
+    expect(await screen.findByText('Void maintenance event')).toBeInTheDocument();
+    expect(api.updateInstrumentMaintenanceEvent).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId('void-event-reason'), { target: { value: 'wrong date' } });
+    fireEvent.click(screen.getByTestId('void-event-confirm'));
     expect(await screen.findByText('Event voided')).toBeInTheDocument();
-    expect(api.updateInstrumentMaintenanceEvent).toHaveBeenCalledWith('e1', { active: false });
+    expect(api.updateInstrumentMaintenanceEvent).toHaveBeenCalledWith('e1', {
+      active: false,
+      reason: 'wrong date',
+    });
   });
 
   test('kind and downtime reason pickers omit removed entries', async () => {
