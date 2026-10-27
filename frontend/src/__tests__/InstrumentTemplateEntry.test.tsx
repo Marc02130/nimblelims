@@ -37,7 +37,7 @@ jest.mock('../services/apiService', () => ({
 
 jest.mock('../contexts/UserContext', () => ({
   useUser: () => ({
-    user: { id: '1', username: 'admin', permissions: ['experiment:manage'] },
+    user: { id: '1', username: 'admin', role: 'Administrator', permissions: ['experiment:manage'] },
     hasPermission: (permission: string) => permission === 'experiment:manage',
     loading: false,
   }),
@@ -66,6 +66,13 @@ beforeEach(() => {
 describe('Experiment template Instruments entry', () => {
   test('Type dropdown includes Instruments', async () => {
     wrap(<ExperimentTemplatesManagement />);
+    await waitFor(() =>
+      expect(api.getExperimentTemplates).toHaveBeenCalledWith({
+        include_inactive: true,
+        page: 1,
+        size: 500,
+      })
+    );
     fireEvent.click(await screen.findByRole('button', { name: /New Template/i }));
     fireEvent.click(screen.getByRole('tab', { name: /Tables & forms/i }));
     const typeSelects = screen.getAllByLabelText('Type');

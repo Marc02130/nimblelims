@@ -68,6 +68,9 @@ Create vendor **Agilent** if it is not already in `/v1/vendors`. Create instrume
 | IT-34 | Use entry belongs to experiment | POST `/v1/instrument-uses` with `entry_id` + `lims_run_id`. Then `entry_id` + a different `experiment_id`. Then `entry_id` + the entry's experiment. | First **422** `use_target_conflict`. Second **422** `entry_experiment_mismatch`. Third **201**. Unknown `entry_id` is **404**. |
 | IT-35 | Restore voided event | After IT-4 (two passing events), as `lab-manager` or `admin` void the earlier one, then PATCH `{"active": true, "reason": "put back"}`. As `lab-tech` the same restore. | Manager/admin restore **200**. `instrument_schedule_audits` has `action=event_restore` with that reason. Tech restore **403**. |
 | IT-36 | create_entry slot validator | POST `/v1/experiments/{id}/entries` as an Instruments entry with a `run_import` slot and no type. Then with a typed `run_import` slot. | First **422** `instrument_entry_invalid`. Second **201**. |
+| IT-37 | Void requires a reason | As `lab-manager` or `admin`, PATCH a maintenance event `{"active":false}` with no reason, then with `"   "`, then with `"wrong date"`. | Missing/blank **422** `void_reason_required`. With a reason **200**, `void_reason` stored, `event_void` audit has the reason. |
+| IT-38 | Track maintenance is Administrator-only | As `lab-manager` (no `config:edit`), PATCH GC-UAT-1 `{"maintenance_tracked":true}` then `{"maintenance_tracked":false}`. As `admin`, both flips. | Manager both **403**. Admin **200** and `instrument_maintenance_audits` written. |
+| IT-39 | Inactive templates hidden from create-run | Deactivate a typed LIMS run template. As `lab-tech`, GET `/v1/experiment-templates` and GET with `include_inactive=true`. As `lab-manager`/`admin`, GET with `include_inactive=true`. Open the existing run. Create a new run from that template. Start the existing run. | Tech lists omit it (even with the flag). Manager/admin catalog includes it. Existing run still shows `experiment_template_id`. Create and start **422** `template_inactive`. |
 
 ---
 
@@ -75,4 +78,5 @@ Create vendor **Agilent** if it is not already in `/v1/vendors`. Create instrume
 
 - Locations on an instrument are optional FKs to the existing `locations` table (client sites). Do not treat them as lab rooms.
 - `lims_runs` must not gain an `instrument_id` column. Fail this script if a run create/edit form asks for an instrument.
+- **Local pytest skip vs CI:** this Cloud Agent environment has previously shown **1 skipped** locally while CI shows **0 skipped**. The skip candidates in-repo are `test_security_p3_s11_s12` (`pytest.skip` when `docker compose` is missing or `compose config` fails) and data-dependent skips in `test_security_s7_project_users` / `test_eav_expansion`. Record the exact skipped node id from `pytest -rs` on this run in the E3 PR body. Do not silently skip.
 - Downtime reasons **Calibration** and maintenance kind **calibration** are different list entries (global `list_entries.name` is unique).

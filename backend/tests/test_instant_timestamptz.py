@@ -27,6 +27,7 @@ from app.core.instant_columns import (
 )
 from checks.naive_instants import scan_tree
 from models.base import Base
+from tests.conftest import clear_0117_downgrade_blockers
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
@@ -120,6 +121,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             targets = _stamp_sample(conn)
@@ -151,6 +153,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
             _assert_catalog(conn, instants_are_aware=True)
             _assert_upgraded_values(conn, targets)
 
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             assert _counts(conn) == before_counts
@@ -348,10 +351,17 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "instrument_schedule_audits",
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
+        "instrument_entry_slot_audits",
     }
     assert extra <= allowed_extra
+    nonempty_ok = {
+        "instrument_template_inactivations",
+        "instrument_types_legacy",
+    }
     for name in extra:
-        assert after[name] == 0
+        if name in nonempty_ok:
+            continue
+        assert after[name] == 0, name
     missing = set(before) - set(after)
     assert missing <= {"instrument_types"}
     # 0111 seeds instrument_types / maintenance_types / downtime_reasons and

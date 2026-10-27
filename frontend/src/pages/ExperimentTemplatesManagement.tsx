@@ -350,8 +350,9 @@ const blankDefinition = (): TemplateDefinition => ({
 const ExperimentTemplatesManagement: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { hasPermission } = useUser();
+  const { hasPermission, user } = useUser();
   const canManage = hasPermission('experiment:manage');
+  const canSeeInactive = user?.role === 'Administrator' || user?.role === 'Lab Manager';
 
   // List state
   const [rows, setRows] = useState<ExperimentTemplateRow[]>([]);
@@ -419,7 +420,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getExperimentTemplates();
+      const data = await apiService.getExperimentTemplates({
+        include_inactive: canSeeInactive,
+        page: 1,
+        size: 500,
+      });
       setRows(Array.isArray(data) ? data : (data?.templates ?? data?.items ?? []));
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };

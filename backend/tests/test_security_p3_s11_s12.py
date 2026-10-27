@@ -104,6 +104,9 @@ class TestS12ProdCompose:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pytest.skip("docker compose not available")
         if result.returncode != 0:
+            # This Cloud Agent docker CLI rejects `docker compose -f`
+            # (`unknown shorthand flag: 'f'`). CI has Compose v2 and does
+            # not skip. See UAT_Scripts/uat-instrument-e3-hardening.md.
             pytest.skip(f"compose config failed: {result.stderr[:200]}")
 
         # Extract db service block; must not publish host 5432

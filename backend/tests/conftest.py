@@ -26,6 +26,52 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
+
+def reset_migrated_engine_sessions(engine) -> None:
+    """Drop pooled connections that leaked SET ROLE lims_app.
+
+    SET ROLE is transactional. A pooled RESET ROLE that then rolls back
+    leaves the next checkout as lims_app with a blank current_user_id.
+    """
+    engine.dispose()
+
+
+def clear_0117_downgrade_blockers(engine) -> None:
+    """Void-reason and slot-audit rows refuse 0117 downgrade. Tests that walk
+    through 0117 must clear them first on the shared migrated_engine."""
+    reset_migrated_engine_sessions(engine)
+    with engine.begin() as conn:
+        conn.execute(text("RESET ROLE"))
+        admin = conn.execute(
+            text(
+                "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id "
+                "WHERE r.name = 'Administrator' ORDER BY u.created_at LIMIT 1"
+            )
+        ).scalar()
+        conn.execute(
+            text("SELECT set_config('app.current_user_id', :u, false)"),
+            {"u": str(admin or "00000000-0000-0000-0000-000000000000")},
+        )
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_entry_slot_audits'"
+            )
+        ).scalar():
+            conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_maintenance_events' "
+                "AND column_name = 'void_reason'"
+            )
+        ).scalar():
+            conn.execute(
+                text("UPDATE instrument_maintenance_events SET void_reason = NULL")
+            )
+
 from app.main import app
 from app.database import get_db
 from app.core.bootstrap_roles import (
@@ -330,6 +376,17 @@ def _reset_published_lab_zone():
     clear_published_lab_zone()
     yield
     clear_published_lab_zone()
+
+
+@pytest.fixture(autouse=True)
+def _reset_migrated_engine_sessions(request):
+    """Close leaked SET ROLE sessions before a migrated_engine test."""
+    if "migrated_engine" not in request.fixturenames:
+        yield
+        return
+    engine = request.getfixturevalue("migrated_engine")
+    reset_migrated_engine_sessions(engine)
+    yield
 
 
 @pytest.fixture(scope="function")

@@ -48,6 +48,40 @@ def _run_as_lims_app(engine, user_id, sql, params=None):
         isolated.dispose()
 
 
+def _direct_lims_app_engine(engine):
+    """Login as lims_app. Password is the test fixture value, never committed."""
+    from app.core.bootstrap_roles import APP_ROLE, TEST_APP_PASSWORD
+
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(
+            text(f"ALTER ROLE {APP_ROLE} PASSWORD :pwd"),
+            {"pwd": TEST_APP_PASSWORD},
+        )
+    url = engine.url.set(
+        username=APP_ROLE, password=TEST_APP_PASSWORD
+    ).render_as_string(hide_password=False)
+    return create_engine(url, poolclass=NullPool)
+
+
+def _run_as_direct_lims_app(engine, user_id, sql, params=None, reset_role=False):
+    """CONNECT as lims_app. No SET ROLE unless reset_role exercises RESET ROLE."""
+    isolated = _direct_lims_app_engine(engine)
+    try:
+        with isolated.connect() as conn:
+            if reset_role:
+                conn.execute(text("SET ROLE lims_app"))
+                conn.execute(text("RESET ROLE"))
+            conn.execute(
+                text("SELECT set_config('app.current_user_id', :u, true)"),
+                {"u": str(user_id)},
+            )
+            result = conn.execute(text(sql), params or {})
+            conn.commit()
+            return result
+    finally:
+        isolated.dispose()
+
+
 @pytest.fixture
 def admin_h(client, test_admin_user):
     return _login(client, "admin", "adminpassword")
@@ -353,7 +387,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     client.patch(
         f"/v1/instrument-maintenance-events/{first.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void only passing"},
     )
     awaiting = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
     assert awaiting["code"] == "instrument_awaiting_first_due"
@@ -401,7 +435,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     client.patch(
         f"/v1/instrument-maintenance-events/{second_keep.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void later passing"},
     )
     still = client.get(f"/v1/instruments/{other['id']}/eligibility", headers=admin_h).json()
     assert still["allowed"] is True
@@ -1020,7 +1054,7 @@ def test_void_last_event_is_audited_and_keeps_ruling_7(
     voided = client.patch(
         f"/v1/instrument-maintenance-events/{created.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void last event"},
     )
     assert voided.status_code == 200, voided.text
     awaiting = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
