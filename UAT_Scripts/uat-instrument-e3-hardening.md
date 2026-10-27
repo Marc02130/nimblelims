@@ -19,7 +19,7 @@
 
 Exact local skip from `pytest -rs` on this branch:
 
-- `tests/test_security_p3_s11_s12.py:107` — `compose config failed: unknown shorthand flag: 'f' in -f`. This Cloud Agent image's `docker` CLI does not accept `docker compose -f`. CI runs a real Compose file and shows **0 skipped**.
+- `tests/test_security_p3_s11_s12.py:110` — `compose config failed: unknown shorthand flag: 'f' in -f`. This Cloud Agent image's `docker` CLI does not accept `docker compose -f`. CI runs a real Compose file and shows **0 skipped**.
 
 Other in-repo skip candidates (not hit on this run):
 
