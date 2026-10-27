@@ -20,8 +20,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from db.append_only_tables import MAINTENANCE_SESSION_ROLES
-
 revision = "0117_e3_hardening"
 down_revision = "0116_e2_review_fixes"
 branch_labels = None
@@ -315,7 +313,7 @@ $$;
 # Production connects as lims_app and never SET ROLE, so current_setting('role')
 # is 'none'. Skip only pinned maintenance roles (and superuser logins used
 # by tests). Enforce when session_user is lims_app or SET ROLE lims_app.
-_SKIP_GUARD_FN = f"""
+_SKIP_GUARD_FN = """
 CREATE OR REPLACE FUNCTION public.skip_app_row_guard()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -329,7 +327,7 @@ BEGIN
         RETURN FALSE;
     END IF;
     IF session_user = ANY (
-        ARRAY[{", ".join(repr(n) for n in MAINTENANCE_SESSION_ROLES)}]::name[]
+        ARRAY['lims_migrate', 'schema_apply', 'postgres']::name[]
     ) THEN
         RETURN TRUE;
     END IF;

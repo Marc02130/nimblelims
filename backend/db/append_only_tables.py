@@ -14,6 +14,9 @@ from typing import FrozenSet, Mapping
 
 # table -> privileges to revoke from lims_app after the blanket GRANT.
 APPEND_ONLY_REVOKES: Mapping[str, FrozenSet[str]] = {
+    # 0095 / 0118 — CREATE granted SELECT/INSERT/UPDATE only; ensure must
+    # not put DELETE back.
+    "lab_settings": frozenset({"DELETE"}),
     # 0108
     "result_acceptances": frozenset({"DELETE"}),
     # 0109

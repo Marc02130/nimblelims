@@ -63,14 +63,18 @@ def _direct_lims_app_engine(engine):
     return create_engine(url, poolclass=NullPool)
 
 
-def _run_as_direct_lims_app(engine, user_id, sql, params=None, reset_role=False):
-    """CONNECT as lims_app. No SET ROLE unless reset_role exercises RESET ROLE."""
+def _run_as_direct_lims_app(
+    engine, user_id, sql, params=None, reset_role=False, set_role_none=False
+):
+    """CONNECT as lims_app. Optional SET ROLE lims_app then RESET ROLE or NONE."""
     isolated = _direct_lims_app_engine(engine)
     try:
         with isolated.connect() as conn:
             if reset_role:
                 conn.execute(text("SET ROLE lims_app"))
                 conn.execute(text("RESET ROLE"))
+            if set_role_none:
+                conn.execute(text("SET ROLE NONE"))
             conn.execute(
                 text("SELECT set_config('app.current_user_id', :u, true)"),
                 {"u": str(user_id)},

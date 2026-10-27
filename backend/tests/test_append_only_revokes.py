@@ -11,7 +11,7 @@ from db.append_only_tables import APPEND_ONLY_REVOKES
 VERSIONS = Path(__file__).resolve().parents[1] / "db" / "migrations" / "versions"
 _REVOKE = re.compile(
     r"REVOKE\s+((?:INSERT|UPDATE|DELETE)(?:\s*,\s*(?:INSERT|UPDATE|DELETE))*)"
-    r"\s+ON(?:\s+TABLE)?\s+\{?['\"]?(\w+)",
+    r"\s+ON(?:\s+TABLE)?\s+\{?['\"]?(\w+)['\"]?\s*(?:FROM|\})",
     re.IGNORECASE,
 )
 
@@ -55,21 +55,26 @@ def _revokes_in_migrations() -> dict[str, set[str]]:
 
 def test_canonical_list_matches_migration_revokes():
     found = _revokes_in_migrations()
-    for table, privileges in APPEND_ONLY_REVOKES.items():
-        assert table in found, table
-        assert privileges <= found[table], (table, privileges, found[table])
-    extras = {
-        name
-        for name in found
-        if name not in APPEND_ONLY_REVOKES
-        and name not in {"table", "SCHEMA"}
-        and ("_" in name or name in {"vendors", "reagents"})
+    missing = []
+    for table, privileges in found.items():
+        if table in {"table", "SCHEMA"}:
+            continue
+        needed = privileges & {"UPDATE", "DELETE"}
+        if not needed:
+            continue
+        if table not in APPEND_ONLY_REVOKES:
+            missing.append((table, needed))
+            continue
+        assert needed <= APPEND_ONLY_REVOKES[table], (table, needed, APPEND_ONLY_REVOKES[table])
+    assert missing == [], missing
+    extras = set(APPEND_ONLY_REVOKES) - {
+        name for name in found if name not in {"table", "SCHEMA"}
     }
     assert extras == set(), extras
 
 
 def test_ensure_script_reapplies_revokes(migrated_engine, monkeypatch):
-    from app.core.bootstrap_roles import TEST_APP_PASSWORD
+    from app.core.bootstrap_roles import HISTORICAL_ROLE, TEST_APP_PASSWORD
     from ensure_lims_app_role import ensure_lims_app_role
 
     monkeypatch.setenv(
@@ -85,6 +90,16 @@ def test_ensure_script_reapplies_revokes(migrated_engine, monkeypatch):
                 "IN SCHEMA public TO lims_app"
             )
         )
+        if conn.execute(
+            text("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :r"),
+            {"r": HISTORICAL_ROLE},
+        ).scalar():
+            conn.execute(
+                text(
+                    f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES "
+                    f"IN SCHEMA public TO {HISTORICAL_ROLE}"
+                )
+            )
     ensure_lims_app_role()
     with migrated_engine.connect() as conn:
         existing = {
@@ -96,12 +111,23 @@ def test_ensure_script_reapplies_revokes(migrated_engine, monkeypatch):
                 )
             ).all()
         }
+        missing = set(APPEND_ONLY_REVOKES) - existing
+        assert missing == set(), missing
         for table, privileges in APPEND_ONLY_REVOKES.items():
-            if table not in existing:
-                continue
             for privilege in privileges:
                 allowed = conn.execute(
                     text("SELECT has_table_privilege('lims_app', :t, :p)"),
                     {"t": table, "p": privilege},
                 ).scalar()
                 assert allowed is False, f"{table} {privilege}"
+        if conn.execute(
+            text("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :r"),
+            {"r": HISTORICAL_ROLE},
+        ).scalar():
+            for table, privileges in APPEND_ONLY_REVOKES.items():
+                for privilege in privileges:
+                    allowed = conn.execute(
+                        text("SELECT has_table_privilege(:r, :t, :p)"),
+                        {"r": HISTORICAL_ROLE, "t": table, "p": privilege},
+                    ).scalar()
+                    assert allowed is False, f"{HISTORICAL_ROLE} {table} {privilege}"
