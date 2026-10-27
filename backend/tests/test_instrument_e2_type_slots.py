@@ -413,7 +413,7 @@ def test_entry_slot_type_change_voids_use_and_does_not_change_template(
 ):
     from models.experiment import Experiment, ExperimentTemplate
     from models.entry import Entry
-    from models.instrument import InstrumentUse
+    from models.instrument import InstrumentEntrySlotAudit, InstrumentUse
 
     plate = _seeded_type(client, admin_h, "Plate reader")
     qpcr = _seeded_type(client, admin_h, "qPCR")
@@ -492,6 +492,16 @@ def test_entry_slot_type_change_voids_use_and_does_not_change_template(
     assert use_row.active is False
     kept = db_session.query(ExperimentTemplate).filter(ExperimentTemplate.id == template.id).one()
     assert kept.template_definition["entries"][0]["config"]["slots"][0]["instrument_type_id"] == plate["id"]
+    audits = (
+        db_session.query(InstrumentEntrySlotAudit)
+        .filter(InstrumentEntrySlotAudit.entry_id == entry.id)
+        .all()
+    )
+    assert len(audits) == 1
+    assert audits[0].slot_key == "reader"
+    assert str(audits[0].previous_instrument_type_id) == plate["id"]
+    assert str(audits[0].new_instrument_type_id) == qpcr["id"]
+    assert audits[0].created_by == test_admin_user.id
 
 
 def test_use_type_mismatch_and_missing_slot(

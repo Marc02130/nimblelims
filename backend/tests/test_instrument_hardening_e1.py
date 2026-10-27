@@ -353,7 +353,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     client.patch(
         f"/v1/instrument-maintenance-events/{first.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void only passing"},
     )
     awaiting = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
     assert awaiting["code"] == "instrument_awaiting_first_due"
@@ -401,7 +401,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     client.patch(
         f"/v1/instrument-maintenance-events/{second_keep.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void later passing"},
     )
     still = client.get(f"/v1/instruments/{other['id']}/eligibility", headers=admin_h).json()
     assert still["allowed"] is True
@@ -1020,7 +1020,7 @@ def test_void_last_event_is_audited_and_keeps_ruling_7(
     voided = client.patch(
         f"/v1/instrument-maintenance-events/{created.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void last event"},
     )
     assert voided.status_code == 200, voided.text
     awaiting = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
