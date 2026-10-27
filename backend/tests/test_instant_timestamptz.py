@@ -27,6 +27,7 @@ from app.core.instant_columns import (
 )
 from checks.naive_instants import scan_tree
 from models.base import Base
+from tests.conftest import clear_0117_downgrade_blockers
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
@@ -120,9 +121,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
-        with migrated_engine.begin() as conn:
-            conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
-            conn.execute(text("UPDATE instrument_maintenance_events SET void_reason = NULL"))
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             targets = _stamp_sample(conn)
@@ -154,6 +153,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
             _assert_catalog(conn, instants_are_aware=True)
             _assert_upgraded_values(conn, targets)
 
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             assert _counts(conn) == before_counts

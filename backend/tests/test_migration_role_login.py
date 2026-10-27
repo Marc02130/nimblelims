@@ -26,6 +26,9 @@ def test_existing_nologin_lims_migrate_is_altered_to_login(migrated_engine):
                 text("SELECT rolcanlogin FROM pg_roles WHERE rolname = 'lims_migrate'")
             ).scalar()
             assert before is False
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0102_instant_timestamptz")
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:

@@ -17,10 +17,11 @@
 
 ## Local pytest skip
 
-This Cloud Agent environment has previously shown **1 skipped** locally while CI shows **0 skipped**. In-repo skip candidates:
+Exact local skip from `pytest -rs` on this branch:
 
-- `backend/tests/test_security_p3_s11_s12.py` — `pytest.skip` when `docker compose` is missing or `compose config` fails
+- `tests/test_security_p3_s11_s12.py:107` — `compose config failed: unknown shorthand flag: 'f' in -f`. This Cloud Agent image's `docker` CLI does not accept `docker compose -f`. CI runs a real Compose file and shows **0 skipped**.
+
+Other in-repo skip candidates (not hit on this run):
+
 - `backend/tests/test_security_s7_project_users.py` — `pytest.skip("Client role not seeded")`
 - `backend/tests/test_eav_expansion.py` — skips when sample/test/project/client/batch status rows are missing
-
-Record the exact skipped node id from `pytest -rs` on the E3 run. Do not silently skip.

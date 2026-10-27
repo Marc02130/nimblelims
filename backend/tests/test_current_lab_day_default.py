@@ -13,6 +13,7 @@ from sqlalchemy.exc import InternalError
 
 from app.core.lab_time import clock_date
 from models.lab_setting import LAB_SETTINGS_ID
+from tests.conftest import clear_0117_downgrade_blockers
 
 BEFORE = "0103_migration_role_owner"
 REVISION_0104 = "0104_current_lab_day"
@@ -262,6 +263,7 @@ def test_downgrade_restores_current_date(migrated_engine) -> None:
     url, previous_database, previous_migrate = _bind_urls(migrated_engine)
     cfg = _config(url)
     try:
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             default = conn.execute(

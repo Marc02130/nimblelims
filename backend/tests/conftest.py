@@ -26,6 +26,31 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
+
+def clear_0117_downgrade_blockers(engine) -> None:
+    """Void-reason and slot-audit rows refuse 0117 downgrade. Tests that walk
+    through 0117 must clear them first on the shared migrated_engine."""
+    with engine.begin() as conn:
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_entry_slot_audits'"
+            )
+        ).scalar():
+            conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_maintenance_events' "
+                "AND column_name = 'void_reason'"
+            )
+        ).scalar():
+            conn.execute(
+                text("UPDATE instrument_maintenance_events SET void_reason = NULL")
+            )
+
 from app.main import app
 from app.database import get_db
 from app.core.bootstrap_roles import (

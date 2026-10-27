@@ -167,6 +167,8 @@ def _register_new_columns() -> None:
     conn = op.get_bind()
     m = _m0089()
     admin = m._bind_admin(conn)
+    if admin is None:
+        return
     tables = sorted({table for table, _col in NEW_COLUMNS})
     reflected_by_table = m._reflect(conn, tables)
     for table, column in NEW_COLUMNS:

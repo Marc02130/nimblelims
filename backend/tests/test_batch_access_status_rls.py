@@ -672,6 +672,9 @@ def test_downgrade_drops_the_function(migrated_engine, batch_world):
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0097_list_entry_code")
         with migrated_engine.connect() as conn:
             present = conn.execute(
@@ -893,6 +896,9 @@ def test_migration_role_cannot_execute_and_lims_app_still_403(
             conn.commit()
             assert _privilege(conn, MIGRATION_ROLE) is True
 
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0100_calendar_dates")
         with migrated_engine.connect() as conn:
             assert _privilege(conn, MIGRATION_ROLE) is True

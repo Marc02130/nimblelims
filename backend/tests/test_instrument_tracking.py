@@ -13,6 +13,7 @@ from app.services import configuring_agent_allow as allow
 from app.services import configuring_agent_catalog as cat
 from app.services import ui_schema_catalog as schema_catalog
 from models.flexible_experiment import LimsRun
+from tests.conftest import clear_0117_downgrade_blockers
 
 
 def _login(client, username, password):
@@ -582,10 +583,9 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
     with migrated_engine.begin() as conn:
         conn.execute(text("DELETE FROM instrument_maintenance_audits"))
         conn.execute(text("DELETE FROM instrument_schedule_audits"))
-        conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
         conn.execute(text("DELETE FROM lims_run_type_substitutions"))
         conn.execute(text("DELETE FROM lims_run_imports WHERE filename = 'admin_override'"))
-        conn.execute(text("UPDATE instrument_maintenance_events SET void_reason = NULL"))
+    clear_0117_downgrade_blockers(migrated_engine)
     type_id = uuid.uuid4()
     inst_id = uuid.uuid4()
     inactive_id = uuid.uuid4()
@@ -697,6 +697,7 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
                 {"id": extra_entry, "n": "Post-upgrade type", "lid": list_id},
             )
             conn.commit()
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             restored = conn.execute(
