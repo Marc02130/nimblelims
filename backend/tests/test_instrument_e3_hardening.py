@@ -7,9 +7,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, InternalError, ProgrammingError
 
 from models.instrument import InstrumentMaintenanceAudit, InstrumentScheduleAudit
+from tests.test_instrument_e2_review_fixes import _seed_schedule_event
 from tests.test_instrument_e2_type_slots import _create_run, _create_template, _start_run
 from tests.test_instrument_hardening_e1 import _role_user, _run_as_lims_app, _schedule
-from tests.test_instrument_tracking import _instrument, _login, _name, _seeded_type
+from tests.test_instrument_tracking import _instrument, _login, _name
 
 
 @pytest.fixture
@@ -85,29 +86,17 @@ def test_void_event_requires_reason_api_and_audit(
     assert voids[0].reason == "misdated"
 
 
-def test_void_reason_db_check_and_trigger(migrated_engine, client, admin_h, test_admin_user):
-    inst = _instrument(client, admin_h, maintenance_tracked=True)
-    sched = _schedule(client, admin_h, inst["id"], interval=10)
-    created = client.post(
-        "/v1/instrument-maintenance-events",
-        headers=admin_h,
-        json={
-            "instrument_id": inst["id"],
-            "schedule_id": sched["id"],
-            "performed_on": date.today().isoformat(),
-            "performed_by_user_id": str(test_admin_user.id),
-            "passed": True,
-        },
-    )
-    assert created.status_code == 201, created.text
-    event_id = created.json()["id"]
+def test_void_reason_db_check_and_trigger(migrated_engine):
+    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
+    with migrated_engine.begin() as conn:
+        _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
     with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as blank:
         _run_as_lims_app(
             migrated_engine,
-            test_admin_user.id,
+            ids["uid"],
             "UPDATE instrument_maintenance_events "
             "SET active = false, void_reason = '   ' WHERE id = :id",
-            {"id": event_id},
+            {"id": ids["event"]},
         )
     assert "void_reason_required" in str(blank.value.orig) or "ck_instrument_events_void_reason" in str(
         blank.value.orig
@@ -115,17 +104,17 @@ def test_void_reason_db_check_and_trigger(migrated_engine, client, admin_h, test
     with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
         _run_as_lims_app(
             migrated_engine,
-            test_admin_user.id,
+            ids["uid"],
             "UPDATE instrument_maintenance_events "
             "SET active = false, void_reason = :r WHERE id = :id",
-            {"id": event_id, "r": "x" * 1001},
+            {"id": ids["event"], "r": "x" * 1001},
         )
     _run_as_lims_app(
         migrated_engine,
-        test_admin_user.id,
+        ids["uid"],
         "UPDATE instrument_maintenance_events "
         "SET active = false, void_reason = 'db reason' WHERE id = :id",
-        {"id": event_id},
+        {"id": ids["event"]},
     )
 
 
@@ -171,9 +160,9 @@ def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(
         .all()
     )
     values = [(a.previous_value, a.new_value) for a in audits]
-    assert ("false", "true") in values
-    assert ("true", "false") in values
-    assert all(a.created_by == test_admin_user.id for a in audits if a.new_value in ("true", "false"))
+    assert (False, True) in values
+    assert (True, False) in values
+    assert all(a.created_by == test_admin_user.id for a in audits if a.new_value in (True, False))
 
 
 def test_inactive_template_hidden_from_tech_picker_visible_in_manager_catalog(
@@ -237,45 +226,68 @@ def test_inactive_template_hidden_from_tech_picker_visible_in_manager_catalog(
     assert start.json()["detail"]["code"] == "template_inactive"
 
 
-def test_db_refuses_foreign_substitution_and_cancel_after_import(
-    migrated_engine, client, admin_h, db_session, test_org, run_analysis_id, cohort_sample_id
-):
-    tech = _role_user(db_session, test_org, "Lab Technician", extra_perms=("experiment:manage",))
-    other = _role_user(db_session, test_org, "Lab Technician", extra_perms=("experiment:manage",))
-    template = _create_template(client, admin_h)
-    owned = _create_run(client, _login(client, other.username, "pass-word-1"), template["id"], run_analysis_id)
-    assert owned.status_code == 201, owned.text
-    started = _start_run(client, admin_h, owned.json()["id"], cohort_sample_id)
-    assert started.status_code == 200, started.text
-    qpcr = _seeded_type(client, admin_h, "qPCR")
-    imported = client.post(
-        f"/v1/lims-runs/{owned.json()['id']}/import",
-        headers=admin_h,
-        json={"rows": [{"well_position": "A1", "row_data": {"well": "A1"}}]},
-    )
-    assert imported.status_code == 200, imported.text
-    type_id = uuid.UUID(qpcr["id"])
-    run_id = uuid.UUID(owned.json()["id"])
-
+def test_db_refuses_foreign_substitution_and_cancel_after_import(migrated_engine):
     with migrated_engine.begin() as conn:
-        _grant_if_missing(conn, "lims_runs", "UPDATE")
-        _grant_if_missing(conn, "lims_run_type_substitutions", "INSERT")
+        tech_role = conn.execute(text("SELECT id FROM roles WHERE name = 'Lab Technician'")).scalar()
+        client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
+        type_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'Plate reader' LIMIT 1")
+        ).scalar()
+        owner = uuid.uuid4()
+        tech = uuid.uuid4()
+        for uid, label in ((owner, "own"), (tech, "tech")):
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
+                    "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
+                ),
+                {
+                    "id": uid,
+                    "n": f"e3s-{label}-{uid.hex[:6]}",
+                    "u": f"e3s-{label}-{uid.hex[:6]}",
+                    "e": f"e3s-{label}-{uid.hex[:6]}@x.org",
+                    "r": tech_role,
+                    "c": client_id,
+                },
+            )
+        run_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_runs (id, name, status, created_by, modified_by) "
+                "VALUES (:id, :n, 'running', :u, :u)"
+            ),
+            {"id": run_id, "n": f"e3sub-{run_id.hex[:6]}", "u": owner},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_imports (id, lims_run_id, filename, imported_by) "
+                "VALUES (:id, :r, 'admin_override', :u)"
+            ),
+            {"id": uuid.uuid4(), "r": run_id, "u": owner},
+        )
+        for table, privilege in (
+            ("lims_runs", "SELECT"),
+            ("lims_runs", "UPDATE"),
+            ("lims_run_type_substitutions", "INSERT"),
+            ("users", "SELECT"),
+        ):
+            _grant_if_missing(conn, table, privilege)
 
     with pytest.raises((ProgrammingError, InternalError)) as sub:
         _run_as_lims_app(
             migrated_engine,
-            tech.id,
+            tech,
             "INSERT INTO lims_run_type_substitutions "
             "(lims_run_id, to_instrument_type_id, reason, created_by) "
             "VALUES (:r, :t, 'not mine', :u)",
-            {"r": run_id, "t": type_id, "u": tech.id},
+            {"r": run_id, "t": type_id, "u": tech},
         )
     assert "substitute_not_own_run" in str(sub.value.orig)
 
     with pytest.raises((ProgrammingError, InternalError)) as apply:
         _run_as_lims_app(
             migrated_engine,
-            tech.id,
+            tech,
             "UPDATE lims_runs SET instrument_type_id = :t WHERE id = :id",
             {"t": type_id, "id": run_id},
         )
@@ -284,7 +296,7 @@ def test_db_refuses_foreign_substitution_and_cancel_after_import(
     with pytest.raises((ProgrammingError, InternalError)) as cancel:
         _run_as_lims_app(
             migrated_engine,
-            tech.id,
+            tech,
             "UPDATE lims_runs SET status = 'canceled' WHERE id = :id",
             {"id": run_id},
         )
@@ -292,6 +304,10 @@ def test_db_refuses_foreign_substitution_and_cancel_after_import(
 
 
 def test_imported_rows_are_immutable_for_lims_app(migrated_engine):
+    with migrated_engine.begin() as conn:
+        for table in ("lims_run_imports", "lims_run_data"):
+            _grant_if_missing(conn, table, "SELECT")
+            _grant_if_missing(conn, table, "INSERT")
     with migrated_engine.connect() as conn:
         for table in ("lims_run_imports", "lims_run_data"):
             for privilege in ("UPDATE", "DELETE"):
@@ -338,7 +354,7 @@ def test_imported_rows_are_immutable_for_lims_app(migrated_engine):
         conn.execute(
             text(
                 "INSERT INTO lims_run_imports (id, lims_run_id, filename, imported_by) "
-                "VALUES (:id, :r, 'kept.csv', :u)"
+                "VALUES (:id, :r, 'admin_override', :u)"
             ),
             {"id": import_id, "r": run_id, "u": uid},
         )

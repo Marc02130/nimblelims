@@ -107,7 +107,7 @@ def _write_schedule_audit(
             previous_value=_audit_text(previous_value),
             new_value=_audit_text(new_value),
             overdue=overdue,
-            reason=reason,
+            reason=(reason.strip() if isinstance(reason, str) else reason) or None,
             created_by=user.id,
         )
     )
@@ -594,7 +594,7 @@ def update_event(
                     previous_value=prior_next_due,
                     new_value=schedule.next_due,
                     overdue=overdue_at_time,
-                    reason=body.reason,
+                    reason=row.void_reason if voiding else body.reason,
                 )
     elif voiding or restoring:
         _write_schedule_audit(
@@ -607,7 +607,7 @@ def update_event(
             previous_value=None,
             new_value=None,
             overdue=None,
-            reason=body.reason,
+            reason=row.void_reason if voiding else body.reason,
         )
     try:
         db.commit()

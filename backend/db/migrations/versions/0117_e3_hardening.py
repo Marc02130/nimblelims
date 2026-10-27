@@ -32,13 +32,7 @@ TABLES = (
 _CATALOG_POLICY = "is_admin() OR has_experiment_access() OR has_config_edit()"
 _CREATED_BY = "created_by IS NOT NULL AND created_by = current_user_id()"
 _CATALOG_INSERT = f"{_CREATED_BY} AND ({_CATALOG_POLICY})"
-_SUBSTITUTION_INSERT = (
-    f"{_CATALOG_INSERT} AND ("
-    "is_lab_manager_or_admin() OR EXISTS ("
-    "SELECT 1 FROM public.lims_runs r "
-    "WHERE r.id = lims_run_id AND r.created_by = current_user_id()"
-    "))"
-)
+_SUBSTITUTION_INSERT = f"{_CATALOG_INSERT} AND can_substitute_run(lims_run_id)"
 
 _REASON_LEN = (
     "(reason IS NULL OR (char_length(btrim(reason)) BETWEEN 1 AND 1000))"
@@ -249,6 +243,26 @@ END;
 $$;
 """
 
+_CAN_SUBSTITUTE_FN = """
+CREATE OR REPLACE FUNCTION public.can_substitute_run(run_id uuid)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    IF public.is_lab_manager_or_admin() THEN
+        RETURN TRUE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM public.lims_runs r
+         WHERE r.id = run_id
+           AND r.created_by = public.current_user_id()
+    );
+END;
+$$;
+"""
+
 _SUBSTITUTE_INSERT_FN = """
 CREATE OR REPLACE FUNCTION public.refuse_run_type_substitution()
 RETURNS trigger
@@ -260,14 +274,7 @@ BEGIN
     IF current_user <> 'lims_app' THEN
         RETURN NEW;
     END IF;
-    IF public.is_lab_manager_or_admin() THEN
-        RETURN NEW;
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM public.lims_runs r
-         WHERE r.id = NEW.lims_run_id
-           AND r.created_by = public.current_user_id()
-    ) THEN
+    IF public.can_substitute_run(NEW.lims_run_id) THEN
         RETURN NEW;
     END IF;
     RAISE EXCEPTION 'substitute_not_own_run'
@@ -472,6 +479,14 @@ def upgrade() -> None:
         "FOR EACH ROW EXECUTE FUNCTION public.refuse_void_only_passing_event()"
     )
 
+    op.execute(_CAN_SUBSTITUTE_FN)
+    op.execute("ALTER FUNCTION public.can_substitute_run(uuid) SECURITY DEFINER")
+    op.execute(
+        "ALTER FUNCTION public.can_substitute_run(uuid) "
+        "SET search_path = pg_catalog, public"
+    )
+    op.execute("REVOKE EXECUTE ON FUNCTION public.can_substitute_run(uuid) FROM PUBLIC")
+    op.execute("GRANT EXECUTE ON FUNCTION public.can_substitute_run(uuid) TO lims_app")
     _install_fn(_SUBSTITUTE_INSERT_FN, "refuse_run_type_substitution")
     op.execute(
         "DROP TRIGGER IF EXISTS lims_run_type_substitutions_refuse_not_own "
@@ -508,6 +523,8 @@ def upgrade() -> None:
     # Stored import rows stay. fail_run already keeps them; this closes the
     # app-user bypass. No DELETE grants. UPDATE is also refused — there is
     # no legitimate status column on these tables in this slice.
+    op.execute("GRANT SELECT, INSERT ON lims_run_imports TO lims_app")
+    op.execute("GRANT SELECT, INSERT ON lims_run_data TO lims_app")
     op.execute("REVOKE UPDATE ON lims_run_imports FROM lims_app")
     op.execute("REVOKE DELETE ON lims_run_imports FROM lims_app")
     op.execute("REVOKE UPDATE ON lims_run_data FROM lims_app")
@@ -553,6 +570,7 @@ def downgrade() -> None:
         "ON lims_run_type_substitutions"
     )
     op.execute("DROP FUNCTION IF EXISTS public.refuse_run_type_substitution()")
+    op.execute("DROP FUNCTION IF EXISTS public.can_substitute_run(uuid)")
     op.execute("DROP POLICY IF EXISTS lims_run_type_substitutions_insert ON lims_run_type_substitutions")
     op.execute(
         "CREATE POLICY lims_run_type_substitutions_insert "
