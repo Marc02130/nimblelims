@@ -18,6 +18,7 @@ from sqlalchemy import text
 from app.core import lab_time
 from app.core.lab_time import current_lab_day
 from app.schemas.project import ProjectCreate, ProjectUpdate
+from tests.conftest import clear_0117_downgrade_blockers
 
 BEFORE = "0099_batch_update_qualifiers"
 
@@ -66,6 +67,7 @@ def test_calendar_backfill_keeps_the_naive_date_part(migrated_engine):
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             sample_id = conn.execute(text("SELECT id FROM samples LIMIT 1")).scalar()
@@ -104,6 +106,7 @@ def test_calendar_backfill_keeps_the_naive_date_part(migrated_engine):
                 )
             ).scalar()
             assert data_type == "date"
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             row = conn.execute(

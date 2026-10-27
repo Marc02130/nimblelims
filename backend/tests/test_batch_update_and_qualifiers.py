@@ -289,6 +289,9 @@ def test_seeded_grant_and_qualifier_move_round_trip(migrated_engine):
             normal = _entry_home(conn, "Normal")
             assert [row[0] for row in normal] == ["result_qualifiers"]
 
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0098_batch_access_status")
         with migrated_engine.connect() as conn:
             assert _roles_with_batch_update(conn) == []

@@ -688,7 +688,7 @@ def test_m5_void_waits_on_held_schedule_lock(migrated_engine):
             try:
                 box["value"] = update_event(
                     ids["event"],
-                    MaintenanceEventUpdate(active=False),
+                    MaintenanceEventUpdate(active=False, reason="void under lock"),
                     current_user=user,
                     db=s,
                 )
@@ -803,7 +803,10 @@ def test_refuse_void_only_passing_event_is_security_definer(migrated_engine):
 def test_void_guard_set_role_exact_error_and_forged_actor(migrated_engine):
     ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     failed = _seed_schedule_event(migrated_engine, next_due=date.today(), passed=False)
-    void_sql = "UPDATE instrument_maintenance_events SET active = false WHERE id = :id"
+    void_sql = (
+        "UPDATE instrument_maintenance_events "
+        "SET active = false, void_reason = 'db void' WHERE id = :id"
+    )
     note_sql = "UPDATE instrument_maintenance_events SET note = 'tech' WHERE id = :id"
     with pytest.raises((ProgrammingError, InternalError)) as raised:
         _run_as_lims_app(migrated_engine, ids["tech"], void_sql, {"id": ids["event"]})
@@ -921,7 +924,7 @@ def test_unvoid_writes_event_restore_audit(client, admin_h, db_session, test_adm
     assert restores[0].created_by == test_admin_user.id
 
 
-def test_reason_fields_max_length_500(client, admin_h):
+def test_reason_fields_max_length_1000(client, admin_h):
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     kinds = client.get("/lists/maintenance_types/entries", headers=admin_h).json()
     if isinstance(kinds, dict):
@@ -932,7 +935,7 @@ def test_reason_fields_max_length_500(client, admin_h):
         headers=admin_h,
         json={"instrument_id": inst["id"], "kind_id": kind_id, "interval_days": 10},
     ).json()
-    too_long = "x" * 501
+    too_long = "x" * 1001
     first = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,

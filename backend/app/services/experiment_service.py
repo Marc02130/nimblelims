@@ -431,10 +431,19 @@ class ExperimentService:
     def list_templates(
         self,
         active: Optional[bool] = None,
+        include_inactive: bool = False,
         page: int = 1,
         size: int = 10,
     ) -> Tuple[List[ExperimentTemplate], int]:
-        return self.repo.list_templates(active=active, page=page, size=size)
+        role = getattr(getattr(self.current_user, "role", None), "name", None)
+        can_see_inactive = role in ("Administrator", "Lab Manager")
+        if not can_see_inactive:
+            return self.repo.list_templates(active=True, page=page, size=size)
+        if active is not None:
+            return self.repo.list_templates(active=active, page=page, size=size)
+        if include_inactive:
+            return self.repo.list_templates(active=None, page=page, size=size)
+        return self.repo.list_templates(active=True, page=page, size=size)
 
     def create_template(self, data: ExperimentTemplateCreate) -> ExperimentTemplate:
         if self.repo.get_template_by_name(data.name):

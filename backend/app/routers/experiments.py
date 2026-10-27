@@ -66,12 +66,22 @@ def get_experiment_service(
 @experiment_templates_router.get("", response_model=ExperimentTemplateListResponse)
 def list_experiment_templates(
     active: Optional[bool] = Query(None, description="Filter by active status"),
+    include_inactive: bool = Query(
+        False,
+        description=(
+            "Include inactive templates for Administrator / Lab Manager catalog views "
+            "when `active` is omitted. `active=false` still returns only inactive "
+            "rows for those roles. Non-managers still receive only active rows."
+        ),
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(10, ge=1, le=500, description="Page size (up to 500 for dropdown use)"),
     service: ExperimentService = Depends(get_experiment_service),
 ):
-    """List experiment templates with optional filter and pagination."""
-    items, total = service.list_templates(active=active, page=page, size=size)
+    """List experiment templates. Create-run pickers get active rows only."""
+    items, total = service.list_templates(
+        active=active, include_inactive=include_inactive, page=page, size=size
+    )
     pages = (total + size - 1) // size if size else 0
     return ExperimentTemplateListResponse(
         templates=[ExperimentTemplateRead.model_validate(t) for t in items],

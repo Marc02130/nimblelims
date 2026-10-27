@@ -24,7 +24,7 @@ class MaintenanceScheduleUpdate(BaseModel):
 
 class FirstDueCreate(BaseModel):
     next_due: date
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: Optional[str] = Field(None, max_length=1000)
 
 
 class MaintenanceScheduleResponse(BaseModel):
@@ -60,7 +60,7 @@ class MaintenanceEventUpdate(BaseModel):
     active: Optional[bool] = None
     note: Optional[str] = None
     certificate_url: Optional[str] = Field(None, max_length=1024)
-    reason: Optional[str] = Field(None, max_length=500)
+    reason: Optional[str] = Field(None, max_length=1000)
 
 
 class MaintenanceEventResponse(BaseModel):
@@ -75,6 +75,7 @@ class MaintenanceEventResponse(BaseModel):
     passed: bool
     certificate_url: Optional[str] = None
     note: Optional[str] = None
+    void_reason: Optional[str] = None
     active: bool
     created_at: datetime
     modified_at: datetime

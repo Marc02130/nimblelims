@@ -1892,7 +1892,12 @@ export class ApiService {
   }
 
   // Experiment templates (v1 API)
-  async getExperimentTemplates(params?: { active?: boolean; page?: number; size?: number }) {
+  async getExperimentTemplates(params?: {
+    active?: boolean;
+    include_inactive?: boolean;
+    page?: number;
+    size?: number;
+  }) {
     const response: AxiosResponse = await this.api.get('v1/experiment-templates', { params });
     return response.data;
   }

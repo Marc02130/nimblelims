@@ -13,6 +13,7 @@ from app.services import configuring_agent_allow as allow
 from app.services import configuring_agent_catalog as cat
 from app.services import ui_schema_catalog as schema_catalog
 from models.flexible_experiment import LimsRun
+from tests.conftest import clear_0117_downgrade_blockers
 
 
 def _login(client, username, password):
@@ -85,6 +86,7 @@ def test_schema_catalog_registers_new_tables_and_drops_types():
         "instrument_type_defaults",
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
+        "instrument_entry_slot_audits",
     ):
         assert name in schema_catalog.LAB_TABLES
         assert schema_catalog.shown_in_schema(name, schema_catalog.kind_for(name))
@@ -101,6 +103,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
             "instrument_uses",
             "instrument_type_defaults",
             "instrument_template_inactivations",
+            "instrument_entry_slot_audits",
         } <= names
         forced = dict(
             conn.execute(
@@ -118,6 +121,7 @@ def test_fresh_db_registers_instrument_tables_and_rls(migrated_engine):
                         "instrument_schedule_audits",
                         "lims_run_type_substitutions",
                         "instrument_template_inactivations",
+                        "instrument_entry_slot_audits",
                     ]
                 },
             ).all()
@@ -160,6 +164,9 @@ def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
         "instrument_schedule_audits",
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
+        "instrument_entry_slot_audits",
+        "lims_run_imports",
+        "lims_run_data",
     )
     with migrated_engine.connect() as conn:
         for table in tables:
@@ -434,9 +441,9 @@ def test_passing_event_advances_and_void_recomputes(client, admin_h, test_admin_
     voided = client.patch(
         f"/v1/instrument-maintenance-events/{second.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void last event"},
     )
-    assert voided.status_code == 200
+    assert voided.status_code == 200, voided.text
     recomputed = client.get(
         f"/v1/instrument-maintenance-schedules/{sched['id']}", headers=admin_h
     ).json()
@@ -578,6 +585,7 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
         conn.execute(text("DELETE FROM instrument_schedule_audits"))
         conn.execute(text("DELETE FROM lims_run_type_substitutions"))
         conn.execute(text("DELETE FROM lims_run_imports WHERE filename = 'admin_override'"))
+    clear_0117_downgrade_blockers(migrated_engine)
     type_id = uuid.uuid4()
     inst_id = uuid.uuid4()
     inactive_id = uuid.uuid4()
@@ -689,6 +697,7 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
                 {"id": extra_entry, "n": "Post-upgrade type", "lid": list_id},
             )
             conn.commit()
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             restored = conn.execute(
