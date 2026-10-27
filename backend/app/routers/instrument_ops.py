@@ -718,15 +718,33 @@ def _lock_downtime(db: Session, downtime_id: UUID) -> InstrumentDowntime:
         ) from exc
     if row is None:
         raise HTTPException(status_code=404, detail="Downtime not found")
-    if row.maintenance_event_id:
-        event = (
-            db.query(InstrumentMaintenanceEvent)
-            .filter(InstrumentMaintenanceEvent.id == row.maintenance_event_id)
-            .first()
-        )
-        if event is not None and event.schedule_id:
-            _lock_schedule(db, event.schedule_id)
     return row
+
+
+def _schedule_id_for_event(db: Session, event_id: Optional[UUID]) -> Optional[UUID]:
+    if event_id is None:
+        return None
+    event = (
+        db.query(InstrumentMaintenanceEvent)
+        .filter(InstrumentMaintenanceEvent.id == event_id)
+        .first()
+    )
+    if event is None:
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
+    return event.schedule_id
+
+
+def _lock_schedules_in_order(db: Session, *schedule_ids: Optional[UUID]) -> None:
+    """Lock distinct schedule rows by id so two re-points cannot deadlock."""
+    seen = set()
+    ordered = []
+    for schedule_id in schedule_ids:
+        if schedule_id is None or schedule_id in seen:
+            continue
+        seen.add(schedule_id)
+        ordered.append(schedule_id)
+    for schedule_id in sorted(ordered, key=lambda value: value.hex):
+        _lock_schedule(db, schedule_id)
 
 
 @downtime_router.patch("/{downtime_id}", response_model=DowntimeResponse)
@@ -746,14 +764,14 @@ def update_downtime(
             "downtime reason",
             allow_inactive=data["reason_id"] == row.reason_id,
         )
-    if "maintenance_event_id" in data and data["maintenance_event_id"] is not None:
-        ev = (
-            db.query(InstrumentMaintenanceEvent)
-            .filter(InstrumentMaintenanceEvent.id == data["maintenance_event_id"])
-            .first()
-        )
-        if ev is None:
-            raise HTTPException(status_code=404, detail="Maintenance event not found")
+    new_event_id = data["maintenance_event_id"] if "maintenance_event_id" in data else row.maintenance_event_id
+    old_schedule_id = _schedule_id_for_event(db, row.maintenance_event_id)
+    new_schedule_id = (
+        _schedule_id_for_event(db, new_event_id)
+        if "maintenance_event_id" in data
+        else old_schedule_id
+    )
+    _lock_schedules_in_order(db, old_schedule_id, new_schedule_id)
     for k, v in data.items():
         setattr(row, k, v)
     _refuse_future_ended_at(row.ended_at)

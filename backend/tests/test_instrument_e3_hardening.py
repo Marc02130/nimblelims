@@ -9,7 +9,12 @@ from sqlalchemy.exc import IntegrityError, InternalError, ProgrammingError
 from models.instrument import InstrumentMaintenanceAudit, InstrumentScheduleAudit
 from tests.test_instrument_e2_review_fixes import _seed_schedule_event
 from tests.test_instrument_e2_type_slots import _create_run, _create_template, _start_run
-from tests.test_instrument_hardening_e1 import _role_user, _run_as_lims_app, _schedule
+from tests.test_instrument_hardening_e1 import (
+    _role_user,
+    _run_as_direct_lims_app,
+    _run_as_lims_app,
+    _schedule,
+)
 from tests.test_instrument_tracking import _instrument, _login, _name
 
 
@@ -213,6 +218,22 @@ def test_inactive_template_hidden_from_tech_picker_visible_in_manager_catalog(
     assert mgr_list.status_code == 200, mgr_list.text
     mgr_ids = {row["id"] for row in mgr_list.json()["templates"]}
     assert template["id"] in mgr_ids
+
+    admin_inactive_only = client.get(
+        "/v1/experiment-templates?active=false&page=1&size=500",
+        headers=admin_h,
+    )
+    assert admin_inactive_only.status_code == 200, admin_inactive_only.text
+    inactive_ids = {row["id"] for row in admin_inactive_only.json()["templates"]}
+    assert template["id"] in inactive_ids
+    assert all(row["active"] is False for row in admin_inactive_only.json()["templates"])
+
+    tech_active_false = client.get(
+        "/v1/experiment-templates?active=false&page=1&size=500",
+        headers=tech_h,
+    )
+    assert template["id"] not in {row["id"] for row in tech_active_false.json()["templates"]}
+    assert all(row["active"] is True for row in tech_active_false.json()["templates"])
 
     admin_list = client.get(
         "/v1/experiment-templates?include_inactive=true&page=1&size=500",
@@ -471,7 +492,151 @@ def test_0117_revision_id_and_single_head():
     assert 'down_revision = "0116_e2_review_fixes"' in text_src
     assert "GRANT DELETE" not in text_src
     assert "NULLIF(current_setting('app.current_user_id', true), '')" in text_src
+    assert "skip_app_row_guard" in text_src
+    assert "session_user = 'lims_app'" in text_src
+    assert "IS DISTINCT FROM 'lims_app' THEN" not in text_src
+    assert "0117 refuses CHECK" in text_src
+    assert "run_created_by_immutable" in text_src
     assert "REVOKE UPDATE ON lims_run_imports FROM lims_app" in text_src
     assert "REVOKE DELETE ON lims_run_imports FROM lims_app" in text_src
     heads = [p.name for p in (backend / "db/migrations/versions").glob("0117*.py")]
     assert heads == ["0117_e3_hardening.py"]
+
+
+def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
+    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as blank:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            ids["uid"],
+            "UPDATE instrument_maintenance_events "
+            "SET active = false, void_reason = '   ' WHERE id = :id",
+            {"id": ids["event"]},
+        )
+    assert "void_reason_required" in str(blank.value.orig)
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as after_reset:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            ids["uid"],
+            "UPDATE instrument_maintenance_events "
+            "SET active = false, void_reason = '   ' WHERE id = :id",
+            {"id": ids["event"]},
+            reset_role=True,
+        )
+    assert "void_reason_required" in str(after_reset.value.orig)
+
+
+def test_direct_lims_app_substitution_cancel_import_and_created_by(migrated_engine):
+    with migrated_engine.begin() as conn:
+        tech_role = conn.execute(text("SELECT id FROM roles WHERE name = 'Lab Technician'")).scalar()
+        client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
+        type_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'Plate reader' LIMIT 1")
+        ).scalar()
+        owner = uuid.uuid4()
+        tech = uuid.uuid4()
+        for uid, label in ((owner, "own"), (tech, "tech")):
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
+                    "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
+                ),
+                {
+                    "id": uid,
+                    "n": f"e3d-{label}-{uid.hex[:6]}",
+                    "u": f"e3d-{label}-{uid.hex[:6]}",
+                    "e": f"e3d-{label}-{uid.hex[:6]}@x.org",
+                    "r": tech_role,
+                    "c": client_id,
+                },
+            )
+        run_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_runs (id, name, status, created_by, modified_by) "
+                "VALUES (:id, :n, 'running', :u, :u)"
+            ),
+            {"id": run_id, "n": f"e3d-{run_id.hex[:6]}", "u": owner},
+        )
+        import_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_imports (id, lims_run_id, filename, imported_by) "
+                "VALUES (:id, :r, 'admin_override', :u)"
+            ),
+            {"id": import_id, "r": run_id, "u": owner},
+        )
+        data_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_data (id, lims_run_id, row_data, import_id, created_by) "
+                "VALUES (:id, :r, '{}'::jsonb, :i, :u)"
+            ),
+            {"id": data_id, "r": run_id, "i": import_id, "u": owner},
+        )
+        conn.execute(text("GRANT UPDATE ON TABLE lims_run_imports TO lims_app"))
+        conn.execute(text("GRANT DELETE ON TABLE lims_run_imports TO lims_app"))
+        conn.execute(text("GRANT UPDATE ON TABLE lims_run_data TO lims_app"))
+        conn.execute(text("GRANT DELETE ON TABLE lims_run_data TO lims_app"))
+
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as sub:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            tech,
+            "INSERT INTO lims_run_type_substitutions "
+            "(lims_run_id, to_instrument_type_id, reason, created_by) "
+            "VALUES (:r, :t, 'not mine', :u)",
+            {"r": run_id, "t": type_id, "u": tech},
+        )
+    assert "substitute_not_own_run" in str(sub.value.orig)
+
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as apply:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            tech,
+            "UPDATE lims_runs SET instrument_type_id = :t WHERE id = :id",
+            {"t": type_id, "id": run_id},
+        )
+    assert "substitute_not_own_run" in str(apply.value.orig)
+
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as cancel:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            tech,
+            "UPDATE lims_runs SET status = 'canceled' WHERE id = :id",
+            {"id": run_id},
+        )
+    assert "run_has_imported_data" in str(cancel.value.orig)
+
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as stolen:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            tech,
+            "UPDATE lims_runs SET created_by = :u WHERE id = :id",
+            {"u": tech, "id": run_id},
+        )
+    assert "run_created_by_immutable" in str(stolen.value.orig)
+
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as imp:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            tech,
+            "UPDATE lims_run_imports SET filename = 'x' WHERE id = :id",
+            {"id": import_id},
+        )
+    assert "imported_row_immutable" in str(imp.value.orig)
+
+    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as data:
+        _run_as_direct_lims_app(
+            migrated_engine,
+            tech,
+            "DELETE FROM lims_run_data WHERE id = :id",
+            {"id": data_id},
+        )
+    assert "imported_row_immutable" in str(data.value.orig)
+
+    with migrated_engine.begin() as conn:
+        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_imports FROM lims_app"))
+        conn.execute(text("REVOKE DELETE ON TABLE lims_run_imports FROM lims_app"))
+        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_data FROM lims_app"))
+        conn.execute(text("REVOKE DELETE ON TABLE lims_run_data FROM lims_app"))

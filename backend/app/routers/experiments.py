@@ -69,8 +69,9 @@ def list_experiment_templates(
     include_inactive: bool = Query(
         False,
         description=(
-            "Include inactive templates for Administrator / Lab Manager catalog views. "
-            "Non-managers still receive only active rows."
+            "Include inactive templates for Administrator / Lab Manager catalog views "
+            "when `active` is omitted. `active=false` still returns only inactive "
+            "rows for those roles. Non-managers still receive only active rows."
         ),
     ),
     page: int = Query(1, ge=1, description="Page number"),

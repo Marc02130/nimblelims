@@ -42,11 +42,15 @@ def clear_0117_downgrade_blockers(engine) -> None:
     reset_migrated_engine_sessions(engine)
     with engine.begin() as conn:
         conn.execute(text("RESET ROLE"))
-        conn.execute(
+        admin = conn.execute(
             text(
-                "SELECT set_config('app.current_user_id', "
-                "'00000000-0000-0000-0000-000000000000', false)"
+                "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id "
+                "WHERE r.name = 'Administrator' ORDER BY u.created_at LIMIT 1"
             )
+        ).scalar()
+        conn.execute(
+            text("SELECT set_config('app.current_user_id', :u, false)"),
+            {"u": str(admin or "00000000-0000-0000-0000-000000000000")},
         )
         if conn.execute(
             text(

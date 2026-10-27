@@ -20,6 +20,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from db.append_only_tables import MAINTENANCE_SESSION_ROLES
+
 revision = "0117_e3_hardening"
 down_revision = "0116_e2_review_fixes"
 branch_labels = None
@@ -309,6 +311,37 @@ END;
 $$;
 """
 
+# session_user is the login role. SECURITY DEFINER does not change it.
+# Production connects as lims_app and never SET ROLE, so current_setting('role')
+# is 'none'. Skip only pinned maintenance roles (and superuser logins used
+# by tests). Enforce when session_user is lims_app or SET ROLE lims_app.
+_SKIP_GUARD_FN = f"""
+CREATE OR REPLACE FUNCTION public.skip_app_row_guard()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    IF session_user = 'lims_app'
+       OR current_setting('role', true) = 'lims_app' THEN
+        RETURN FALSE;
+    END IF;
+    IF session_user = ANY (
+        ARRAY[{", ".join(repr(n) for n in MAINTENANCE_SESSION_ROLES)}]::name[]
+    ) THEN
+        RETURN TRUE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM pg_catalog.pg_roles r
+         WHERE r.rolname = session_user AND r.rolsuper
+    );
+END;
+$$;
+"""
+
+# 0116 behavior: no skip. Manager check + void_reason always run.
 _VOID_FN = """
 CREATE OR REPLACE FUNCTION public.refuse_void_only_passing_event()
 RETURNS trigger
@@ -317,9 +350,6 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
-        RETURN NEW;
-    END IF;
     IF NOT public.is_lab_manager_or_admin() THEN
         RAISE EXCEPTION 'maintenance_event_update_forbidden'
             USING ERRCODE = '42501';
@@ -384,8 +414,6 @@ END;
 $$;
 """
 
-# SECURITY DEFINER makes current_user the owner. After SET ROLE lims_app,
-# current_setting('role') is still lims_app; superuser cleanup is not.
 _SUBSTITUTE_INSERT_FN = """
 CREATE OR REPLACE FUNCTION public.refuse_run_type_substitution()
 RETURNS trigger
@@ -394,7 +422,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
+    IF public.skip_app_row_guard() THEN
         RETURN NEW;
     END IF;
     IF public.can_substitute_run(NEW.lims_run_id) THEN
@@ -414,7 +442,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
+    IF public.skip_app_row_guard() THEN
         RETURN NEW;
     END IF;
     IF NEW.instrument_type_id IS NOT DISTINCT FROM OLD.instrument_type_id THEN
@@ -440,7 +468,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
+    IF public.skip_app_row_guard() THEN
         RETURN NEW;
     END IF;
     IF NEW.status IS DISTINCT FROM OLD.status
@@ -466,7 +494,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
+    IF public.skip_app_row_guard() THEN
         IF TG_OP = 'DELETE' THEN
             RETURN OLD;
         END IF;
@@ -474,6 +502,26 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'imported_row_immutable'
         USING ERRCODE = '42501';
+END;
+$$;
+"""
+
+_CREATED_BY_IMMUTABLE_FN = """
+CREATE OR REPLACE FUNCTION public.refuse_run_created_by_mutate()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    IF public.skip_app_row_guard() THEN
+        RETURN NEW;
+    END IF;
+    IF NEW.created_by IS DISTINCT FROM OLD.created_by THEN
+        RAISE EXCEPTION 'run_created_by_immutable'
+            USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
 END;
 $$;
 """
@@ -487,8 +535,59 @@ def _install_fn(sql: str, name: str) -> None:
     op.execute(f"GRANT EXECUTE ON FUNCTION public.{name}() TO lims_app")
 
 
+def _refuse_bad_reasons(conn) -> None:
+    """Abort upgrade with table+count rather than a bare CHECK failure.
+
+    Pre-existing whitespace-only or over-length reasons would otherwise
+    fail ADD CONSTRAINT with no row counts. Chosen over NOT VALID: a
+    lab row that already violates the rule must be fixed before 0117
+    proceeds, not left unvalidated.
+    """
+    checks = (
+        (
+            "instrument_maintenance_events",
+            "void_reason",
+            "void_reason IS NOT NULL AND NOT (char_length(btrim(void_reason)) BETWEEN 1 AND 1000)",
+        ),
+        (
+            "instrument_schedule_audits",
+            "reason",
+            "reason IS NOT NULL AND NOT (char_length(btrim(reason)) BETWEEN 1 AND 1000)",
+        ),
+        (
+            "lims_run_type_substitutions",
+            "reason",
+            "NOT (char_length(btrim(reason)) BETWEEN 1 AND 1000)",
+        ),
+        (
+            "instrument_template_inactivations",
+            "reason",
+            "NOT (char_length(btrim(reason)) BETWEEN 1 AND 1000)",
+        ),
+    )
+    bad = []
+    for table, column, where in checks:
+        present = conn.exec_driver_sql(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = 'public' "
+            f"AND table_name = '{table}' AND column_name = '{column}'"
+        ).scalar()
+        if not present:
+            continue
+        count = conn.exec_driver_sql(
+            f"SELECT count(*) FROM {table} WHERE {where}"
+        ).scalar()
+        if count:
+            bad.append(f"{table}.{column}={count}")
+    if bad:
+        raise RuntimeError(
+            "0117 refuses CHECK: " + ", ".join(bad)
+        )
+
+
 def upgrade() -> None:
     uuid_t = postgresql.UUID(as_uuid=True)
+    _refuse_bad_reasons(op.get_bind())
 
     op.add_column(
         "instrument_maintenance_events",
@@ -599,6 +698,7 @@ def upgrade() -> None:
         "SET search_path = pg_catalog, public"
     )
     op.execute("GRANT EXECUTE ON FUNCTION public.current_user_id() TO lims_app")
+    _install_fn(_SKIP_GUARD_FN, "skip_app_row_guard")
     _install_fn(_VOID_FN, "refuse_void_only_passing_event")
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
@@ -650,6 +750,13 @@ def upgrade() -> None:
         "BEFORE UPDATE ON lims_runs "
         "FOR EACH ROW EXECUTE FUNCTION public.refuse_cancel_after_import()"
     )
+    _install_fn(_CREATED_BY_IMMUTABLE_FN, "refuse_run_created_by_mutate")
+    op.execute("DROP TRIGGER IF EXISTS lims_runs_refuse_created_by_mutate ON lims_runs")
+    op.execute(
+        "CREATE TRIGGER lims_runs_refuse_created_by_mutate "
+        "BEFORE UPDATE ON lims_runs "
+        "FOR EACH ROW EXECUTE FUNCTION public.refuse_run_created_by_mutate()"
+    )
 
     # Stored import rows stay. fail_run already keeps them; this closes the
     # app-user bypass. No DELETE grants. UPDATE is also refused — there is
@@ -694,6 +801,8 @@ def downgrade() -> None:
 
     op.execute("DROP TRIGGER IF EXISTS lims_runs_refuse_cancel_after_import ON lims_runs")
     op.execute("DROP FUNCTION IF EXISTS public.refuse_cancel_after_import()")
+    op.execute("DROP TRIGGER IF EXISTS lims_runs_refuse_created_by_mutate ON lims_runs")
+    op.execute("DROP FUNCTION IF EXISTS public.refuse_run_created_by_mutate()")
     op.execute("DROP TRIGGER IF EXISTS lims_runs_refuse_type_apply ON lims_runs")
     op.execute("DROP FUNCTION IF EXISTS public.refuse_run_type_apply()")
     op.execute(
@@ -710,6 +819,7 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS public.can_substitute_run(uuid)")
 
     op.execute(_0116_VOID_FN)
+    op.execute("DROP FUNCTION IF EXISTS public.skip_app_row_guard()")
     op.execute(_0003_CURRENT_USER_ID_FN)
     op.execute(
         "DROP TRIGGER IF EXISTS instrument_events_refuse_only_passing_void "
