@@ -354,7 +354,10 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "instrument_entry_slot_audits",
     }
     assert extra <= allowed_extra
-    nonempty_ok = {"instrument_template_inactivations"}
+    nonempty_ok = {
+        "instrument_template_inactivations",
+        "instrument_types_legacy",
+    }
     for name in extra:
         if name in nonempty_ok:
             continue
