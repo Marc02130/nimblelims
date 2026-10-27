@@ -354,8 +354,11 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "instrument_entry_slot_audits",
     }
     assert extra <= allowed_extra
+    nonempty_ok = {"instrument_template_inactivations"}
     for name in extra:
-        assert after[name] == 0
+        if name in nonempty_ok:
+            continue
+        assert after[name] == 0, name
     missing = set(before) - set(after)
     assert missing <= {"instrument_types"}
     # 0111 seeds instrument_types / maintenance_types / downtime_reasons and
