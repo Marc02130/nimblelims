@@ -328,6 +328,8 @@ class EntryService:
         ]
         if not changed:
             return
+        from models.instrument import InstrumentEntrySlotAudit
+
         rows = (
             self.db.query(InstrumentUse)
             .filter(
@@ -340,6 +342,18 @@ class EntryService:
         for row in rows:
             row.active = False
             row.modified_by = self._user_id()
+        for key in changed:
+            old = old_slots.get(key) or {}
+            new = new_slots.get(key) or {}
+            self.db.add(
+                InstrumentEntrySlotAudit(
+                    entry_id=entry.id,
+                    slot_key=key,
+                    previous_instrument_type_id=old.get("instrument_type_id") or None,
+                    new_instrument_type_id=new.get("instrument_type_id") or None,
+                    created_by=self._user_id(),
+                )
+            )
 
     def delete_entry(self, entry_id: UUID) -> None:
         entry = self.get_entry(entry_id)

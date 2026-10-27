@@ -124,6 +124,7 @@ class LimsRunService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Experiment template not found",
                 )
+            self._require_active_template(template)
             require_typed_run_import(template.template_definition)
         run = self.run_repo.create(
             name=data.name,
@@ -134,6 +135,17 @@ class LimsRunService:
         )
         self._commit_refresh(run)
         return run
+
+    def _require_active_template(self, template) -> None:
+        if getattr(template, "active", True) is True:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "template_inactive",
+                "message": "This experiment template is inactive and cannot start a run.",
+            },
+        )
 
     def _require_analysis(self, analysis_id: uuid.UUID) -> None:
         from models.analysis import Analysis
@@ -412,6 +424,7 @@ class LimsRunService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Experiment template not found",
                 )
+            self._require_active_template(template)
             run.instrument_type_id = require_typed_run_import(template.template_definition)
             run.modified_by = self._user_id()
             self.db.flush()

@@ -560,6 +560,14 @@ def update_event(
         _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
     voiding = "active" in data and data["active"] is False and row.active is True
     restoring = "active" in data and data["active"] is True and row.active is not True
+    if voiding:
+        text = (body.reason or "").strip()
+        if not text:
+            _refuse(
+                "void_reason_required",
+                "A reason is required to void a maintenance event.",
+            )
+        row.void_reason = text
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -683,6 +691,44 @@ def create_downtime(
     return _downtime_out(_downtime_query(db).filter(InstrumentDowntime.id == row.id).first())
 
 
+def _lock_downtime(db: Session, downtime_id: UUID) -> InstrumentDowntime:
+    from sqlalchemy.exc import OperationalError
+    from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
+
+    try:
+        row = (
+            db.query(InstrumentDowntime)
+            .filter(InstrumentDowntime.id == downtime_id)
+            .with_for_update()
+            .first()
+        )
+    except OperationalError as exc:
+        if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+            raise
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "schedule_busy",
+                "message": (
+                    "Another change to this downtime is in progress. "
+                    "Wait for it to finish, then try again."
+                ),
+            },
+        ) from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="Downtime not found")
+    if row.maintenance_event_id:
+        event = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == row.maintenance_event_id)
+            .first()
+        )
+        if event is not None and event.schedule_id:
+            _lock_schedule(db, event.schedule_id)
+    return row
+
+
 @downtime_router.patch("/{downtime_id}", response_model=DowntimeResponse)
 def update_downtime(
     downtime_id: UUID,
@@ -690,9 +736,7 @@ def update_downtime(
     current_user: User = Depends(require_experiment_manage),
     db: Session = Depends(get_db),
 ):
-    row = db.query(InstrumentDowntime).filter(InstrumentDowntime.id == downtime_id).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Downtime not found")
+    row = _lock_downtime(db, downtime_id)
     data = explicit_updates(body, row, refuse_null={"active"})
     if "reason_id" in data:
         _list_entry(

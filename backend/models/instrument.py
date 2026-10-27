@@ -260,6 +260,7 @@ class InstrumentMaintenanceEvent(Base):
     passed = Column(Boolean, nullable=False)
     certificate_url = Column(String(1024), nullable=True)
     note = Column(Text, nullable=True)
+    void_reason = Column(Text, nullable=True)
     active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
@@ -362,6 +363,28 @@ class InstrumentUse(Base):
     )
 
     instrument = relationship("Instrument", foreign_keys=[instrument_id])
+
+
+class InstrumentEntrySlotAudit(Base):
+    """Append-only who/when/old/new when an entry slot type changes."""
+
+    __tablename__ = "instrument_entry_slot_audits"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entry_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("entries.id"), nullable=False, index=True
+    )
+    slot_key = Column(String(64), nullable=False)
+    previous_instrument_type_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True
+    )
+    new_instrument_type_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
 
 
 class InstrumentTemplateInactivation(Base):
