@@ -924,7 +924,7 @@ def test_unvoid_writes_event_restore_audit(client, admin_h, db_session, test_adm
     assert restores[0].created_by == test_admin_user.id
 
 
-def test_reason_fields_max_length_500(client, admin_h):
+def test_reason_fields_max_length_1000(client, admin_h):
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     kinds = client.get("/lists/maintenance_types/entries", headers=admin_h).json()
     if isinstance(kinds, dict):
@@ -935,7 +935,7 @@ def test_reason_fields_max_length_500(client, admin_h):
         headers=admin_h,
         json={"instrument_id": inst["id"], "kind_id": kind_id, "interval_days": 10},
     ).json()
-    too_long = "x" * 501
+    too_long = "x" * 1001
     first = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,

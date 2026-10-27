@@ -444,3 +444,18 @@ def test_reason_length_check_on_substitution(migrated_engine):
                 ),
                 {"r": run_id, "t": type_id, "u": uid, "reason": "x" * 1001},
             )
+
+
+def test_0117_revision_id_and_single_head():
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parents[1]
+    text_src = (backend / "db/migrations/versions/0117_e3_hardening.py").read_text()
+    assert 'revision = "0117_e3_hardening"' in text_src
+    assert len("0117_e3_hardening") <= 32
+    assert 'down_revision = "0116_e2_review_fixes"' in text_src
+    assert "GRANT DELETE" not in text_src
+    assert "REVOKE UPDATE ON lims_run_imports FROM lims_app" in text_src
+    assert "REVOKE DELETE ON lims_run_imports FROM lims_app" in text_src
+    heads = [p.name for p in (backend / "db/migrations/versions").glob("0117*.py")]
+    assert heads == ["0117_e3_hardening.py"]

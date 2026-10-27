@@ -29,6 +29,7 @@ MIGRATION_0107 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations
 MIGRATION_0113 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0113_maintenance_tracked.py")
 MIGRATION_0115 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0115_instrument_type_slots.py")
 MIGRATION_0116 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0116_e2_review_fixes.py")
+MIGRATION_0117 = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions", "0117_e3_hardening.py")
 
 
 def _migration(path=MIGRATION):
@@ -57,6 +58,7 @@ def test_frozen_migration_list_matches_the_live_display_rule():
         + _migration(MIGRATION_0113).TABLES
         + _migration(MIGRATION_0115).TABLES
         + _migration(MIGRATION_0116).TABLES
+        + _migration(MIGRATION_0117).TABLES
     }
     for name in getattr(m0111, "REMOVED", ()):
         frozen.pop(name, None)
@@ -72,6 +74,7 @@ def test_frozen_migration_list_matches_the_live_display_rule():
     assert len(_migration(MIGRATION_0113).revision) <= 32
     assert len(_migration(MIGRATION_0115).revision) <= 32
     assert len(_migration(MIGRATION_0116).revision) <= 32
+    assert len(_migration(MIGRATION_0117).revision) <= 32
 
 
 def test_fresh_seed_db_has_catalog_rows_before_any_run(migrated_engine):
@@ -172,6 +175,7 @@ def test_downgrade_removes_only_its_rows_and_upgrade_restores_them(migrated_engi
         + _migration(MIGRATION_0113).TABLES
         + _migration(MIGRATION_0115).TABLES
         + _migration(MIGRATION_0116).TABLES
+        + _migration(MIGRATION_0117).TABLES
     )
     with migrated_engine.connect() as conn:
         transaction = conn.begin()

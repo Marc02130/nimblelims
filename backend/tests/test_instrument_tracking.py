@@ -163,6 +163,9 @@ def test_lims_app_cannot_delete_instrument_tables(migrated_engine):
         "instrument_schedule_audits",
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
+        "instrument_entry_slot_audits",
+        "lims_run_imports",
+        "lims_run_data",
     )
     with migrated_engine.connect() as conn:
         for table in tables:
@@ -437,9 +440,9 @@ def test_passing_event_advances_and_void_recomputes(client, admin_h, test_admin_
     voided = client.patch(
         f"/v1/instrument-maintenance-events/{second.json()['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "void last event"},
     )
-    assert voided.status_code == 200
+    assert voided.status_code == 200, voided.text
     recomputed = client.get(
         f"/v1/instrument-maintenance-schedules/{sched['id']}", headers=admin_h
     ).json()

@@ -28,6 +28,9 @@ depends_on = None
 TABLES = (
     ("instrument_entry_slot_audits", "core", "Instrument entry slot audits"),
 )
+NEW_COLUMNS = (
+    ("instrument_maintenance_events", "void_reason"),
+)
 
 _CATALOG_POLICY = "is_admin() OR has_experiment_access() OR has_config_edit()"
 _CREATED_BY = "created_by IS NOT NULL AND created_by = current_user_id()"
@@ -160,6 +163,72 @@ def _register() -> None:
     )
 
 
+def _register_new_columns() -> None:
+    conn = op.get_bind()
+    m = _m0089()
+    admin = m._bind_admin(conn)
+    tables = sorted({table for table, _col in NEW_COLUMNS})
+    reflected_by_table = m._reflect(conn, tables)
+    for table, column in NEW_COLUMNS:
+        reflected = reflected_by_table.get(table, [])
+        col = next((c for c in reflected if c["name"] == column), None)
+        if col is None:
+            continue
+        table_rows = conn.execute(
+            sa.text(
+                "SELECT client_id, id FROM schema_tables WHERE physical_name = :p"
+            ),
+            {"p": table},
+        ).all()
+        for client, table_id in table_rows:
+            existing = conn.execute(
+                sa.text(
+                    "SELECT 1 FROM schema_columns "
+                    "WHERE table_id = :t AND physical_name = :p"
+                ),
+                {"t": table_id, "p": column},
+            ).scalar()
+            if existing:
+                continue
+            conn.execute(
+                sa.text(
+                    """
+                    INSERT INTO schema_columns (
+                        id, client_id, table_id, display_name, physical_name, data_type,
+                        nullable, sort_order, status, is_platform, is_identity, is_fk,
+                        fk_table, is_unique, pg_type, origin, active,
+                        created_at, created_by, modified_at, modified_by
+                    )
+                    VALUES (
+                        :id, :c, :t, :d, :p, :dt, :n, :o, 'active', :plat, false, :fk,
+                        :fkt, :uq, :pg, 'reflected', true, NOW(), :u, NOW(), :u
+                    )
+                    """
+                ),
+                {
+                    "id": m._id(client, table, "col", column),
+                    "c": client,
+                    "t": table_id,
+                    "d": m._column_display(col["name"], col["is_fk"]),
+                    "p": col["name"],
+                    "dt": m._map_type(col["udt"], col["is_fk"], col["fk_table"]),
+                    "n": col["nullable"],
+                    "o": col["ordinal"],
+                    "plat": col["name"] in m.PLATFORM_COLUMNS,
+                    "fk": col["is_fk"],
+                    "fkt": col["fk_table"],
+                    "uq": col["is_unique"],
+                    "pg": col["udt"],
+                    "u": admin,
+                },
+            )
+    conn.execute(
+        sa.text(
+            "SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000000', false)"
+        )
+    )
+
+
 def _unregister() -> None:
     conn = op.get_bind()
     conn.execute(
@@ -187,6 +256,18 @@ def _unregister() -> None:
     conn.execute(
         sa.text(
             "DELETE FROM schema_tables WHERE physical_name = 'instrument_entry_slot_audits'"
+        )
+    )
+    conn.execute(
+        sa.text(
+            """
+            DELETE FROM schema_columns
+            WHERE physical_name = 'void_reason'
+              AND table_id IN (
+                  SELECT id FROM schema_tables
+                  WHERE physical_name = 'instrument_maintenance_events'
+              )
+            """
         )
     )
 
@@ -469,6 +550,7 @@ def upgrade() -> None:
     )
     op.execute("ALTER TABLE instrument_entry_slot_audits FORCE ROW LEVEL SECURITY")
     _register()
+    _register_new_columns()
 
     _install_fn(_VOID_FN, "refuse_void_only_passing_event")
     op.execute(
@@ -572,13 +654,13 @@ def downgrade() -> None:
         "ON lims_run_type_substitutions"
     )
     op.execute("DROP FUNCTION IF EXISTS public.refuse_run_type_substitution()")
-    op.execute("DROP FUNCTION IF EXISTS public.can_substitute_run(uuid)")
     op.execute("DROP POLICY IF EXISTS lims_run_type_substitutions_insert ON lims_run_type_substitutions")
     op.execute(
         "CREATE POLICY lims_run_type_substitutions_insert "
         "ON lims_run_type_substitutions FOR INSERT "
         f"WITH CHECK ({_CATALOG_INSERT})"
     )
+    op.execute("DROP FUNCTION IF EXISTS public.can_substitute_run(uuid)")
 
     op.execute(_0116_VOID_FN)
     op.execute(
