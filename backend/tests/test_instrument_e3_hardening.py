@@ -392,8 +392,8 @@ def test_imported_rows_are_immutable_for_lims_app(migrated_engine):
         _run_as_lims_app(
             migrated_engine,
             uid,
-            "UPDATE lims_run_data SET row_data = '{\"x\":1}'::jsonb WHERE id = :id",
-            {"id": data_id},
+            "UPDATE lims_run_data SET row_data = CAST(:payload AS jsonb) WHERE id = :id",
+            {"id": data_id, "payload": '{"changed":true}'},
         )
     with migrated_engine.connect() as conn:
         assert conn.execute(

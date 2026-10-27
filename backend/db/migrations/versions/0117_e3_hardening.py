@@ -263,6 +263,8 @@ END;
 $$;
 """
 
+# SECURITY DEFINER makes current_user the owner. After SET ROLE lims_app,
+# current_setting('role') is still lims_app; superuser cleanup is not.
 _SUBSTITUTE_INSERT_FN = """
 CREATE OR REPLACE FUNCTION public.refuse_run_type_substitution()
 RETURNS trigger
@@ -271,7 +273,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_user <> 'lims_app' THEN
+    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
         RETURN NEW;
     END IF;
     IF public.can_substitute_run(NEW.lims_run_id) THEN
@@ -291,7 +293,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_user <> 'lims_app' THEN
+    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
         RETURN NEW;
     END IF;
     IF NEW.instrument_type_id IS NOT DISTINCT FROM OLD.instrument_type_id THEN
@@ -317,7 +319,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_user <> 'lims_app' THEN
+    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
         RETURN NEW;
     END IF;
     IF NEW.status IS DISTINCT FROM OLD.status
@@ -343,7 +345,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    IF current_user <> 'lims_app' THEN
+    IF current_setting('role', true) IS DISTINCT FROM 'lims_app' THEN
         IF TG_OP = 'DELETE' THEN
             RETURN OLD;
         END IF;
