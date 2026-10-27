@@ -190,6 +190,7 @@ const InstrumentCatalogManagement: React.FC<{
   const canEdit = hasPermission('config:edit');
   const canBench = hasPermission('experiment:manage');
   const canManageSchedules = user?.role === 'Administrator' || user?.role === 'Lab Manager';
+  const canSetMaintenanceTracked = user?.role === 'Administrator';
 
   const [tab, setTab] = useState<TabKey>(
     eventsOnly ? 'events' : maintenanceOnly ? 'maintenance' : 'types'
@@ -428,7 +429,7 @@ const InstrumentCatalogManagement: React.FC<{
         else await apiService.createInstrumentType(payload);
         setSuccess(editingId ? 'Instrument type updated' : 'Instrument type created');
       } else if (tab === 'instances') {
-        const payload = {
+        const payload: Record<string, unknown> = {
           name: instrumentForm.name.trim(),
           description: instrumentForm.description.trim() || undefined,
           instrument_type_id: instrumentForm.instrument_type_id,
@@ -438,8 +439,10 @@ const InstrumentCatalogManagement: React.FC<{
           asset_tag: instrumentForm.asset_tag.trim() || undefined,
           status: instrumentForm.status,
           active: instrumentForm.active,
-          maintenance_tracked: instrumentForm.maintenance_tracked,
         };
+        if (canSetMaintenanceTracked) {
+          payload.maintenance_tracked = instrumentForm.maintenance_tracked;
+        }
         if (!payload.name) throw new Error('Name is required');
         if (!payload.instrument_type_id) throw new Error('Instrument type is required');
         if (editingId) await apiService.updateInstrument(editingId, payload);
@@ -985,6 +988,7 @@ const InstrumentCatalogManagement: React.FC<{
                 control={
                   <Switch
                     checked={instrumentForm.maintenance_tracked}
+                    disabled={!canSetMaintenanceTracked}
                     onChange={(e) =>
                       setInstrumentForm({
                         ...instrumentForm,
@@ -995,6 +999,11 @@ const InstrumentCatalogManagement: React.FC<{
                 }
                 label="Track maintenance"
               />
+              {!canSetMaintenanceTracked && (
+                <Typography variant="caption" color="text.secondary" display="block">
+                  An Administrator can turn on maintenance tracking.
+                </Typography>
+              )}
             </>
           )}
           {tab === 'cro' && (

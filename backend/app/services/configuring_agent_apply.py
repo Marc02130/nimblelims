@@ -485,29 +485,19 @@ def _instrument_catalog(db, user, method: str, path: str, body: dict) -> list[Ap
         raise CannotExpress(
             "Instrument status and active are not set by this configuration run. "
             "Schedules and due dates are set by a lab admin or manager. "
-            "Send name, type, vendor, and maintenance_tracked only."
+            "Send name, type, and vendor only."
+        )
+    if "maintenance_tracked" in (body or {}):
+        raise CannotExpress(
+            "The configuring agent does not set maintenance tracking. "
+            "An Administrator can turn it on for the instrument."
         )
     if method == "POST" and path == "/v1/instruments":
-        tracked = (body or {}).get("maintenance_tracked")
-        if tracked is not True and tracked is not False:
-            raise CannotExpress(
-                "Answer before confirming: does the lab track maintenance "
-                "for this instrument in NimbleLIMS?"
-            )
         created = create_instrument(InstrumentCreate.model_validate(body), user, db)
         return [AppliedChange("instrument", created.name, created.id)]
     instrument_id = _uuid_from_path(path)
-    previous = None
-    if method == "PATCH" and "maintenance_tracked" in (body or {}):
-        from models.instrument import Instrument
-
-        current = db.query(Instrument).filter(Instrument.id == instrument_id).first()
-        previous = None if current is None else current.maintenance_tracked
     updated = update_instrument(instrument_id, InstrumentUpdate.model_validate(body), user, db)
-    detail = None
-    if previous is True and updated.maintenance_tracked is False:
-        detail = "maintenance_tracked previous=true new=false"
-    return [AppliedChange("instrument", updated.name, updated.id, detail=detail)]
+    return [AppliedChange("instrument", updated.name, updated.id)]
 
 
 def _instrument_types(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:

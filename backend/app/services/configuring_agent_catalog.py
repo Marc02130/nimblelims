@@ -175,6 +175,10 @@ def route_formats() -> list[dict[str, str]]:
             body = "{amount: 0} (exactly this)"
         elif schema is not None:
             full = schema.model_json_schema()
+            if kind == "instrument":
+                props = dict(full.get("properties") or {})
+                props.pop("maintenance_tracked", None)
+                full = {**full, "properties": props}
             body = _fields_text(full, full.get("$defs") or {})
         else:
             body = "{}"

@@ -142,6 +142,22 @@ describe('InstrumentCatalogManagement', () => {
     expect(screen.queryByLabelText('Track maintenance by default')).not.toBeInTheDocument();
   });
 
+  test('Configuration Editor cannot send maintenance_tracked', async () => {
+    userState.user = {
+      id: '2',
+      username: 'config-editor',
+      role: 'Configuration Editor',
+      permissions: ['config:edit'],
+    };
+    wrap(<InstrumentCatalogManagement />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Instruments' }));
+    fireEvent.click(screen.getByRole('button', { name: /Add Instrument/i }));
+    expect(await screen.findByLabelText('Track maintenance')).toBeDisabled();
+    expect(
+      screen.getByText('An Administrator can turn on maintenance tracking.'),
+    ).toBeInTheDocument();
+  });
+
   test('Save turns maintenance tracking off with no extra prompt', async () => {
     api.getInstruments.mockResolvedValue([
       {

@@ -42,8 +42,27 @@ instruments_router = APIRouter(prefix="/instruments", tags=["instruments"])
 cro_sources_router = APIRouter(prefix="/cro-sources", tags=["cro-sources"])
 
 
+MAINTENANCE_TRACKED_ADMIN_ONLY = "maintenance_tracked_admin_only"
+
+
 def _has_config_edit(user: User, db: Session) -> bool:
     return "config:edit" in get_user_permissions(user, db)
+
+
+def _is_administrator(user: User) -> bool:
+    return getattr(getattr(user, "role", None), "name", None) == "Administrator"
+
+
+def _refuse_maintenance_tracked_unless_admin(user: User) -> None:
+    if _is_administrator(user):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "code": MAINTENANCE_TRACKED_ADMIN_ONLY,
+            "message": "Only an Administrator can turn maintenance tracking on or off.",
+        },
+    )
 
 
 def _active_filter(query, model, user: User, db: Session):
@@ -315,6 +334,8 @@ def create_instrument(
     current_user: User = Depends(require_config_edit),
     db: Session = Depends(get_db),
 ):
+    if body.maintenance_tracked is not None:
+        _refuse_maintenance_tracked_unless_admin(current_user)
     _require_active_type(db, body.instrument_type_id)
     if body.vendor_id and not db.query(Vendor).filter(Vendor.id == body.vendor_id).first():
         raise HTTPException(status_code=400, detail="Invalid vendor")
@@ -362,6 +383,8 @@ def update_instrument(
     if not row:
         raise HTTPException(status_code=404, detail="Instrument not found")
     data = explicit_updates(body, row, refuse_null={"active", "status", "maintenance_tracked"})
+    if "maintenance_tracked" in data:
+        _refuse_maintenance_tracked_unless_admin(current_user)
     previous_tracked = row.maintenance_tracked
     if "instrument_type_id" in data:
         _require_active_type(db, data["instrument_type_id"])

@@ -246,15 +246,13 @@ def _body_gap(method: str, path: str, body: Any) -> Optional[str]:
             return (
                 "Instrument status and active are not set by this configuration run. "
                 "Schedules and due dates are set by a lab admin or manager. "
-                "Send name, type, vendor, and maintenance_tracked only."
+                "Send name, type, and vendor only."
             )
-        if method == "POST" and path == "/v1/instruments":
-            tracked = (body or {}).get("maintenance_tracked")
-            if tracked is not True and tracked is not False:
-                return (
-                    "Answer before confirming: does the lab track maintenance "
-                    "for this instrument in NimbleLIMS?"
-                )
+        if isinstance(body, dict) and "maintenance_tracked" in body:
+            return (
+                "The configuring agent does not set maintenance tracking. "
+                "An Administrator can turn it on for the instrument."
+            )
     return None
 
 

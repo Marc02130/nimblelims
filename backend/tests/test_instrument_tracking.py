@@ -505,19 +505,22 @@ def test_agent_refuses_schedule_due_and_active_fields():
 
 def test_agent_may_create_instruments_and_schedules_not_events_or_downtime():
     asked = allow.classify_call("POST", "/v1/instruments", {"name": "Qubit"})
-    assert asked.ok is False
-    assert "track maintenance" in (asked.gap or "").lower()
-    assert allow.classify_call(
+    assert asked.ok is True
+    flagged = allow.classify_call(
         "POST",
         "/v1/instruments",
         {"name": "Qubit", "maintenance_tracked": False},
-    ).ok
+    )
+    assert flagged.ok is False
+    assert "does not set maintenance tracking" in (flagged.gap or "")
     blocked_status = allow.classify_call("PATCH", "/v1/instruments/abc", {"active": False})
     assert blocked_status.ok is False
     assert "status" in blocked_status.gap or "active" in blocked_status.gap
-    assert allow.classify_call(
+    patched = allow.classify_call(
         "PATCH", "/v1/instruments/abc", {"maintenance_tracked": True}
-    ).ok
+    )
+    assert patched.ok is False
+    assert "does not set maintenance tracking" in (patched.gap or "")
     type_flag = allow.classify_call(
         "POST", "/v1/instrument-types", {"name": "Balance", "maintenance_tracked": True}
     )
@@ -936,16 +939,22 @@ def test_type_default_is_inherited_unless_explicit(client, admin_h):
 
 def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_session, test_admin_user, test_org, monkeypatch):
     from app.services import configuring_agent_service as svc
-    from models.configuring_agent import Configuration, ConfigurationItem
-    from models.instrument import InstrumentMaintenanceAudit
+    from app.services.configuring_agent_apply import CannotExpress, execute_step
+    from models.configuring_agent import Configuration
 
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     assert inst["maintenance_tracked"] is True
     off = {"maintenance_tracked": False}
     path = f"/v1/instruments/{inst['id']}"
     classified = allow.classify_call("PATCH", path, off)
-    assert classified.ok is True
-    assert allow.needs_second_confirm("PATCH", path, off, classified.kind) is False
+    assert classified.ok is False
+    assert "does not set maintenance tracking" in (classified.gap or "")
+    try:
+        execute_step(db_session, test_admin_user, "PATCH", path, off)
+    except CannotExpress as exc:
+        assert "does not set maintenance tracking" in exc.gap
+    else:
+        raise AssertionError("apply should refuse maintenance_tracked")
     monkeypatch.setattr(svc, "_key_for_run", lambda _db: (
         type("P", (), {"agent_provider": "xai", "agent_model": "grok-test-model"})(),
         "test-key",
@@ -982,26 +991,12 @@ def test_agent_off_requires_confirm_and_keeps_previous(client, admin_h, db_sessi
     run = svc.start_run(db_session, test_admin_user, configuration.id, "goal")
     still = client.get(f"/v1/instruments/{inst['id']}", headers=admin_h).json()
     assert still["maintenance_tracked"] is True
-    result, code = svc.apply_run(db_session, test_admin_user, run.id)
-    assert code == 200, result.error_message
-    assert result.status == "done"
-    assert result.confirmed_by == test_admin_user.id
-    assert result.confirmed_at is not None
+    from app.services.configuring_agent_service import ApplyRefused
+
+    with pytest.raises(ApplyRefused):
+        svc.apply_run(db_session, test_admin_user, run.id)
     after = client.get(f"/v1/instruments/{inst['id']}", headers=admin_h).json()
-    assert after["maintenance_tracked"] is False
-    item = db_session.query(ConfigurationItem).filter_by(run_id=run.id).one()
-    assert item.created_by == test_admin_user.id
-    assert item.agent_assisted is True
-    assert "previous=true" in (item.detail or "")
-    audit = (
-        db_session.query(InstrumentMaintenanceAudit)
-        .filter(InstrumentMaintenanceAudit.instrument_id == inst["id"])
-        .one()
-    )
-    assert audit.previous_value is True
-    assert audit.new_value is False
-    assert audit.created_by == test_admin_user.id
-    assert audit.created_at is not None
+    assert after["maintenance_tracked"] is True
 
 
 def test_json_import_requires_source_unless_admin(
