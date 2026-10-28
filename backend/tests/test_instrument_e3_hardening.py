@@ -3,8 +3,12 @@ import uuid
 from datetime import date
 
 import pytest
+from contextlib import contextmanager
+
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, InternalError, ProgrammingError
+
+from app.core.db_errors import pgcode
 
 from models.instrument import InstrumentMaintenanceAudit, InstrumentScheduleAudit
 from tests.test_instrument_e2_review_fixes import _seed_schedule_event
@@ -31,6 +35,22 @@ def _grant_if_missing(conn, table, privilege):
     if not allowed:
         conn.execute(text(f"GRANT {privilege} ON TABLE {table} TO lims_app"))
     return not allowed
+
+
+@contextmanager
+def _import_write_grants(engine):
+    tables = ("lims_run_imports", "lims_run_data")
+    with engine.begin() as conn:
+        for table in tables:
+            conn.execute(text(f"GRANT UPDATE ON TABLE {table} TO lims_app"))
+            conn.execute(text(f"GRANT DELETE ON TABLE {table} TO lims_app"))
+    try:
+        yield
+    finally:
+        with engine.begin() as conn:
+            for table in tables:
+                conn.execute(text(f"REVOKE UPDATE ON TABLE {table} FROM lims_app"))
+                conn.execute(text(f"REVOKE DELETE ON TABLE {table} FROM lims_app"))
 
 
 def test_void_event_requires_reason_api_and_audit(
@@ -524,9 +544,11 @@ def test_0118_revision_id_and_single_head():
     cfg = Config(str(backend / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0118_e3_followups"]
-    heads = [p.name for p in (backend / "db/migrations/versions").glob("0118*.py")]
-    assert heads == ["0118_e3_followups.py"]
+    heads = script.get_heads()
+    assert len(heads) == 1, heads
+    assert len(heads[0]) <= 32
+    files = [p.name for p in (backend / "db/migrations/versions").glob("0118*.py")]
+    assert files == ["0118_e3_followups.py"]
 
 
 def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
@@ -540,6 +562,7 @@ def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
             {"id": ids["event"]},
         )
     assert "void_reason_required" in str(blank.value.orig)
+    assert pgcode(blank.value) == "23514"
     with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as after_reset:
         _run_as_direct_lims_app(
             migrated_engine,
@@ -550,6 +573,7 @@ def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
             reset_role=True,
         )
     assert "void_reason_required" in str(after_reset.value.orig)
+    assert pgcode(after_reset.value) == "23514"
 
 
 def test_direct_lims_app_substitution_cancel_import_and_created_by(migrated_engine):
@@ -600,72 +624,68 @@ def test_direct_lims_app_substitution_cancel_import_and_created_by(migrated_engi
             ),
             {"id": data_id, "r": run_id, "i": import_id, "u": owner},
         )
-        conn.execute(text("GRANT UPDATE ON TABLE lims_run_imports TO lims_app"))
-        conn.execute(text("GRANT DELETE ON TABLE lims_run_imports TO lims_app"))
-        conn.execute(text("GRANT UPDATE ON TABLE lims_run_data TO lims_app"))
-        conn.execute(text("GRANT DELETE ON TABLE lims_run_data TO lims_app"))
+    with _import_write_grants(migrated_engine):
+        with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as sub:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                tech,
+                "INSERT INTO lims_run_type_substitutions "
+                "(lims_run_id, to_instrument_type_id, reason, created_by) "
+                "VALUES (:r, :t, 'not mine', :u)",
+                {"r": run_id, "t": type_id, "u": tech},
+            )
+        assert "substitute_not_own_run" in str(sub.value.orig)
+        assert pgcode(sub.value) == "42501"
 
-    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as sub:
-        _run_as_direct_lims_app(
-            migrated_engine,
-            tech,
-            "INSERT INTO lims_run_type_substitutions "
-            "(lims_run_id, to_instrument_type_id, reason, created_by) "
-            "VALUES (:r, :t, 'not mine', :u)",
-            {"r": run_id, "t": type_id, "u": tech},
-        )
-    assert "substitute_not_own_run" in str(sub.value.orig)
+        with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as apply:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                tech,
+                "UPDATE lims_runs SET instrument_type_id = :t WHERE id = :id",
+                {"t": type_id, "id": run_id},
+            )
+        assert "substitute_not_own_run" in str(apply.value.orig)
+        assert pgcode(apply.value) == "42501"
 
-    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as apply:
-        _run_as_direct_lims_app(
-            migrated_engine,
-            tech,
-            "UPDATE lims_runs SET instrument_type_id = :t WHERE id = :id",
-            {"t": type_id, "id": run_id},
-        )
-    assert "substitute_not_own_run" in str(apply.value.orig)
+        with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as cancel:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                tech,
+                "UPDATE lims_runs SET status = 'canceled' WHERE id = :id",
+                {"id": run_id},
+            )
+        assert "run_has_imported_data" in str(cancel.value.orig)
+        assert pgcode(cancel.value) == "23514"
 
-    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as cancel:
-        _run_as_direct_lims_app(
-            migrated_engine,
-            tech,
-            "UPDATE lims_runs SET status = 'canceled' WHERE id = :id",
-            {"id": run_id},
-        )
-    assert "run_has_imported_data" in str(cancel.value.orig)
+        with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as stolen:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                tech,
+                "UPDATE lims_runs SET created_by = :u WHERE id = :id",
+                {"u": tech, "id": run_id},
+            )
+        assert "run_created_by_immutable" in str(stolen.value.orig)
+        assert pgcode(stolen.value) == "42501"
 
-    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as stolen:
-        _run_as_direct_lims_app(
-            migrated_engine,
-            tech,
-            "UPDATE lims_runs SET created_by = :u WHERE id = :id",
-            {"u": tech, "id": run_id},
-        )
-    assert "run_created_by_immutable" in str(stolen.value.orig)
+        with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as imp:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                tech,
+                "UPDATE lims_run_imports SET filename = 'x' WHERE id = :id",
+                {"id": import_id},
+            )
+        assert "imported_row_immutable" in str(imp.value.orig)
+        assert pgcode(imp.value) == "42501"
 
-    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as imp:
-        _run_as_direct_lims_app(
-            migrated_engine,
-            tech,
-            "UPDATE lims_run_imports SET filename = 'x' WHERE id = :id",
-            {"id": import_id},
-        )
-    assert "imported_row_immutable" in str(imp.value.orig)
-
-    with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as data:
-        _run_as_direct_lims_app(
-            migrated_engine,
-            tech,
-            "DELETE FROM lims_run_data WHERE id = :id",
-            {"id": data_id},
-        )
-    assert "imported_row_immutable" in str(data.value.orig)
-
-    with migrated_engine.begin() as conn:
-        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_imports FROM lims_app"))
-        conn.execute(text("REVOKE DELETE ON TABLE lims_run_imports FROM lims_app"))
-        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_data FROM lims_app"))
-        conn.execute(text("REVOKE DELETE ON TABLE lims_run_data FROM lims_app"))
+        with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as data:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                tech,
+                "DELETE FROM lims_run_data WHERE id = :id",
+                {"id": data_id},
+            )
+        assert "imported_row_immutable" in str(data.value.orig)
+        assert pgcode(data.value) == "42501"
 
 
 def test_whitespace_only_reasons_are_blank_api_and_db(
@@ -800,6 +820,7 @@ def test_direct_lims_app_guards_survive_reset_and_set_role_none(migrated_engine)
                 **mode,
             )
         assert "void_reason_required" in str(blank.value.orig)
+        assert pgcode(blank.value) == "23514"
 
     with migrated_engine.begin() as conn:
         tech_role = conn.execute(text("SELECT id FROM roles WHERE name = 'Lab Technician'")).scalar()
@@ -848,11 +869,6 @@ def test_direct_lims_app_guards_survive_reset_and_set_role_none(migrated_engine)
             ),
             {"id": data_id, "r": run_id, "i": import_id, "u": owner},
         )
-        conn.execute(text("GRANT UPDATE ON TABLE lims_run_imports TO lims_app"))
-        conn.execute(text("GRANT DELETE ON TABLE lims_run_imports TO lims_app"))
-        conn.execute(text("GRANT UPDATE ON TABLE lims_run_data TO lims_app"))
-        conn.execute(text("GRANT DELETE ON TABLE lims_run_data TO lims_app"))
-
     guards = (
         (
             "INSERT INTO lims_run_type_substitutions "
@@ -887,16 +903,131 @@ def test_direct_lims_app_guards_survive_reset_and_set_role_none(migrated_engine)
             "imported_row_immutable",
         ),
     )
-    for sql, params, needle in guards:
-        for mode in modes:
-            with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as err:
-                _run_as_direct_lims_app(
-                    migrated_engine, tech, sql, params, **mode
+    expected_state = {
+        "substitute_not_own_run": "42501",
+        "run_has_imported_data": "23514",
+        "run_created_by_immutable": "42501",
+        "imported_row_immutable": "42501",
+    }
+    with _import_write_grants(migrated_engine):
+        for sql, params, needle in guards:
+            for mode in modes:
+                with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as err:
+                    _run_as_direct_lims_app(
+                        migrated_engine, tech, sql, params, **mode
+                    )
+                assert needle in str(err.value.orig), (needle, mode, err.value.orig)
+                assert pgcode(err.value) == expected_state[needle], (
+                    needle,
+                    mode,
+                    pgcode(err.value),
                 )
-            assert needle in str(err.value.orig), (needle, mode, err.value.orig)
 
+
+_UNICODE_REASON_CASES = (
+    ("nbsp", "\u00a0"),
+    *( (f"u{code:04x}", chr(code)) for code in range(0x2000, 0x200B) ),
+    ("u3000", "\u3000"),
+    ("zwsp", "\u200b"),
+    ("bom", "\ufeff"),
+)
+
+
+def test_unicode_whitespace_reason_behavior_is_recorded(
+    client, admin_h, db_session, test_admin_user, migrated_engine
+):
+    """Record API vs DB for Unicode whitespace. Marc decides whether they should match."""
+    from app.core.visible_text import has_visible_text
+
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    sched = _schedule(client, admin_h, inst["id"], interval=10)
+    client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": date.today().isoformat()},
+    )
+    created = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(test_admin_user.id),
+            "passed": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    event_id = created.json()["id"]
+
+    api_rows = []
+    for name, char in _UNICODE_REASON_CASES:
+        refused = client.patch(
+            f"/v1/instrument-maintenance-events/{event_id}",
+            headers=admin_h,
+            json={"active": False, "reason": char},
+        )
+        code = None
+        if refused.status_code == 422:
+            detail = refused.json().get("detail")
+            code = detail.get("code") if isinstance(detail, dict) else "pydantic"
+        elif refused.status_code == 200:
+            client.patch(
+                f"/v1/instrument-maintenance-events/{event_id}",
+                headers=admin_h,
+                json={"active": True},
+            )
+        api_rows.append(
+            (
+                name,
+                has_visible_text(char),
+                refused.status_code,
+                code,
+            )
+        )
+
+    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     with migrated_engine.begin() as conn:
-        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_imports FROM lims_app"))
-        conn.execute(text("REVOKE DELETE ON TABLE lims_run_imports FROM lims_app"))
-        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_data FROM lims_app"))
-        conn.execute(text("REVOKE DELETE ON TABLE lims_run_data FROM lims_app"))
+        _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
+    db_rows = []
+    for name, char in _UNICODE_REASON_CASES:
+        try:
+            _run_as_lims_app(
+                migrated_engine,
+                ids["uid"],
+                "UPDATE instrument_maintenance_events "
+                "SET active = false, void_reason = :r WHERE id = :id",
+                {"id": ids["event"], "r": char},
+            )
+            db_rows.append((name, "accepted", None))
+            _run_as_lims_app(
+                migrated_engine,
+                ids["uid"],
+                "UPDATE instrument_maintenance_events "
+                "SET active = true, void_reason = NULL WHERE id = :id",
+                {"id": ids["event"]},
+            )
+        except (IntegrityError, InternalError, ProgrammingError) as exc:
+            db_rows.append((name, "rejected", pgcode(exc)))
+
+    # Current observed behavior. Do not "fix" API or DB here.
+    unicode_spaces = ("nbsp",) + tuple(f"u{code:04x}" for code in range(0x2000, 0x200B)) + ("u3000",)
+    assert api_rows == [
+        *((name, False, 422, "void_reason_required") for name in unicode_spaces),
+        ("zwsp", True, 200, None),
+        ("bom", True, 200, None),
+    ]
+    db_expected = [("nbsp", "accepted", None)]
+    for code in range(0x2000, 0x200B):
+        if code == 0x2007:
+            db_expected.append((f"u{code:04x}", "accepted", None))
+        else:
+            db_expected.append((f"u{code:04x}", "rejected", "23514"))
+    db_expected.extend(
+        [
+            ("u3000", "rejected", "23514"),
+            ("zwsp", "accepted", None),
+            ("bom", "accepted", None),
+        ]
+    )
+    assert db_rows == db_expected

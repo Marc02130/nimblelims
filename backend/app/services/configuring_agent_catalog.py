@@ -1267,8 +1267,6 @@ def _resolve_instrument_body(db, data: dict) -> dict:
     for key in ("description", "model", "serial_number", "asset_tag", "location_id"):
         if data.get(key) not in (None, ""):
             out[key] = data[key]
-    if "maintenance_tracked" in data:
-        out["maintenance_tracked"] = data["maintenance_tracked"]
     return {k: v for k, v in out.items() if v is not None}
 
 
