@@ -160,6 +160,86 @@ def test_agent_refuses_maintenance_tracked_in_classify_and_apply(
         raise AssertionError("apply should refuse an instrument PATCH with maintenance_tracked")
 
 
+def test_lab_manager_and_tech_with_config_edit_cannot_set_maintenance_tracked(
+    client, admin_h, db_session, test_org
+):
+    type_id = _seeded_type(client, admin_h)["id"]
+    manager = _role_user(
+        db_session,
+        test_org,
+        "Lab Manager",
+        extra_perms=("config:edit", "experiment:manage"),
+    )
+    tech = _role_user(
+        db_session,
+        test_org,
+        "Lab Technician",
+        extra_perms=("config:edit", "experiment:manage"),
+    )
+    manager_h = _login(client, manager.username, "pass-word-1")
+    tech_h = _login(client, tech.username, "pass-word-1")
+    inst = _instrument(client, admin_h, maintenance_tracked=False)
+    for headers in (manager_h, tech_h):
+        created = client.post(
+            "/v1/instruments",
+            headers=headers,
+            json={
+                "name": _name("Cfg"),
+                "instrument_type_id": type_id,
+                "maintenance_tracked": True,
+            },
+        )
+        assert created.status_code == 403, created.text
+        assert _code(created) == "maintenance_tracked_admin_only"
+        for flag in (True, False):
+            refused = client.patch(
+                f"/v1/instruments/{inst['id']}",
+                headers=headers,
+                json={"maintenance_tracked": flag},
+            )
+            assert refused.status_code == 403, refused.text
+            assert _code(refused) == "maintenance_tracked_admin_only"
+
+
+def test_camel_case_maintenance_tracked_is_ignored(client, admin_h):
+    type_id = _seeded_type(client, admin_h)["id"]
+    created = client.post(
+        "/v1/instruments",
+        headers=admin_h,
+        json={
+            "name": _name("Camel"),
+            "instrument_type_id": type_id,
+            "maintenanceTracked": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["maintenance_tracked"] is False
+
+
+def test_admin_create_with_tracked_true_writes_no_audit(
+    client, admin_h, db_session
+):
+    type_id = _seeded_type(client, admin_h)["id"]
+    created = client.post(
+        "/v1/instruments",
+        headers=admin_h,
+        json={
+            "name": _name("Audited"),
+            "instrument_type_id": type_id,
+            "maintenance_tracked": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["maintenance_tracked"] is True
+    db_session.expire_all()
+    audits = (
+        db_session.query(InstrumentMaintenanceAudit)
+        .filter(InstrumentMaintenanceAudit.instrument_id == created.json()["id"])
+        .all()
+    )
+    assert audits == []
+
+
 def test_agent_prompt_and_summary_do_not_instruct_setting_the_flag():
     prompt = _system_prompt(None, "")
     lowered = prompt.lower()
