@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, field_validator
 from app.schemas._instants import APIModel as BaseModel
 
 
@@ -25,6 +25,15 @@ class MaintenanceScheduleUpdate(BaseModel):
 class FirstDueCreate(BaseModel):
     next_due: date
     reason: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        from app.core.visible_text import has_visible_text
+
+        if value is not None and not has_visible_text(value):
+            return None
+        return value
 
 
 class MaintenanceScheduleResponse(BaseModel):
@@ -61,6 +70,15 @@ class MaintenanceEventUpdate(BaseModel):
     note: Optional[str] = None
     certificate_url: Optional[str] = Field(None, max_length=1024)
     reason: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        from app.core.visible_text import has_visible_text
+
+        if value is not None and not has_visible_text(value):
+            return None
+        return value
 
 
 class MaintenanceEventResponse(BaseModel):

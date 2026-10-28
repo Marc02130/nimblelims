@@ -499,8 +499,34 @@ def test_0117_revision_id_and_single_head():
     assert "run_created_by_immutable" in text_src
     assert "REVOKE UPDATE ON lims_run_imports FROM lims_app" in text_src
     assert "REVOKE DELETE ON lims_run_imports FROM lims_app" in text_src
+    assert "from db.append_only_tables import" not in text_src
+    assert "ARRAY['lims_migrate', 'schema_apply', 'postgres']" in text_src
     heads = [p.name for p in (backend / "db/migrations/versions").glob("0117*.py")]
     assert heads == ["0117_e3_hardening.py"]
+
+
+def test_0118_revision_id_and_single_head():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parents[1]
+    text_src = (backend / "db/migrations/versions/0118_e3_followups.py").read_text()
+    assert 'revision = "0118_e3_followups"' in text_src
+    assert len("0118_e3_followups") <= 32
+    assert 'down_revision = "0117_e3_hardening"' in text_src
+    assert "GRANT DELETE" not in text_src
+    assert "REVOKE DELETE ON TABLE lab_settings FROM lims_app" in text_src
+    assert "_WS = r\"E' \\t\\r\\n'\"" in text_src
+    assert "btrim(reason, {_WS})" in text_src
+    assert "from app.core.bootstrap_roles import" not in text_src
+    assert "0118 refuses CHECK" in text_src
+    cfg = Config(str(backend / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend / "db/migrations"))
+    script = ScriptDirectory.from_config(cfg)
+    assert script.get_heads() == ["0118_e3_followups"]
+    heads = [p.name for p in (backend / "db/migrations/versions").glob("0118*.py")]
+    assert heads == ["0118_e3_followups.py"]
 
 
 def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
@@ -634,6 +660,240 @@ def test_direct_lims_app_substitution_cancel_import_and_created_by(migrated_engi
             {"id": data_id},
         )
     assert "imported_row_immutable" in str(data.value.orig)
+
+    with migrated_engine.begin() as conn:
+        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_imports FROM lims_app"))
+        conn.execute(text("REVOKE DELETE ON TABLE lims_run_imports FROM lims_app"))
+        conn.execute(text("REVOKE UPDATE ON TABLE lims_run_data FROM lims_app"))
+        conn.execute(text("REVOKE DELETE ON TABLE lims_run_data FROM lims_app"))
+
+
+def test_whitespace_only_reasons_are_blank_api_and_db(
+    client, admin_h, db_session, test_admin_user, run_analysis_id, cohort_sample_id
+):
+    from tests.test_instrument_tracking import _seeded_type
+
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    sched = _schedule(client, admin_h, inst["id"], interval=10)
+    client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": date.today().isoformat()},
+    )
+    created = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(test_admin_user.id),
+            "passed": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    event_id = created.json()["id"]
+    for blank in ("\t", "\n", "\r", "\r\n", " \t\n "):
+        refused = client.patch(
+            f"/v1/instrument-maintenance-events/{event_id}",
+            headers=admin_h,
+            json={"active": False, "reason": blank},
+        )
+        assert refused.status_code == 422, (blank, refused.text)
+        assert refused.json()["detail"]["code"] == "void_reason_required"
+
+    template = _create_template(client, admin_h)
+    run = _create_run(client, admin_h, template["id"], run_analysis_id)
+    assert run.status_code == 201, run.text
+    started = _start_run(client, admin_h, run.json()["id"], cohort_sample_id)
+    assert started.status_code == 200, started.text
+    qpcr = _seeded_type(client, admin_h, "qPCR")
+    for blank in ("\t", "\n", " \t\n "):
+        refused = client.post(
+            f"/v1/lims-runs/{run.json()['id']}/substitute-instrument-type",
+            headers=admin_h,
+            json={"instrument_type_id": qpcr["id"], "reason": blank},
+        )
+        assert refused.status_code == 422, (blank, refused.text)
+
+
+def test_whitespace_only_reasons_fail_db_checks(migrated_engine):
+    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
+    with migrated_engine.begin() as conn:
+        _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
+    for blank in ("\t", "\n", "\r\n", " \t\n "):
+        with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as err:
+            _run_as_lims_app(
+                migrated_engine,
+                ids["uid"],
+                "UPDATE instrument_maintenance_events "
+                "SET active = false, void_reason = :r WHERE id = :id",
+                {"id": ids["event"], "r": blank},
+            )
+        msg = str(err.value.orig)
+        assert "void_reason_required" in msg or "ck_instrument_events_void_reason" in msg
+
+    with migrated_engine.begin() as conn:
+        admin = conn.execute(text("SELECT id FROM roles WHERE name = 'Administrator'")).scalar()
+        client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
+        type_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'Plate reader' LIMIT 1")
+        ).scalar()
+        uid = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
+                "VALUES (:id, 'e3ws', :u, :e, 'x', :r, :c, true)"
+            ),
+            {
+                "id": uid,
+                "u": f"e3ws-{uid.hex[:6]}",
+                "e": f"e3ws-{uid.hex[:6]}@x.org",
+                "r": admin,
+                "c": client_id,
+            },
+        )
+        run_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_runs (id, name, status, created_by, modified_by) "
+                "VALUES (:id, :n, 'draft', :u, :u)"
+            ),
+            {"id": run_id, "n": f"e3ws-{run_id.hex[:6]}", "u": uid},
+        )
+        for blank in ("\t", "\n", "\r\n"):
+            with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
+                conn.execute(
+                    text(
+                        "INSERT INTO lims_run_type_substitutions "
+                        "(lims_run_id, to_instrument_type_id, reason, created_by) "
+                        "VALUES (:r, :t, :reason, :u)"
+                    ),
+                    {"r": run_id, "t": type_id, "u": uid, "reason": blank},
+                )
+
+
+def test_lab_settings_delete_revoked_for_app_role(migrated_engine):
+    with migrated_engine.connect() as conn:
+        allowed = conn.execute(
+            text("SELECT has_table_privilege('lims_app', 'lab_settings', 'DELETE')")
+        ).scalar()
+        assert allowed is False
+        for privilege in ("SELECT", "INSERT", "UPDATE"):
+            assert conn.execute(
+                text("SELECT has_table_privilege('lims_app', 'lab_settings', :p)"),
+                {"p": privilege},
+            ).scalar() is True
+
+
+def test_direct_lims_app_guards_survive_reset_and_set_role_none(migrated_engine):
+    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
+    modes = ({}, {"reset_role": True}, {"set_role_none": True})
+    for mode in modes:
+        with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as blank:
+            _run_as_direct_lims_app(
+                migrated_engine,
+                ids["uid"],
+                "UPDATE instrument_maintenance_events "
+                "SET active = false, void_reason = E'\\t' WHERE id = :id",
+                {"id": ids["event"]},
+                **mode,
+            )
+        assert "void_reason_required" in str(blank.value.orig)
+
+    with migrated_engine.begin() as conn:
+        tech_role = conn.execute(text("SELECT id FROM roles WHERE name = 'Lab Technician'")).scalar()
+        client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
+        type_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'Plate reader' LIMIT 1")
+        ).scalar()
+        owner = uuid.uuid4()
+        tech = uuid.uuid4()
+        for uid, label in ((owner, "own"), (tech, "tech")):
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
+                    "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
+                ),
+                {
+                    "id": uid,
+                    "n": f"e3n-{label}-{uid.hex[:6]}",
+                    "u": f"e3n-{label}-{uid.hex[:6]}",
+                    "e": f"e3n-{label}-{uid.hex[:6]}@x.org",
+                    "r": tech_role,
+                    "c": client_id,
+                },
+            )
+        run_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_runs (id, name, status, created_by, modified_by) "
+                "VALUES (:id, :n, 'running', :u, :u)"
+            ),
+            {"id": run_id, "n": f"e3n-{run_id.hex[:6]}", "u": owner},
+        )
+        import_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_imports (id, lims_run_id, filename, imported_by) "
+                "VALUES (:id, :r, 'admin_override', :u)"
+            ),
+            {"id": import_id, "r": run_id, "u": owner},
+        )
+        data_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_data (id, lims_run_id, row_data, import_id, created_by) "
+                "VALUES (:id, :r, '{}'::jsonb, :i, :u)"
+            ),
+            {"id": data_id, "r": run_id, "i": import_id, "u": owner},
+        )
+        conn.execute(text("GRANT UPDATE ON TABLE lims_run_imports TO lims_app"))
+        conn.execute(text("GRANT DELETE ON TABLE lims_run_imports TO lims_app"))
+        conn.execute(text("GRANT UPDATE ON TABLE lims_run_data TO lims_app"))
+        conn.execute(text("GRANT DELETE ON TABLE lims_run_data TO lims_app"))
+
+    guards = (
+        (
+            "INSERT INTO lims_run_type_substitutions "
+            "(lims_run_id, to_instrument_type_id, reason, created_by) "
+            "VALUES (:r, :t, 'not mine', :u)",
+            {"r": run_id, "t": type_id, "u": tech},
+            "substitute_not_own_run",
+        ),
+        (
+            "UPDATE lims_runs SET instrument_type_id = :t WHERE id = :id",
+            {"t": type_id, "id": run_id},
+            "substitute_not_own_run",
+        ),
+        (
+            "UPDATE lims_runs SET status = 'canceled' WHERE id = :id",
+            {"id": run_id},
+            "run_has_imported_data",
+        ),
+        (
+            "UPDATE lims_runs SET created_by = :u WHERE id = :id",
+            {"u": tech, "id": run_id},
+            "run_created_by_immutable",
+        ),
+        (
+            "UPDATE lims_run_imports SET filename = 'x' WHERE id = :id",
+            {"id": import_id},
+            "imported_row_immutable",
+        ),
+        (
+            "DELETE FROM lims_run_data WHERE id = :id",
+            {"id": data_id},
+            "imported_row_immutable",
+        ),
+    )
+    for sql, params, needle in guards:
+        for mode in modes:
+            with pytest.raises((ProgrammingError, InternalError, IntegrityError)) as err:
+                _run_as_direct_lims_app(
+                    migrated_engine, tech, sql, params, **mode
+                )
+            assert needle in str(err.value.orig), (needle, mode, err.value.orig)
 
     with migrated_engine.begin() as conn:
         conn.execute(text("REVOKE UPDATE ON TABLE lims_run_imports FROM lims_app"))

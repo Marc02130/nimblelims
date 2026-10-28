@@ -17,6 +17,7 @@ import sys
 
 from sqlalchemy import create_engine, text
 
+from app.core.bootstrap_roles import HISTORICAL_ROLE
 from db.append_only_tables import APPEND_ONLY_REVOKES
 
 APP_ROLE = "lims_app"
@@ -116,6 +117,20 @@ def ensure_lims_app_role() -> None:
                 conn.execute(
                     text(f"REVOKE {privilege} ON TABLE {table} FROM {APP_ROLE}")
                 )
+        legacy = conn.execute(
+            text("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :r"),
+            {"r": HISTORICAL_ROLE},
+        ).scalar()
+        if legacy:
+            for table, privileges in APPEND_ONLY_REVOKES.items():
+                if table not in existing:
+                    continue
+                for privilege in sorted(privileges):
+                    conn.execute(
+                        text(
+                            f"REVOKE {privilege} ON TABLE {table} FROM {HISTORICAL_ROLE}"
+                        )
+                    )
         conn.execute(
             text(f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {APP_ROLE}")
         )

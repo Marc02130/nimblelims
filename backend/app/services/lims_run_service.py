@@ -492,7 +492,9 @@ class LimsRunService:
                     },
                 )
         require_active_instrument_type(self.db, instrument_type_id)
-        if not (reason or "").strip():
+        from app.core.visible_text import has_visible_text
+
+        if not has_visible_text(reason):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={

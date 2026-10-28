@@ -561,8 +561,10 @@ def update_event(
     voiding = "active" in data and data["active"] is False and row.active is True
     restoring = "active" in data and data["active"] is True and row.active is not True
     if voiding:
+        from app.core.visible_text import has_visible_text
+
         text = (body.reason or "").strip()
-        if not text:
+        if not has_visible_text(body.reason):
             _refuse(
                 "void_reason_required",
                 "A reason is required to void a maintenance event.",

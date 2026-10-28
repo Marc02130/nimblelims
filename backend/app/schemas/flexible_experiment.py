@@ -118,6 +118,15 @@ class LimsRunSubstituteInstrumentTypeRequest(BaseModel):
     instrument_type_id: uuid.UUID
     reason: str = Field(..., min_length=1, max_length=1000)
 
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: str) -> str:
+        from app.core.visible_text import has_visible_text
+
+        if not has_visible_text(value):
+            raise ValueError("reason must contain a non-whitespace character")
+        return value
+
 
 class LimsRunCohort(BaseModel):
     sample_ids: List[uuid.UUID] = Field(default_factory=list)
