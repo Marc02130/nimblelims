@@ -130,31 +130,24 @@ def _schedule(client, admin_h, inst_id, interval=30):
 
 def test_agent_asks_and_sets_maintenance_tracked(client, admin_h, db_session, test_admin_user):
     asked = allow.classify_call("POST", "/v1/instruments", {"name": "Qubit"})
-    assert asked.ok is False
-    assert "Answer before confirming" in (asked.gap or "")
-    assert allow.classify_call(
+    assert asked.ok is True
+    flagged = allow.classify_call(
         "POST", "/v1/instruments", {"name": "Qubit", "maintenance_tracked": True}
-    ).ok
-    assert allow.classify_call(
-        "POST", "/v1/instruments", {"name": "Qubit", "maintenance_tracked": False}
-    ).ok
+    )
+    assert flagged.ok is False
+    assert "does not set maintenance tracking" in (flagged.gap or "")
     type_id = _seeded_type(client, admin_h)["id"]
-    for flag in (True, False):
-        name = _name("Asked")
-        changes = execute_step(
-            db_session,
-            test_admin_user,
-            "POST",
-            "/v1/instruments",
-            {
-                "name": name,
-                "instrument_type_id": type_id,
-                "maintenance_tracked": flag,
-            },
-        )
-        assert changes[0].kind == "instrument"
-        row = client.get(f"/v1/instruments/{changes[0].target_id}", headers=admin_h).json()
-        assert row["maintenance_tracked"] is flag
+    name = _name("Asked")
+    changes = execute_step(
+        db_session,
+        test_admin_user,
+        "POST",
+        "/v1/instruments",
+        {"name": name, "instrument_type_id": type_id},
+    )
+    assert changes[0].kind == "instrument"
+    row = client.get(f"/v1/instruments/{changes[0].target_id}", headers=admin_h).json()
+    assert row["maintenance_tracked"] is False
 
 
 def test_awaiting_first_due_blocks_uses_and_imports(

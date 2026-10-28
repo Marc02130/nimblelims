@@ -38,12 +38,12 @@ Each rule has an ID that §6 traces to a slice and an acceptance statement. The 
 - **IT-REQ-14 [Shipped]** A passing event recomputes `last_done` and `next_due` (performed on + interval) only after the first due date is set.
 - **IT-REQ-15 [Shipped]** An interval change does not recompute `next_due` and does not clear an overdue block.
 - **IT-REQ-16 [Shipped]** Voiding the only remaining passing event sets `last_done` and `next_due` to null. The instrument is **Awaiting first due date**.
-- **IT-REQ-17 [Shipped]** Turning `maintenance_tracked` off is one confirm (OQ-IT-5). For the API, that is the PATCH itself. For the agent, it is the single apply confirm, and `needs_second_confirm` does not add another. For the admin UI, **Save** on the instrument dialog is that confirm: Cancel and Save, no second prompt, and Save sends `maintenance_tracked`.
+- **IT-REQ-17 [Shipped]** Turning `maintenance_tracked` off is one confirm (OQ-IT-5) and is **Administrator only**. For the API, that is the PATCH itself (`403` `maintenance_tracked_admin_only` for Configuration Editor, Lab Manager, Lab Technician, and clients). The configuring agent cannot send the flag. For the admin UI, **Save** on the instrument dialog is that confirm: Cancel and Save, no second prompt, and Save sends `maintenance_tracked` only when the user is an Administrator.
 
 ### Roles
 
 - **IT-REQ-18 [Shipped]** Schedule create, schedule PATCH, and first due need Administrator or Lab Manager. The API checks with `require_lab_manager`. The database backs it up with `is_lab_manager_or_admin()` on schedule INSERT and with the update guard trigger on schedule UPDATE. Other roles get **403**. The backup (OQ-IT-1) is a second user with the Lab Manager role. There is no new role.
-- **IT-REQ-19 [Shipped]** Maintenance events, event voids, downtime, and uses need `experiment:manage`. The catalog (types, instruments, CRO sources, and the **Track maintenance** flag) needs `config:edit`.
+- **IT-REQ-19 [Shipped]** Maintenance events, event voids, downtime, and uses need `experiment:manage`. The catalog (types, instruments, CRO sources) needs `config:edit`. Turning **Track maintenance** on or off needs the Administrator role in addition to `config:edit`.
 
 ### Runs
 
@@ -59,12 +59,12 @@ Each rule has an ID that §6 traces to a slice and an acceptance statement. The 
 - **IT-REQ-26 [Shipped for Active and interval; kind and vendor Not built, OQ-IT-4 Decided]** A schedule Active flip or interval change writes one row (`schedule_active` or `schedule_interval`), with old, new, and whether the schedule was overdue at the time. A kind change and a service-vendor change must write the same kind of row. Today a kind-only or vendor-only PATCH writes none. That audit is not built. The check constraint on `instrument_schedule_audits.action` allows only `first_due`, `schedule_active`, `schedule_interval`, and `event_void`.
 - **IT-REQ-27 [Shipped]** An event void writes one row (`event_void`) with the event id and `next_due` before and after.
 - **IT-REQ-27b [Shipped; OQ-IT-7 Decided, widened]** A Lab Technician may create a maintenance event and cannot update one. `update_event` requires Administrator or Lab Manager. A technician PATCH (void last, void non-last, void failed, un-void, or field edit) is 403. The same UPDATE as `lims_app` with a technician `current_user_id` raises `42501` `maintenance_event_update_forbidden`. INSERT stays allowed. The return to **Awaiting first due date** (IT-REQ-16) is shipped.
-- **IT-REQ-28 [Shipped]** Every change to `maintenance_tracked`, and a create with it false, writes one `instrument_maintenance_audits` row with who, when, old, and new. An agent apply writes the same row.
+- **IT-REQ-28 [Shipped]** Every change to `maintenance_tracked`, and a create with it false, writes one `instrument_maintenance_audits` row with who, when, old, and new. The configuring agent does not write this row because it cannot set the flag.
 - **IT-REQ-29 [Shipped]** Both audit tables are append-only for `lims_app`: SELECT and INSERT only, with UPDATE and DELETE revoked and FORCE RLS on. E2 adds the rule `created_by = current_user_id()` on INSERT. **[E2]**
 
 ### Configuring agent
 
-- **IT-REQ-30 [Shipped]** An instrument POST from the agent must carry an explicit boolean `maintenance_tracked`. Without one, the step stops with the question "does the lab track maintenance for this instrument in NimbleLIMS?". The agent's proposal never includes schedule routes, `next_due`, `last_done`, `status`, `active`, events, downtime, or uses. A type body carrying `maintenance_tracked` is stopped.
+- **IT-REQ-30 [Shipped]** An instrument POST or PATCH from the agent that includes `maintenance_tracked` is a stop. The agent does not ask whether the lab tracks maintenance and does not set the flag. An Administrator can turn it on. The agent's proposal never includes schedule routes, `next_due`, `last_done`, `status`, `active`, events, downtime, or uses. A type body carrying `maintenance_tracked` is stopped.
 
 ---
 
@@ -152,6 +152,6 @@ Each acceptance statement below is a requirement that QA must verify. None of th
 | IT-REQ-27b | #238 | Shipped | A Lab Technician create is 201. Every technician update (void last, void non-last, void failed, un-void, field edit) is 403. A Lab Manager or Administrator update is 200. Void of the only passing event still returns the schedule to awaiting first due. | IT-23 |
 | IT-REQ-28 | #225, #235 | Shipped | Each on/off change writes one `instrument_maintenance_audits` row with previous and new values. Creating with false writes one row. Creating with true writes none. | IT-21 |
 | IT-REQ-29 | #235 (+E2) | Shipped (E2 part in progress) | `has_table_privilege('lims_app', t, 'UPDATE')` and `'DELETE'` are false for both audit tables. | — |
-| IT-REQ-30 | #225, #235 | Shipped | An agent instrument POST without a boolean `maintenance_tracked` stops with the yes/no question. Any proposed schedule, first-due, event, downtime, use, status, or active step stops. | IT-9, IT-14 |
+| IT-REQ-30 | #225, #235, D2 | Shipped | An agent instrument POST or PATCH that includes `maintenance_tracked` is a stop. The agent does not ask the yes/no question. Any proposed schedule, first-due, event, downtime, use, status, or active step stops. | IT-9, IT-14 |
 
 OQ-IT-1 through OQ-IT-5 and OQ-IT-7 are Decided in the [PRD](../../prd/instrument-tracking/PRD.md). The only open question is OQ-IT-6 (Deferred, no decision) in [PRD §11](../../prd/instrument-tracking/PRD.md#11-open-questions).
