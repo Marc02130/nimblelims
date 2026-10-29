@@ -171,7 +171,6 @@ const emptyEventForm = {
   certificate_url: '',
   note: '',
   active: true,
-  reason: '',
 };
 
 const STATUSES = [
@@ -398,7 +397,6 @@ const InstrumentCatalogManagement: React.FC<{
         certificate_url: row.certificate_url || '',
         note: row.note || '',
         active: row.active,
-        reason: '',
       });
     } else {
       setDowntimeForm({
@@ -474,16 +472,11 @@ const InstrumentCatalogManagement: React.FC<{
       } else if (tab === 'events') {
         if (editingId) {
           if (!canManageSchedules) throw new Error('Only a Lab Manager or Administrator can edit an event');
-          if (!eventForm.active && !eventForm.reason.trim()) {
-            throw new Error('A reason is required to void a maintenance event');
-          }
           await apiService.updateInstrumentMaintenanceEvent(editingId, {
             note: eventForm.note || undefined,
             certificate_url: eventForm.certificate_url.trim() || undefined,
-            active: eventForm.active,
-            reason: eventForm.reason.trim() || undefined,
           });
-          setSuccess(eventForm.active ? 'Event updated' : 'Event voided');
+          setSuccess('Event updated');
         } else {
           if (!canBench) throw new Error('Permission experiment:manage is required to log an event');
           if (!eventForm.instrument_id || !eventForm.performed_on) {
@@ -817,9 +810,9 @@ const InstrumentCatalogManagement: React.FC<{
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {eventsOnly
-          ? 'Log a maintenance event. Edit and void are Lab Manager and Administrator only.'
+          ? 'Log a maintenance event. Edit and void are Lab Manager and Administrator only. A void is final; log a new event to correct it.'
           : maintenanceOnly
-            ? 'Lab managers and administrators set schedules and the first due date. Retire a schedule with Active off; there is no delete. A technician may log an event and cannot edit or void one.'
+            ? 'Lab managers and administrators set schedules and the first due date. Retire a schedule with Active off; there is no delete. A technician may log an event and cannot edit or void one. A void is final; log a new event to correct it.'
             : 'Types are a configurable list. Add a type or retire it with Active off — there is no delete. A run is not locked to one type. Vendor and model live on each instrument.'}
       </Typography>
       {error && (
@@ -1165,31 +1158,10 @@ const InstrumentCatalogManagement: React.FC<{
                 value={eventForm.note}
                 onChange={(e) => setEventForm({ ...eventForm, note: e.target.value })}
               />
-              {editingId && canManageSchedules && (
-                <>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={eventForm.active}
-                        onChange={(e) => setEventForm({ ...eventForm, active: e.target.checked })}
-                      />
-                    }
-                    label="Active"
-                  />
-                  <TextField
-                    label="Reason"
-                    fullWidth
-                    margin="normal"
-                    required={!eventForm.active}
-                    value={eventForm.reason}
-                    onChange={(e) => setEventForm({ ...eventForm, reason: e.target.value })}
-                    helperText={
-                      eventForm.active
-                        ? 'Required when voiding. Trimmed length 1–1000.'
-                        : 'Required to void. Trimmed length 1–1000.'
-                    }
-                  />
-                </>
+              {editingId && !eventForm.active && (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  This event is voided. A void is final; log a new event to correct it.
+                </Alert>
               )}
             </>
           )}
