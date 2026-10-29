@@ -66,6 +66,8 @@ const apiErrorMsg = (err: any, fallback: string): string => {
   return fallback;
 };
 
+const REASON_MAX = 4000;
+
 const isAnalysisRequiredError = (err: any): boolean => {
   const detail = err?.response?.data?.detail;
   return (
@@ -153,6 +155,7 @@ const LimsRunDetail: React.FC = () => {
   const [substituteTypes, setSubstituteTypes] = useState<{ id: string; name: string }[]>([]);
   const [substituteTypeId, setSubstituteTypeId] = useState('');
   const [substituteReason, setSubstituteReason] = useState('');
+  const [substituteReasonError, setSubstituteReasonError] = useState('');
   const [substituting, setSubstituting] = useState(false);
   const [startTypeId, setStartTypeId] = useState('');
   const [startTypes, setStartTypes] = useState<{ id: string; name: string }[]>([]);
@@ -636,6 +639,7 @@ const LimsRunDetail: React.FC = () => {
             data-testid="substitute-instrument-type-button"
             onClick={() => {
               setSubstituteReason('');
+              setSubstituteReasonError('');
               setSubstituteTypeId(run.instrument_type_id || '');
               setSubstituteOpen(true);
               apiService
@@ -937,7 +941,10 @@ const LimsRunDetail: React.FC = () => {
       <Dialog
         open={substituteOpen}
         onClose={() => {
-          if (!substituting) setSubstituteOpen(false);
+          if (!substituting) {
+            setSubstituteOpen(false);
+            setSubstituteReasonError('');
+          }
         }}
         maxWidth="sm"
         fullWidth
@@ -972,9 +979,18 @@ const LimsRunDetail: React.FC = () => {
             inputProps={{
               'aria-label': 'Substitution reason',
               'data-testid': 'substitute-instrument-type-reason',
+              maxLength: REASON_MAX,
             }}
             value={substituteReason}
-            onChange={(e) => setSubstituteReason(e.target.value)}
+            onChange={(e) => {
+              setSubstituteReason(e.target.value);
+              setSubstituteReasonError('');
+            }}
+            error={Boolean(substituteReasonError)}
+            helperText={
+              substituteReasonError ||
+              `Required. Trimmed length 1–${REASON_MAX}. ${substituteReason.trim().length}/${REASON_MAX}`
+            }
           />
         </DialogContent>
         <DialogActions>
@@ -987,12 +1003,22 @@ const LimsRunDetail: React.FC = () => {
             disabled={substituting || !substituteTypeId || !substituteReason.trim()}
             onClick={async () => {
               if (!runId) return;
+              const reason = substituteReason.trim();
+              if (!reason) {
+                setSubstituteReasonError('A reason is required to substitute the instrument type.');
+                return;
+              }
+              if (reason.length > REASON_MAX) {
+                setSubstituteReasonError(`Reason must be at most ${REASON_MAX} characters.`);
+                return;
+              }
+              setSubstituteReasonError('');
               setSubstituting(true);
               setError(null);
               try {
                 await apiService.substituteLimsRunInstrumentType(runId, {
                   instrument_type_id: substituteTypeId,
-                  reason: substituteReason.trim(),
+                  reason,
                 });
                 setSubstituteOpen(false);
                 setSuccessMsg('Instrument type substituted for this run.');

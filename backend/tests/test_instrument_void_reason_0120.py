@@ -1,6 +1,7 @@
-"""Void reason max 4000 (0120). Whitespace/NBSP/ZWSP/BOM stay in 0119 tests."""
+"""Void and substitute reason max 4000 (0120). Whitespace/NBSP/ZWSP/BOM stay in 0119 tests."""
 import importlib.util
 import os
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -12,10 +13,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, InternalError, ProgrammingError
 
 from app.core.required_reason import CHANGE_REASON_MAX, REASON_MAX, VOID_REASON_MAX
+from tests.conftest import clip_long_reasons_for_0120_downgrade
 from tests.test_instrument_e2_review_fixes import _seed_schedule_event
+from tests.test_instrument_e2_type_slots import _create_run, _create_template, _start_run
 from tests.test_instrument_e3_hardening import _grant_if_missing
 from tests.test_instrument_hardening_e1 import _run_as_lims_app, _schedule
-from tests.test_instrument_tracking import _instrument, _login
+from tests.test_instrument_tracking import _instrument, _login, _seeded_type
 
 BACKEND = Path(__file__).resolve().parents[1]
 MIGRATION_0120 = BACKEND / "db/migrations/versions/0120_void_reason_4000.py"
@@ -26,12 +29,13 @@ def admin_h(client, test_admin_user):
     return _login(client, "admin", "adminpassword")
 
 
-def _constraint_def(conn):
+def _constraint_def(conn, name="ck_instrument_events_void_reason"):
     return conn.execute(
         text(
             "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-            "WHERE conname = 'ck_instrument_events_void_reason'"
-        )
+            "WHERE conname = :n"
+        ),
+        {"n": name},
     ).scalar()
 
 
@@ -51,15 +55,48 @@ def _load_0120():
 
 def _clip_void_reasons_to_1000(engine) -> None:
     """Test isolation only. 0120 itself never truncates."""
+    clip_long_reasons_for_0120_downgrade(engine)
+
+
+def _seed_substitution(engine, reason: str):
     with engine.begin() as conn:
+        admin = conn.execute(text("SELECT id FROM roles WHERE name = 'Administrator'")).scalar()
+        client_id = conn.execute(text("SELECT id FROM clients LIMIT 1")).scalar()
+        type_id = conn.execute(
+            text("SELECT id FROM list_entries WHERE name = 'Plate reader' LIMIT 1")
+        ).scalar()
+        uid = uuid.uuid4()
         conn.execute(
             text(
-                "UPDATE instrument_maintenance_events "
-                "SET void_reason = left(void_reason, 1000) "
-                "WHERE void_reason IS NOT NULL "
-                "AND char_length(btrim(void_reason)) > 1000"
-            )
+                "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
+                "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
+            ),
+            {
+                "id": uid,
+                "n": f"e3s-{uid.hex[:8]}",
+                "u": f"e3s-{uid.hex[:8]}",
+                "e": f"e3s-{uid.hex[:8]}@x.org",
+                "r": admin,
+                "c": client_id,
+            },
         )
+        run_id = uuid.uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO lims_runs (id, name, status, created_by, modified_by) "
+                "VALUES (:id, :n, 'draft', :u, :u)"
+            ),
+            {"id": run_id, "n": f"e3sr-{run_id.hex[:6]}", "u": uid},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_type_substitutions "
+                "(lims_run_id, to_instrument_type_id, reason, created_by) "
+                "VALUES (:r, :t, :reason, :u)"
+            ),
+            {"r": run_id, "t": type_id, "u": uid, "reason": reason},
+        )
+        return {"run": run_id, "uid": uid, "type": type_id, "reason": reason}
 
 
 def test_shared_reason_max_is_4000():
@@ -76,12 +113,15 @@ def test_0120_revision_id_and_single_head():
     assert "GRANT DELETE" not in text_src
     assert "BETWEEN 1 AND 4000" in text_src
     assert "BETWEEN 1 AND 1000" in text_src
+    assert "ck_lims_run_type_substitutions_reason" in text_src
     assert "0120 downgrade refuses" in text_src
     assert "substring(" not in text_src.lower()
     assert "left(" not in text_src.lower()
     down = text_src[text_src.index("def downgrade()") :]
     assert "DELETE FROM instrument_maintenance_events" not in down
     assert "UPDATE instrument_maintenance_events" not in down
+    assert "DELETE FROM lims_run_type_substitutions" not in down
+    assert "UPDATE lims_run_type_substitutions" not in down
     cfg = Config(str(BACKEND / "alembic.ini"))
     cfg.set_main_option("script_location", str(BACKEND / "db/migrations"))
     heads = ScriptDirectory.from_config(cfg).get_heads()
@@ -237,11 +277,13 @@ def test_0120_downgrade_and_upgrade_when_reasons_fit_1000(migrated_engine):
         command.downgrade(cfg, "0119_instrument_reasons")
         with migrated_engine.connect() as conn:
             defn = _constraint_def(conn)
+            subst = _constraint_def(conn, "ck_lims_run_type_substitutions_reason")
             version = conn.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar()
         assert version == "0119_instrument_reasons"
         assert "1000" in defn
+        assert "1000" in subst
         other = _seed_schedule_event(migrated_engine, next_due=date.today())
         with migrated_engine.begin() as conn:
             _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
@@ -253,14 +295,18 @@ def test_0120_downgrade_and_upgrade_when_reasons_fit_1000(migrated_engine):
                 "SET active = false, void_reason = :r WHERE id = :id",
                 {"id": other["event"], "r": "x" * 1001},
             )
+        with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
+            _seed_substitution(migrated_engine, "x" * 1001)
         command.upgrade(cfg, "head")
         with migrated_engine.connect() as conn:
             defn = _constraint_def(conn)
+            subst = _constraint_def(conn, "ck_lims_run_type_substitutions_reason")
             version = conn.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar()
         assert version == "0120_void_reason_4000"
         assert "4000" in defn
+        assert "4000" in subst
         _run_as_lims_app(
             migrated_engine,
             other["uid"],
@@ -278,3 +324,95 @@ def test_0120_downgrade_and_upgrade_when_reasons_fit_1000(migrated_engine):
             os.environ.pop("MIGRATE_DATABASE_URL", None)
         else:
             os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
+
+
+def test_substitute_reason_api_accepts_4000_and_rejects_4001(
+    client, admin_h, run_analysis_id, cohort_sample_id
+):
+    template = _create_template(client, admin_h)
+    created = _create_run(client, admin_h, template["id"], run_analysis_id)
+    assert created.status_code == 201, created.text
+    started = _start_run(client, admin_h, created.json()["id"], cohort_sample_id)
+    assert started.status_code == 200, started.text
+    qpcr = _seeded_type(client, admin_h, "qPCR")
+    refused = client.post(
+        f"/v1/lims-runs/{created.json()['id']}/substitute-instrument-type",
+        headers=admin_h,
+        json={"instrument_type_id": qpcr["id"], "reason": "x" * 4001},
+    )
+    assert refused.status_code == 422, refused.text
+    lcms = _seeded_type(client, admin_h, "LC-MS")
+    ok = client.post(
+        f"/v1/lims-runs/{created.json()['id']}/substitute-instrument-type",
+        headers=admin_h,
+        json={"instrument_type_id": lcms["id"], "reason": "x" * 4000},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["instrument_type_id"] == lcms["id"]
+
+
+def test_substitute_reason_db_accepts_4000_and_rejects_4001(migrated_engine):
+    with migrated_engine.connect() as conn:
+        subst = _constraint_def(conn, "ck_lims_run_type_substitutions_reason")
+    assert "4000" in subst
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
+        _seed_substitution(migrated_engine, "x" * 4001)
+    _seed_substitution(migrated_engine, "x" * 4000)
+    clip_long_reasons_for_0120_downgrade(migrated_engine)
+
+
+def test_0120_downgrade_refuses_when_substitute_reason_longer_than_1000(
+    migrated_engine,
+):
+    _clip_void_reasons_to_1000(migrated_engine)
+    row = _seed_substitution(migrated_engine, "x" * 1001)
+    url = migrated_engine.url.render_as_string(hide_password=False)
+    cfg = _alembic_cfg(url)
+    previous_database = os.environ.get("DATABASE_URL")
+    previous_migrate = os.environ.get("MIGRATE_DATABASE_URL")
+    os.environ["DATABASE_URL"] = url
+    os.environ["MIGRATE_DATABASE_URL"] = url
+    try:
+        m0120 = _load_0120()
+        with migrated_engine.connect() as conn:
+            with pytest.raises(
+                RuntimeError, match="lims_run_type_substitutions.reason"
+            ):
+                m0120.refuse_downgrade_if_long_substitute_reasons(conn)
+            stored = conn.execute(
+                text(
+                    "SELECT char_length(reason) "
+                    "FROM lims_run_type_substitutions "
+                    "WHERE lims_run_id = :id"
+                ),
+                {"id": row["run"]},
+            ).scalar()
+            assert stored == 1001
+        with pytest.raises(Exception, match="0120 downgrade refuses"):
+            command.downgrade(cfg, "0119_instrument_reasons")
+        with migrated_engine.connect() as conn:
+            head = conn.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar()
+            assert head == "0120_void_reason_4000"
+            stored = conn.execute(
+                text(
+                    "SELECT char_length(reason) "
+                    "FROM lims_run_type_substitutions "
+                    "WHERE lims_run_id = :id"
+                ),
+                {"id": row["run"]},
+            ).scalar()
+            assert stored == 1001
+    finally:
+        command.upgrade(cfg, "head")
+        clip_long_reasons_for_0120_downgrade(migrated_engine)
+        if previous_database is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous_database
+        if previous_migrate is None:
+            os.environ.pop("MIGRATE_DATABASE_URL", None)
+        else:
+            os.environ["MIGRATE_DATABASE_URL"] = previous_migrate
+

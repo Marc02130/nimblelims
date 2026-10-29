@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import Field, field_validator
+from app.core.required_reason import REASON_MAX
 from app.schemas._instants import APIModel as BaseModel
 
 from models.flexible_experiment import LimsRunStatus, SopParseJobStatus
@@ -116,7 +117,7 @@ class LimsRunStartRequest(BaseModel):
 
 class LimsRunSubstituteInstrumentTypeRequest(BaseModel):
     instrument_type_id: uuid.UUID
-    reason: str = Field(..., min_length=1, max_length=1000)
+    reason: str = Field(..., min_length=1, max_length=REASON_MAX)
 
     @field_validator("reason")
     @classmethod

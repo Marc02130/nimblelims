@@ -1,7 +1,8 @@
 """Shared required-reason rules for instrument voids and audited changes.
 
 All required reasons (void, schedule, maintenance_tracked, type
-deactivate) share one max of 4000 characters (Marc 2026-10-29).
+deactivate, substitute-instrument-type) share one max of 4000
+characters (Marc 2026-10-29).
 Visible-text (including NBSP / U+2007 as blank) is the same check for
 every caller.
 """

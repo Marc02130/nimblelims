@@ -492,16 +492,14 @@ class LimsRunService:
                     },
                 )
         require_active_instrument_type(self.db, instrument_type_id)
-        from app.core.visible_text import has_visible_text
+        from app.core.required_reason import REASON_MAX, require_reason
 
-        if not has_visible_text(reason):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={
-                    "code": "substitute_reason_required",
-                    "message": "A reason is required to substitute the instrument type.",
-                },
-            )
+        reason = require_reason(
+            reason,
+            code="substitute_reason_required",
+            message="A reason is required to substitute the instrument type.",
+            max_length=REASON_MAX,
+        )
         previous = run.instrument_type_id
         run.instrument_type_id = instrument_type_id
         run.modified_by = self._user_id()
@@ -510,7 +508,7 @@ class LimsRunService:
                 lims_run_id=run.id,
                 from_instrument_type_id=previous,
                 to_instrument_type_id=instrument_type_id,
-                reason=reason.strip(),
+                reason=reason,
                 created_by=self._user_id(),
             )
         )
