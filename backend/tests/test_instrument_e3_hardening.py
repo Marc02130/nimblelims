@@ -133,7 +133,7 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
             ids["uid"],
             "UPDATE instrument_maintenance_events "
             "SET active = false, void_reason = :r WHERE id = :id",
-            {"id": ids["event"], "r": "x" * 1001},
+            {"id": ids["event"], "r": "x" * 4001},
         )
     _run_as_lims_app(
         migrated_engine,
@@ -579,7 +579,7 @@ def test_0119_revision_id_and_single_head():
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0119_instrument_reasons"], heads
+    assert heads == ["0120_void_reason_4000"], heads
 
 
 def test_live_void_trigger_body_keeps_reason_lock_nbsp_and_final_void(migrated_engine):

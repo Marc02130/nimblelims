@@ -124,6 +124,8 @@ interface ListEntryOption {
   active?: boolean;
 }
 
+const REASON_MAX = 4000;
+
 const pickerEntries = (rows: ListEntryOption[], currentId?: string) =>
   rows.filter((row) => row.active !== false || (currentId && row.id === currentId));
 
@@ -236,6 +238,7 @@ const InstrumentCatalogManagement: React.FC<{
   });
   const [voidEventId, setVoidEventId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [voidReasonError, setVoidReasonError] = useState('');
 
   const loadAll = useCallback(async () => {
     try {
@@ -381,8 +384,8 @@ const InstrumentCatalogManagement: React.FC<{
       setChangeReasonError(message);
       return null;
     }
-    if (text.length > 4000) {
-      setChangeReasonError('Reason must be at most 4000 characters.');
+    if (text.length > REASON_MAX) {
+      setChangeReasonError(`Reason must be at most ${REASON_MAX} characters.`);
       return null;
     }
     setChangeReasonError('');
@@ -630,8 +633,8 @@ const InstrumentCatalogManagement: React.FC<{
       setFirstDueReasonError('A reason is required to set the first due date.');
       return;
     }
-    if (reason.length > 4000) {
-      setFirstDueReasonError('Reason must be at most 4000 characters.');
+    if (reason.length > REASON_MAX) {
+      setFirstDueReasonError(`Reason must be at most ${REASON_MAX} characters.`);
       return;
     }
     setFirstDueReasonError('');
@@ -673,17 +676,28 @@ const InstrumentCatalogManagement: React.FC<{
         : canEdit;
 
   const submitVoidEvent = async () => {
-    if (!voidEventId || !voidReason.trim()) return;
+    if (!voidEventId) return;
+    const reason = voidReason.trim();
+    if (!reason) {
+      setVoidReasonError('A reason is required to void a maintenance event.');
+      return;
+    }
+    if (reason.length > REASON_MAX) {
+      setVoidReasonError(`Reason must be at most ${REASON_MAX} characters.`);
+      return;
+    }
+    setVoidReasonError('');
     setSubmitting(true);
     setError(null);
     try {
       await apiService.updateInstrumentMaintenanceEvent(voidEventId, {
         active: false,
-        reason: voidReason.trim(),
+        reason,
       });
       setSuccess('Event voided');
       setVoidEventId(null);
       setVoidReason('');
+      setVoidReasonError('');
       await loadAll();
     } catch (err: any) {
       const detail = err.response?.data?.detail;
@@ -832,6 +846,7 @@ const InstrumentCatalogManagement: React.FC<{
           onClick={() => {
             setVoidEventId(p.row.id);
             setVoidReason('');
+            setVoidReasonError('');
           }}
         />,
       ];
@@ -1005,8 +1020,8 @@ const InstrumentCatalogManagement: React.FC<{
                     setChangeReasonError('');
                   }}
                   error={Boolean(changeReasonError)}
-                  helperText={changeReasonError || 'Required. Trimmed length 1–4000.'}
-                  inputProps={{ maxLength: 4000, 'data-testid': 'type-deactivate-reason' }}
+                  helperText={changeReasonError || `Required. Trimmed length 1–${REASON_MAX}.`}
+                  inputProps={{ maxLength: REASON_MAX, 'data-testid': 'type-deactivate-reason' }}
                 />
               )}
             </>
@@ -1126,8 +1141,8 @@ const InstrumentCatalogManagement: React.FC<{
                       setChangeReasonError('');
                     }}
                     error={Boolean(changeReasonError)}
-                    helperText={changeReasonError || 'Required. Trimmed length 1–4000.'}
-                    inputProps={{ maxLength: 4000, 'data-testid': 'maintenance-tracked-reason' }}
+                    helperText={changeReasonError || `Required. Trimmed length 1–${REASON_MAX}.`}
+                    inputProps={{ maxLength: REASON_MAX, 'data-testid': 'maintenance-tracked-reason' }}
                   />
                 )}
             </>
@@ -1230,8 +1245,8 @@ const InstrumentCatalogManagement: React.FC<{
                     setChangeReasonError('');
                   }}
                   error={Boolean(changeReasonError)}
-                  helperText={changeReasonError || 'Required when the schedule changes. Trimmed length 1–4000.'}
-                  inputProps={{ maxLength: 4000, 'data-testid': 'schedule-change-reason' }}
+                  helperText={changeReasonError || `Required when the schedule changes. Trimmed length 1–${REASON_MAX}.`}
+                  inputProps={{ maxLength: REASON_MAX, 'data-testid': 'schedule-change-reason' }}
                 />
               )}
             </>
@@ -1387,6 +1402,7 @@ const InstrumentCatalogManagement: React.FC<{
           if (!submitting) {
             setVoidEventId(null);
             setVoidReason('');
+            setVoidReasonError('');
           }
         }}
         maxWidth="xs"
@@ -1400,9 +1416,16 @@ const InstrumentCatalogManagement: React.FC<{
             margin="normal"
             required
             value={voidReason}
-            onChange={(e) => setVoidReason(e.target.value)}
-            helperText="Required. Trimmed length 1–1000."
-            inputProps={{ 'data-testid': 'void-event-reason' }}
+            onChange={(e) => {
+              setVoidReason(e.target.value);
+              setVoidReasonError('');
+            }}
+            error={Boolean(voidReasonError)}
+            helperText={
+              voidReasonError ||
+              `Required. Trimmed length 1–${REASON_MAX}. ${voidReason.trim().length}/${REASON_MAX}`
+            }
+            inputProps={{ maxLength: REASON_MAX, 'data-testid': 'void-event-reason' }}
           />
         </DialogContent>
         <DialogActions>
@@ -1410,6 +1433,7 @@ const InstrumentCatalogManagement: React.FC<{
             onClick={() => {
               setVoidEventId(null);
               setVoidReason('');
+              setVoidReasonError('');
             }}
             disabled={submitting}
           >
@@ -1458,8 +1482,8 @@ const InstrumentCatalogManagement: React.FC<{
               setFirstDueReasonError('');
             }}
             error={Boolean(firstDueReasonError)}
-            helperText={firstDueReasonError || 'Required. Trimmed length 1–4000.'}
-            inputProps={{ maxLength: 4000, 'data-testid': 'first-due-reason' }}
+            helperText={firstDueReasonError || `Required. Trimmed length 1–${REASON_MAX}.`}
+            inputProps={{ maxLength: REASON_MAX, 'data-testid': 'first-due-reason' }}
           />
         </DialogContent>
         <DialogActions>
