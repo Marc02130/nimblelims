@@ -18,7 +18,7 @@ No Accept, Confirm, or UAT Pass is recorded here. Nothing in this file says a sl
 - **R-3 Maintenance.** `maintenance_tracked` is per instrument and off by default. When it is off, only use is recorded. When it is on, `next_due` is **never** auto-seeded. The item stays in status **Awaiting first due date** until a Lab Manager or Administrator sets the first due date. Overdue items are blocked from import and use. Voiding the only passing event returns the item to **Awaiting first due date**. Only an Administrator turns **Track maintenance** on or off (`403` `maintenance_tracked_admin_only` for every other role, including Configuration Editor). The configuring agent does not set the flag; it lacks the SOP information to decide. An Administrator can turn tracking on after the instrument is in the catalog. The agent never sets schedules or due dates. Turning the flag off needs one confirm and is audited. That confirm is the admin dialog's **Save** (OQ-IT-5).
 - **R-4 Roles.** Schedule create and edit, and the first due date, belong to Lab Manager and Administrator. The backup is a second Lab Manager. There is no new role (OQ-IT-1).
 - **R-5 Runs.** Once data is imported, a run cannot be canceled. It can only be failed. The instrument used at run or import must be of the template's type. The person running the experiment is whoever created it, so `created_by` is the field (OQ-IT-3). That person can substitute an instrument type on a run. The substitution needs a **required** reason and writes an audit row. Legacy untyped templates are removed with no backward compatibility, because the product is not live.
-- **R-6 Audit.** These are all audited: setting the first due date, schedule changes (including kind and service vendor, OQ-IT-4), event voids, and changes to `maintenance_tracked`.
+- **R-6 Audit.** These are all audited: setting the first due date, schedule changes (including kind and service vendor, OQ-IT-4), event voids, and changes to `maintenance_tracked`. A void is final (Marc 2026-10-28 via Edmund); existing `event_restore` audit rows stay.
 - **R-7 Status.** #231, #232, #233, #234, and #235 are merged. E2 (migration `0115_instrument_type_slots`, typed templates and substitution) is **in progress** in [#236](https://github.com/Marc02130/nimblelims/pull/236). E2 is not shipped. OQ-IT-2 is a change to E2's scope that #236 does not implement.
 
 ## Decisions on the open questions (Marc, 2026-10-26)
@@ -29,7 +29,7 @@ No Accept, Confirm, or UAT Pass is recorded here. Nothing in this file says a sl
 - **OQ-IT-4 is Decided. Not built.** A change to a schedule's kind and a change to its service vendor are audited, the same way an Active flip and an interval change already are. #235 writes no row for kind-only or vendor-only PATCH.
 - **OQ-IT-5 is Decided. Shipped.** The admin instrument dialog's **Save** is the one confirm for turning **Track maintenance** off. `InstrumentCatalogManagement.tsx` offers Cancel and Save and no second prompt. Save sends `maintenance_tracked` on the instrument PATCH. Cancel writes nothing.
 - **OQ-IT-6 is Deferred.** No decision. The open question is in §11.
-- **OQ-IT-7 is Decided. Widened and shipped.** A Lab Technician may create a maintenance event and cannot edit one: not void, not un-void, not any field. Edit and void are Lab Manager and Administrator only. `update_event` uses `require_lab_manager` (**403** on every PATCH). The `refuse_void_only_passing_event` trigger raises `42501` `maintenance_event_update_forbidden` for the same roles. INSERT stays allowed for a technician. This replaces the earlier "only the last passing event" limit.
+- **OQ-IT-7 is Decided. Widened and shipped.** A Lab Technician may create a maintenance event and cannot edit one: not void, not any field. Edit and void are Lab Manager and Administrator only. A void is final; the correction is a new event (`422` `voided_event_stays_voided` on `PATCH` `{active: true}`). `update_event` uses `require_lab_manager` (**403** on every PATCH). The `refuse_void_only_passing_event` trigger raises `42501` `maintenance_event_update_forbidden` for the same roles. INSERT stays allowed for a technician. This replaces the earlier "only the last passing event" limit.
 
 The standing Marc locks still apply. There is no delete; removal is a status flag (L-B, 2026-10-04). Confirm-before-apply applies to the configuring agent (L-C). See the [configuring-agent PRD](../configuring-agent/PRD.md).
 
@@ -69,7 +69,7 @@ The packet stays sample-centric. A result stays on the sample's Test (WO-7: Test
 |------|-----|
 | Administrator | Everything below. Unsourced JSON import (logged as `admin_override`). |
 | Lab Manager | Create and edit maintenance schedules. Set the first due date. Bench work. |
-| Lab Technician (`experiment:manage`) | Bench work: log maintenance events, record downtime, record uses, import. Substitute a run's type when they created the run (E2, `lims_runs.created_by`). Cannot edit, void, or un-void a maintenance event (OQ-IT-7, shipped). |
+| Lab Technician (`experiment:manage`) | Bench work: log maintenance events, record downtime, record uses, import. Substitute a run's type when they created the run (E2, `lims_runs.created_by`). Cannot edit or void a maintenance event (OQ-IT-7, shipped). A void is final. |
 | Configuration editor (`config:edit`) | Catalog: types, instruments, vendors, CRO sources. Turn **Track maintenance** on or off. Cannot create schedules or set due dates. |
 | Configuring agent (as the confirming user) | Propose instruments with an explicit yes/no on maintenance tracking. Never schedules, due dates, events, downtime, uses, status, or active. |
 | Client | No instrument writes (403). Catalog reads follow the existing RLS. |
@@ -114,7 +114,7 @@ When **Track maintenance** is off, maintenance states do not apply and do not bl
 4. A Lab Manager or Administrator sets the first due date once. A second attempt is refused.
 5. A passing event, logged on the bench, moves last done and next due forward. It does this only after the first due date has been set. An event logged before that does not set a date.
 6. Changing the interval does not move next due and does not clear an overdue block. The new interval applies from the next passing event.
-7. Voiding the only remaining passing event returns the schedule to **Awaiting first due date**. Only a Lab Manager or Administrator can set the first due date again. A Lab Technician may create an event and cannot PATCH one — not the last passing event, not a non-last passing event, not a failed event, not an un-void, and not a field edit (OQ-IT-7, shipped).
+7. Voiding the only remaining passing event returns the schedule to **Awaiting first due date**. Only a Lab Manager or Administrator can set the first due date again. A void is final; the correction is a new event. A Lab Technician may create an event and cannot PATCH one — not the last passing event, not a non-last passing event, not a failed event, and not a field edit (OQ-IT-7, shipped).
 8. Overdue (next due before today on the lab clock) blocks new imports and new uses.
 9. Turning **Track maintenance** off takes one confirm and is audited (§7). That confirm is **Save** on the admin instrument dialog (OQ-IT-5, shipped): Cancel and Save, no second prompt, and Save sends the flag. The agent's one confirm is the apply confirm. Turning the flag off is a legitimate choice for a lab with its own system, so it is not refused when the instrument is overdue.
 
@@ -188,7 +188,7 @@ Every audited write records who and when. Audit rows are append-only: the applic
 | Admin dialog **Save** is the one confirm for turning tracking off (OQ-IT-5) | Shipped. Cancel and Save, no second prompt. | #235 UI |
 | Ad hoc entry: edit the instruments used, add and remove types on the entry, and require a type on every LIMS run including ad hoc (OQ-IT-2) | **Not built.** E2 scope change. #236 leaves the ad hoc type null and unchecked. | — |
 | Audit of schedule kind and service-vendor changes (OQ-IT-4) | **Not built.** Active and interval are audited. | — |
-| Edit and void of any maintenance event limited to Lab Manager and Administrator (OQ-IT-7, widened) | Shipped. Technician create stays 201. Every technician PATCH is 403. | #238 |
+| Edit and void of any maintenance event limited to Lab Manager and Administrator (OQ-IT-7, widened) | Shipped. Technician create stays 201. Every technician PATCH is 403. A void is final; restore is removed. | #238, this PR |
 | Configurable labels (OQ-IT-6) | **Deferred.** No decision. | — |
 
 ---
