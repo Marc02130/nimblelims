@@ -3,9 +3,9 @@
 Schedule create, edit, and first-due need Administrator or Lab Manager.
 Create of events, downtime, and uses is bench work (experiment:manage).
 Passing events recompute next_due only after a lab admin or manager has
-set the first due date. Edit, void, and un-void of a maintenance event
-are Administrator / Lab Manager only. A technician may create an event
-and cannot PATCH one.
+set the first due date. Edit and void of a maintenance event are
+Administrator / Lab Manager only. A void is final; the correction is a
+new event. A technician may create an event and cannot PATCH one.
 """
 from datetime import date, timedelta
 from typing import List, Optional
@@ -65,6 +65,7 @@ experiment_instruments_router = APIRouter(prefix="/experiments", tags=["instrume
 INSTRUMENT_NOT_ON_EXPERIMENT = "instrument_not_on_experiment"
 USE_TARGET_REQUIRED = "use_target_required"
 VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
+VOIDED_EVENT_STAYS_VOIDED = "voided_event_stays_voided"
 
 
 def _refuse(code: str, message: str) -> None:
@@ -556,10 +557,12 @@ def update_event(
     data.pop("reason", None)
     if "certificate_url" in data:
         _require_http_certificate(data["certificate_url"])
-    if "active" in data and data["active"] is False and row.active is False:
-        _refuse(VOIDED_USE_STAYS_VOIDED, "A voided maintenance event stays voided.")
+    if "active" in data and row.active is False:
+        _refuse(
+            VOIDED_EVENT_STAYS_VOIDED,
+            "A voided maintenance event stays voided. Log a new event.",
+        )
     voiding = "active" in data and data["active"] is False and row.active is True
-    restoring = "active" in data and data["active"] is True and row.active is not True
     if voiding:
         from app.core.visible_text import has_visible_text
 
@@ -585,31 +588,31 @@ def update_event(
             overdue_at_time = _schedule_overdue(schedule)
             recompute_schedule(db, schedule)
             schedule.modified_by = current_user.id
-            if voiding or restoring:
+            if voiding:
                 _write_schedule_audit(
                     db,
                     instrument_id=row.instrument_id,
                     schedule_id=schedule.id,
                     event_id=row.id,
-                    action="event_restore" if restoring else "event_void",
+                    action="event_void",
                     user=current_user,
                     previous_value=prior_next_due,
                     new_value=schedule.next_due,
                     overdue=overdue_at_time,
-                    reason=row.void_reason if voiding else body.reason,
+                    reason=row.void_reason,
                 )
-    elif voiding or restoring:
+    elif voiding:
         _write_schedule_audit(
             db,
             instrument_id=row.instrument_id,
             schedule_id=None,
             event_id=row.id,
-            action="event_restore" if restoring else "event_void",
+            action="event_void",
             user=current_user,
             previous_value=None,
             new_value=None,
             overdue=None,
-            reason=row.void_reason if voiding else body.reason,
+            reason=row.void_reason,
         )
     try:
         db.commit()

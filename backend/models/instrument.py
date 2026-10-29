@@ -144,7 +144,7 @@ class InstrumentMaintenanceAudit(Base):
 
 
 class InstrumentScheduleAudit(Base):
-    """Append-only first-due, schedule, and event-void history."""
+    """Append-only first-due, schedule, event-void, and historical event-restore."""
 
     __tablename__ = "instrument_schedule_audits"
     __table_args__ = (
