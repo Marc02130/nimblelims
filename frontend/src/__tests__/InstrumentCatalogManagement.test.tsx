@@ -265,6 +265,40 @@ describe('InstrumentCatalogManagement', () => {
     });
   });
 
+  test('voided event has no restore action and edit does not send active true', async () => {
+    api.updateInstrumentMaintenanceEvent.mockResolvedValue({ id: 'e1', active: false });
+    api.getInstrumentMaintenanceEvents.mockResolvedValue([
+      {
+        id: 'e1',
+        instrument_id: 'i1',
+        performed_on: '2026-10-26',
+        passed: true,
+        note: 'voided PM',
+        certificate_url: '',
+        active: false,
+      },
+    ]);
+    wrap(<InstrumentCatalogManagement eventsOnly />);
+    expect(await screen.findByText('voided PM')).toBeInTheDocument();
+    expect(screen.getByText(/A void is final/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Restore' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Void' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByText('Edit Event')).toBeInTheDocument();
+    expect(screen.getByText(/This event is voided/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Active')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Event updated')).toBeInTheDocument();
+    expect(api.updateInstrumentMaintenanceEvent).toHaveBeenCalledWith('e1', {
+      note: 'voided PM',
+      certificate_url: undefined,
+    });
+    expect(api.updateInstrumentMaintenanceEvent).not.toHaveBeenCalledWith(
+      'e1',
+      expect.objectContaining({ active: true })
+    );
+  });
+
   test('kind and downtime reason pickers omit removed entries', async () => {
     api.getListEntries.mockImplementation(async (name: string) => {
       if (name === 'maintenance_types') {

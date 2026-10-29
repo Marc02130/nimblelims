@@ -859,7 +859,7 @@ def test_void_guard_set_role_exact_error_and_forged_actor(migrated_engine):
     assert pgcode(ledger_forged.value) == "42501"
 
 
-def test_unvoid_writes_event_restore_audit(client, admin_h, db_session, test_admin_user):
+def test_voided_event_cannot_be_restored(client, admin_h, db_session, test_admin_user):
     inst = _instrument(client, admin_h, maintenance_tracked=True)
     kinds = client.get("/lists/maintenance_types/entries", headers=admin_h).json()
     if isinstance(kinds, dict):
@@ -898,30 +898,51 @@ def test_unvoid_writes_event_restore_audit(client, admin_h, db_session, test_adm
         },
     )
     assert first.status_code == 201 and second.status_code == 201
+    event_id = first.json()["id"]
     voided = client.patch(
-        f"/v1/instrument-maintenance-events/{first.json()['id']}",
+        f"/v1/instrument-maintenance-events/{event_id}",
         headers=admin_h,
         json={"active": False, "reason": "void one"},
     )
     assert voided.status_code == 200, voided.text
     restored = client.patch(
-        f"/v1/instrument-maintenance-events/{first.json()['id']}",
+        f"/v1/instrument-maintenance-events/{event_id}",
         headers=admin_h,
         json={"active": True, "reason": "put back"},
     )
-    assert restored.status_code == 200, restored.text
+    assert restored.status_code == 422, restored.text
+    assert restored.json()["detail"]["code"] == "voided_event_stays_voided"
+    again = client.patch(
+        f"/v1/instrument-maintenance-events/{event_id}",
+        headers=admin_h,
+        json={"active": False, "reason": "void again"},
+    )
+    assert again.status_code == 422, again.text
+    assert again.json()["detail"]["code"] == "voided_event_stays_voided"
+    missing = client.post(
+        f"/v1/instrument-maintenance-events/{event_id}/restore",
+        headers=admin_h,
+        json={"reason": "put back"},
+    )
+    assert missing.status_code in (404, 405), missing.text
     db_session.expire_all()
     restores = (
         db_session.query(InstrumentScheduleAudit)
         .filter(
-            InstrumentScheduleAudit.event_id == first.json()["id"],
+            InstrumentScheduleAudit.event_id == event_id,
             InstrumentScheduleAudit.action == "event_restore",
         )
         .all()
     )
-    assert len(restores) == 1
-    assert restores[0].reason == "put back"
-    assert restores[0].created_by == test_admin_user.id
+    assert restores == []
+    listed = client.get(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        params={"include_voided": True, "instrument_id": inst["id"]},
+    )
+    assert listed.status_code == 200, listed.text
+    row = next(item for item in listed.json() if item["id"] == event_id)
+    assert row["active"] is False
 
 
 def test_reason_fields_max_length_1000(client, admin_h):

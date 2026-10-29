@@ -946,24 +946,22 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
         headers=admin_h,
         json={"next_due": date.today().isoformat()},
     )
-    created = client.post(
-        "/v1/instrument-maintenance-events",
-        headers=admin_h,
-        json={
-            "instrument_id": inst["id"],
-            "schedule_id": sched["id"],
-            "performed_on": date.today().isoformat(),
-            "performed_by_user_id": str(test_admin_user.id),
-            "passed": True,
-        },
-    )
-    assert created.status_code == 201, created.text
-    event_id = created.json()["id"]
-
     api_rows = []
     for name, char in _UNICODE_REASON_CASES:
+        created = client.post(
+            "/v1/instrument-maintenance-events",
+            headers=admin_h,
+            json={
+                "instrument_id": inst["id"],
+                "schedule_id": sched["id"],
+                "performed_on": date.today().isoformat(),
+                "performed_by_user_id": str(test_admin_user.id),
+                "passed": True,
+            },
+        )
+        assert created.status_code == 201, created.text
         refused = client.patch(
-            f"/v1/instrument-maintenance-events/{event_id}",
+            f"/v1/instrument-maintenance-events/{created.json()['id']}",
             headers=admin_h,
             json={"active": False, "reason": char},
         )
@@ -971,12 +969,6 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
         if refused.status_code == 422:
             detail = refused.json().get("detail")
             code = detail.get("code") if isinstance(detail, dict) else "pydantic"
-        elif refused.status_code == 200:
-            client.patch(
-                f"/v1/instrument-maintenance-events/{event_id}",
-                headers=admin_h,
-                json={"active": True},
-            )
         api_rows.append(
             (
                 name,
@@ -1000,6 +992,7 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
                 {"id": ids["event"], "r": char},
             )
             db_rows.append((name, "accepted", None))
+            # FLAG: the manager-only trigger still allows active false→true.
             _run_as_lims_app(
                 migrated_engine,
                 ids["uid"],
@@ -1031,3 +1024,37 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
         ]
     )
     assert db_rows == db_expected
+
+
+def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
+    """FLAG: API refuses restore; a Lab Manager / Admin UPDATE as lims_app does not.
+
+    refuse_void_only_passing_event checks manager/admin, void_reason on
+    true→false, and locks the schedule. It does not refuse false→true.
+    Blocking that at the DB needs a migration Edmund has not approved.
+    """
+    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
+    failed = _seed_schedule_event(migrated_engine, next_due=date.today(), passed=False)
+    void_sql = (
+        "UPDATE instrument_maintenance_events "
+        "SET active = false, void_reason = 'db void' WHERE id = :id"
+    )
+    restore_sql = (
+        "UPDATE instrument_maintenance_events "
+        "SET active = true WHERE id = :id"
+    )
+    _run_as_lims_app(migrated_engine, ids["uid"], void_sql, {"id": ids["event"]})
+    _run_as_lims_app(migrated_engine, ids["uid"], restore_sql, {"id": ids["event"]})
+    _run_as_lims_app(migrated_engine, failed["uid"], void_sql, {"id": failed["event"]})
+    _run_as_lims_app(migrated_engine, failed["uid"], restore_sql, {"id": failed["event"]})
+    with migrated_engine.connect() as conn:
+        passing = conn.execute(
+            text("SELECT active FROM instrument_maintenance_events WHERE id = :id"),
+            {"id": ids["event"]},
+        ).scalar()
+        failed_active = conn.execute(
+            text("SELECT active FROM instrument_maintenance_events WHERE id = :id"),
+            {"id": failed["event"]},
+        ).scalar()
+    assert passing is True
+    assert failed_active is True

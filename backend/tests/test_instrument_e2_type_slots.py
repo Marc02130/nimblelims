@@ -1206,6 +1206,13 @@ def test_tech_cannot_void_only_passing_event_manager_can(
     )
     assert unvoid.status_code == 403, unvoid.text
     assert unvoid.json()["detail"] == role_required
+    manager_restore = client.patch(
+        f"/v1/instrument-maintenance-events/{created.json()['id']}",
+        headers=mgr_h,
+        json={"active": True, "reason": "put back"},
+    )
+    assert manager_restore.status_code == 422, manager_restore.text
+    assert manager_restore.json()["detail"]["code"] == "voided_event_stays_voided"
     admin_ok = client.patch(
         f"/v1/instrument-maintenance-events/{only.json()['id']}",
         headers=admin_h,
