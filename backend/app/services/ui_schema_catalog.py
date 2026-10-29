@@ -57,6 +57,7 @@ LAB_TABLES: tuple[str, ...] = (
     "instrument_type_defaults",
     "lims_run_type_substitutions",
     "instrument_template_inactivations",
+    "instrument_type_deactivations",
     "instrument_entry_slot_audits",
     # Reviewer pick of which run's value is accepted (ELISA rerun).
     "result_acceptances",
@@ -135,6 +136,7 @@ DISPLAY_NAMES: Mapping[str, str] = {
     "instrument_type_defaults": "Instrument type defaults",
     "lims_run_type_substitutions": "LIMS run type substitutions",
     "instrument_template_inactivations": "Instrument template inactivations",
+    "instrument_type_deactivations": "Instrument type deactivations",
     "instrument_entry_slot_audits": "Instrument entry slot audits",
     "result_acceptances": "Result acceptances",
     "container_types": "Container types",

@@ -46,6 +46,8 @@ APPEND_ONLY_REVOKES: Mapping[str, FrozenSet[str]] = {
     "instrument_entry_slot_audits": frozenset({"UPDATE", "DELETE"}),
     "lims_run_imports": frozenset({"UPDATE", "DELETE"}),
     "lims_run_data": frozenset({"UPDATE", "DELETE"}),
+    # 0119
+    "instrument_type_deactivations": frozenset({"UPDATE", "DELETE"}),
 }
 
 # Login roles that may skip app-row guards. session_user is not changed by

@@ -971,13 +971,13 @@ def test_audit_insert_created_by_must_match_session(migrated_engine):
         )
     insert_maint = (
         "INSERT INTO instrument_maintenance_audits "
-        "(id, instrument_id, previous_value, new_value, created_by) "
-        "VALUES (:id, :i, true, false, :u)"
+        "(id, instrument_id, previous_value, new_value, reason, created_by) "
+        "VALUES (:id, :i, true, false, 'x', :u)"
     )
     insert_sched = (
         "INSERT INTO instrument_schedule_audits "
-        "(id, instrument_id, action, created_by) "
-        "VALUES (:id, :i, 'first_due', :u)"
+        "(id, instrument_id, action, reason, created_by) "
+        "VALUES (:id, :i, 'first_due', 'x', :u)"
     )
     insert_sub = (
         "INSERT INTO lims_run_type_substitutions "
@@ -1083,7 +1083,11 @@ def test_update_schedule_audits_kind_and_service_vendor(client, admin_h, db_sess
     changed = client.patch(
         f"/v1/instrument-maintenance-schedules/{sched.json()['id']}",
         headers=admin_h,
-        json={"kind_id": cal, "service_vendor_id": vendor.json()["id"]},
+        json={
+            "kind_id": cal,
+            "service_vendor_id": vendor.json()["id"],
+            "reason": "kind and vendor change",
+        },
     )
     assert changed.status_code == 200, changed.text
     audits = (
@@ -1098,9 +1102,11 @@ def test_update_schedule_audits_kind_and_service_vendor(client, admin_h, db_sess
     assert kind_rows[0].new_value == cal
     assert kind_rows[0].created_by is not None
     assert kind_rows[0].created_at is not None
+    assert kind_rows[0].reason == "kind and vendor change"
     assert len(vendor_rows) == 1
     assert vendor_rows[0].previous_value is None
     assert vendor_rows[0].new_value == vendor.json()["id"]
+    assert vendor_rows[0].reason == "kind and vendor change"
 
 
 def test_tech_cannot_void_only_passing_event_manager_can(
@@ -1125,7 +1131,7 @@ def test_tech_cannot_void_only_passing_event_manager_can(
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": date.today().isoformat()},
+        json={"next_due": date.today().isoformat(), "reason": "set first due"},
     )
     admin = db_session.query(User).filter(User.username == "admin").first()
     created = client.post(

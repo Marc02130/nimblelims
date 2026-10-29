@@ -20,6 +20,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.core.lab_time import current_lab_day
 from app.core.patch_fields import explicit_updates
 from app.core.rbac import require_experiment_manage, require_lab_manager
+from app.core.required_reason import CHANGE_REASON_MAX, VOID_REASON_MAX, require_reason
 from app.core.security import get_current_user
 from app.database import get_db
 from app.schemas.instrument_ops import (
@@ -319,6 +320,7 @@ def update_schedule(
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
     data = explicit_updates(body, row, refuse_null={"active", "interval_days", "kind_id"})
+    data.pop("reason", None)
     if "kind_id" in data:
         _list_entry(
             db,
@@ -335,6 +337,20 @@ def update_schedule(
     previous_interval = row.interval_days
     previous_kind = row.kind_id
     previous_vendor = row.service_vendor_id
+    changing = (
+        ("active" in data and data["active"] is not previous_active)
+        or ("interval_days" in data and data["interval_days"] != previous_interval)
+        or ("kind_id" in data and data["kind_id"] != previous_kind)
+        or ("service_vendor_id" in data and data["service_vendor_id"] != previous_vendor)
+    )
+    change_reason = None
+    if changing:
+        change_reason = require_reason(
+            body.reason,
+            code="schedule_change_reason_required",
+            message="A reason is required to change a maintenance schedule.",
+            max_length=CHANGE_REASON_MAX,
+        )
     for k, v in data.items():
         setattr(row, k, v)
     # A new interval applies from the next passing event. Recomputing now
@@ -351,6 +367,7 @@ def update_schedule(
             previous_value=previous_active,
             new_value=row.active,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     if "interval_days" in data and row.interval_days != previous_interval:
         _write_schedule_audit(
@@ -362,6 +379,7 @@ def update_schedule(
             previous_value=previous_interval,
             new_value=row.interval_days,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     if "kind_id" in data and row.kind_id != previous_kind:
         _write_schedule_audit(
@@ -373,6 +391,7 @@ def update_schedule(
             previous_value=previous_kind,
             new_value=row.kind_id,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     if "service_vendor_id" in data and row.service_vendor_id != previous_vendor:
         _write_schedule_audit(
@@ -384,6 +403,7 @@ def update_schedule(
             previous_value=previous_vendor,
             new_value=row.service_vendor_id,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     row.modified_by = current_user.id
     _commit(db, row, "Could not update maintenance schedule")
@@ -436,6 +456,12 @@ def set_first_due(
             "first_due_already_set",
             "The first due date is already set.",
         )
+    first_due_reason = require_reason(
+        body.reason,
+        code="schedule_change_reason_required",
+        message="A reason is required to change a maintenance schedule.",
+        max_length=CHANGE_REASON_MAX,
+    )
     row.next_due = body.next_due
     row.modified_by = current_user.id
     _write_schedule_audit(
@@ -447,7 +473,7 @@ def set_first_due(
         previous_value=None,
         new_value=body.next_due,
         overdue=_schedule_overdue(row),
-        reason=body.reason,
+        reason=first_due_reason,
     )
     _commit(db, row, "Could not set the first due date")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
@@ -564,15 +590,12 @@ def update_event(
         )
     voiding = "active" in data and data["active"] is False and row.active is True
     if voiding:
-        from app.core.visible_text import has_visible_text
-
-        text = (body.reason or "").strip()
-        if not has_visible_text(body.reason):
-            _refuse(
-                "void_reason_required",
-                "A reason is required to void a maintenance event.",
-            )
-        row.void_reason = text
+        row.void_reason = require_reason(
+            body.reason,
+            code="void_reason_required",
+            message="A reason is required to void a maintenance event.",
+            max_length=VOID_REASON_MAX,
+        )
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id

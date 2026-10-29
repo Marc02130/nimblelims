@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.patch_fields import explicit_updates
 from app.core.rbac import require_config_edit
+from app.core.required_reason import CHANGE_REASON_MAX, require_reason
 from app.core.security import get_current_user, get_user_permissions
 from app.database import get_db
 from app.schemas.instrument_catalog import (
@@ -32,6 +33,8 @@ from models.instrument import (
     CroSource,
     Instrument,
     InstrumentMaintenanceAudit,
+    InstrumentScheduleAudit,
+    InstrumentTypeDeactivation,
 )
 from models.list import List as ListModel, ListEntry
 from models.reagent import Vendor
@@ -100,6 +103,7 @@ def _audit_maintenance_tracked(
     new_value: bool,
     user: User,
     always: bool = False,
+    reason: str | None = None,
 ) -> None:
     if not always and previous == new_value:
         return
@@ -108,6 +112,7 @@ def _audit_maintenance_tracked(
             instrument_id=instrument.id,
             previous_value=previous,
             new_value=new_value,
+            reason=reason,
             created_by=user.id,
         )
     )
@@ -204,11 +209,29 @@ def update_instrument_type(
     if not row:
         raise HTTPException(status_code=404, detail="Instrument type not found")
     data = explicit_updates(body, row, refuse_null={"active"})
+    data.pop("reason", None)
     if "name" in data and data["name"] != row.name:
         if _type_query(db).filter(ListEntry.name == data["name"]).first():
             raise HTTPException(status_code=400, detail="Instrument type name already exists")
+    deactivating = "active" in data and data["active"] is False and row.active is True
+    deactivate_reason = None
+    if deactivating:
+        deactivate_reason = require_reason(
+            body.reason,
+            code="instrument_type_deactivate_reason_required",
+            message="A reason is required to deactivate an instrument type.",
+            max_length=CHANGE_REASON_MAX,
+        )
     for k, v in data.items():
         setattr(row, k, v)
+    if deactivating:
+        db.add(
+            InstrumentTypeDeactivation(
+                instrument_type_id=row.id,
+                reason=deactivate_reason,
+                created_by=current_user.id,
+            )
+        )
     row.modified_by = current_user.id
     try:
         db.commit()
@@ -357,6 +380,16 @@ def create_instrument(
         _audit_maintenance_tracked(
             db, row, False, False, current_user, always=True
         )
+    elif row.maintenance_tracked is True:
+        db.add(
+            InstrumentScheduleAudit(
+                instrument_id=row.id,
+                action="maintenance_tracked",
+                previous_value=None,
+                new_value="true",
+                created_by=current_user.id,
+            )
+        )
     try:
         db.commit()
     except IntegrityError as e:
@@ -383,9 +416,18 @@ def update_instrument(
     if not row:
         raise HTTPException(status_code=404, detail="Instrument not found")
     data = explicit_updates(body, row, refuse_null={"active", "status", "maintenance_tracked"})
+    data.pop("reason", None)
     if "maintenance_tracked" in data:
         _refuse_maintenance_tracked_unless_admin(current_user)
     previous_tracked = row.maintenance_tracked
+    tracked_reason = None
+    if "maintenance_tracked" in data and data["maintenance_tracked"] is not previous_tracked:
+        tracked_reason = require_reason(
+            body.reason,
+            code="maintenance_tracked_reason_required",
+            message="A reason is required to change maintenance tracking.",
+            max_length=CHANGE_REASON_MAX,
+        )
     if "instrument_type_id" in data:
         _require_active_type(db, data["instrument_type_id"])
     if "vendor_id" in data and data["vendor_id"] is not None:
@@ -403,7 +445,12 @@ def update_instrument(
         row.active = False
     if "maintenance_tracked" in data:
         _audit_maintenance_tracked(
-            db, row, previous_tracked, row.maintenance_tracked, current_user
+            db,
+            row,
+            previous_tracked,
+            row.maintenance_tracked,
+            current_user,
+            reason=tracked_reason,
         )
     row.modified_by = current_user.id
     try:

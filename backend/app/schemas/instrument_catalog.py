@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, field_validator
+from app.core.required_reason import CHANGE_REASON_MAX, optional_reason
 from app.schemas._instants import APIModel as BaseModel
 
 InstrumentStatus = Literal["in_service", "out_of_service", "retired"]
@@ -23,6 +24,12 @@ class InstrumentTypeUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     active: Optional[bool] = None
+    reason: Optional[str] = Field(None, max_length=CHANGE_REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 class InstrumentTypeResponse(BaseModel):
@@ -62,6 +69,12 @@ class InstrumentUpdate(BaseModel):
     status: Optional[InstrumentStatus] = None
     active: Optional[bool] = None
     maintenance_tracked: Optional[bool] = None
+    reason: Optional[str] = Field(None, max_length=CHANGE_REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 class InstrumentResponse(BaseModel):

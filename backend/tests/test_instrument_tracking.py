@@ -86,6 +86,7 @@ def test_schema_catalog_registers_new_tables_and_drops_types():
         "instrument_type_defaults",
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
+        "instrument_type_deactivations",
         "instrument_entry_slot_audits",
     ):
         assert name in schema_catalog.LAB_TABLES
@@ -325,7 +326,7 @@ def test_open_downtime_and_overdue_block(client, admin_h, db_session, test_admin
     first_due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched.json()['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() - timedelta(days=1))},
+        json={"next_due": str(date.today() - timedelta(days=1)), "reason": "set first due"},
     )
     assert first_due.status_code == 200, first_due.text
     performed = date.today() - timedelta(days=2)
@@ -347,7 +348,7 @@ def test_open_downtime_and_overdue_block(client, admin_h, db_session, test_admin
     client.patch(
         f"/v1/instruments/{inst['id']}",
         headers=admin_h,
-        json={"maintenance_tracked": True},
+        json={"maintenance_tracked": True, "reason": "start tracking"},
     )
     overdue = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
     assert overdue["allowed"] is False
@@ -385,7 +386,7 @@ def test_passing_event_advances_and_void_recomputes(client, admin_h, test_admin_
     first_due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today())},
+        json={"next_due": str(date.today()), "reason": "set first due"},
     )
     assert first_due.status_code == 200, first_due.text
     first_day = date.today() - timedelta(days=20)
@@ -473,7 +474,12 @@ def test_schedule_create_and_update_ignore_due_fields(client, admin_h):
     patched = client.patch(
         f"/v1/instrument-maintenance-schedules/{body['id']}",
         headers=admin_h,
-        json={"last_done": yesterday, "next_due": yesterday, "interval_days": 14},
+        json={
+            "last_done": yesterday,
+            "next_due": yesterday,
+            "interval_days": 14,
+            "reason": "interval change",
+        },
     )
     assert patched.status_code == 200, patched.text
     assert patched.json()["last_done"] is None
@@ -564,7 +570,7 @@ def test_no_delete_routes_left_on_instrument_ops(client, admin_h):
     retired = client.patch(
         f"/v1/instrument-maintenance-schedules/{sched['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "retire schedule"},
     )
     assert retired.status_code == 200
     assert retired.json()["active"] is False
@@ -736,7 +742,10 @@ def _track(client, admin_h, instrument_id, tracked=True):
     patched = client.patch(
         f"/v1/instruments/{instrument_id}",
         headers=admin_h,
-        json={"maintenance_tracked": tracked},
+        json={
+            "maintenance_tracked": tracked,
+            "reason": "start tracking" if tracked else "stop tracking",
+        },
     )
     assert patched.status_code == 200, patched.text
     return patched.json()
@@ -754,7 +763,7 @@ def test_interval_change_does_not_clear_overdue(client, admin_h, test_admin_user
     first_due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() - timedelta(days=1))},
+        json={"next_due": str(date.today() - timedelta(days=1)), "reason": "set first due"},
     )
     assert first_due.status_code == 200, first_due.text
     event = client.post(
@@ -775,7 +784,7 @@ def test_interval_change_does_not_clear_overdue(client, admin_h, test_admin_user
     patched = client.patch(
         f"/v1/instrument-maintenance-schedules/{sched['id']}",
         headers=admin_h,
-        json={"interval_days": 365},
+        json={"interval_days": 365, "reason": "interval change"},
     )
     assert patched.status_code == 200
     assert patched.json()["next_due"] == due_before
@@ -869,7 +878,7 @@ def test_maintenance_on_requires_schedule_and_never_calibrated_is_overdue(
     first_due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() - timedelta(days=1))},
+        json={"next_due": str(date.today() - timedelta(days=1)), "reason": "set first due"},
     )
     assert first_due.status_code == 200, first_due.text
     later = date.today() + timedelta(days=8)
@@ -1108,7 +1117,11 @@ def test_performed_on_certificate_ended_at_used_on_and_inactive_type(
         headers=admin_h,
         json={"name": _name("Inactive type")},
     ).json()
-    client.patch(f"/v1/instrument-types/{typed['id']}", headers=admin_h, json={"active": False})
+    client.patch(
+        f"/v1/instrument-types/{typed['id']}",
+        headers=admin_h,
+        json={"active": False, "reason": "retire unused type"},
+    )
     refused_type = client.post(
         "/v1/instruments",
         headers=admin_h,
@@ -1223,7 +1236,7 @@ def test_removed_list_entries_are_not_newly_selectable(client, admin_h):
     keep = client.patch(
         f"/v1/instrument-maintenance-schedules/{created.json()['id']}",
         headers=admin_h,
-        json={"interval_days": 14},
+        json={"interval_days": 14, "reason": "interval change"},
     )
     assert keep.status_code == 200, keep.text
     same_kind = client.patch(
@@ -1242,7 +1255,7 @@ def test_removed_list_entries_are_not_newly_selectable(client, admin_h):
     switch_active = client.patch(
         f"/v1/instrument-maintenance-schedules/{created.json()['id']}",
         headers=admin_h,
-        json={"kind_id": pm["id"]},
+        json={"kind_id": pm["id"], "reason": "kind change"},
     )
     assert switch_active.status_code == 200, switch_active.text
 

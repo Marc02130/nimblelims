@@ -1277,4 +1277,6 @@ def _resolve_instrument_type_body(db, data: dict) -> dict:
     }
     if "active" in data:
         out["active"] = data["active"]
+    if "reason" in data:
+        out["reason"] = data["reason"]
     return {k: v for k, v in out.items() if v is not None}

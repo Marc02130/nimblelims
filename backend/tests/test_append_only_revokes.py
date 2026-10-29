@@ -97,10 +97,9 @@ def _revokes_in_migrations() -> dict[str, set[str]]:
                         for privilege in ("INSERT", "UPDATE", "DELETE"):
                             if privilege in line.upper():
                                 loop_privs.add(privilege)
+                    assert loop_privs, f"{path.name} expanded {{table}} without I/U/D"
                     for loop_table in _loop_tables(text_src):
-                        found.setdefault(loop_table, set()).update(
-                            loop_privs or privileges
-                        )
+                        found.setdefault(loop_table, set()).update(loop_privs)
                     continue
                 if table in {"SCHEMA", ""}:
                     continue
@@ -118,11 +117,8 @@ def test_canonical_list_matches_migration_revokes():
         if table not in APPEND_ONLY_REVOKES:
             missing.append((table, needed))
             continue
-        assert needed <= APPEND_ONLY_REVOKES[table], (
-            table,
-            needed,
-            APPEND_ONLY_REVOKES[table],
-        )
+        listed = APPEND_ONLY_REVOKES[table] & {"INSERT", "UPDATE", "DELETE"}
+        assert needed == listed, (table, needed, listed)
     assert missing == [], missing
     extras = set(APPEND_ONLY_REVOKES) - set(found)
     assert extras == set(), extras
@@ -142,7 +138,9 @@ def test_0117_inlined_roles_match_maintenance_session_roles():
 def test_append_only_revokes_pinned_at_0118():
     text_src = (VERSIONS / "0118_e3_followups.py").read_text()
     assert "from db.append_only_tables import APPEND_ONLY_REVOKES" in text_src
-    assert dict(APPEND_ONLY_REVOKES) == APPEND_ONLY_REVOKES_AT_0118
+    assert set(APPEND_ONLY_REVOKES_AT_0118) <= set(APPEND_ONLY_REVOKES)
+    for table, privileges in APPEND_ONLY_REVOKES_AT_0118.items():
+        assert APPEND_ONLY_REVOKES[table] == privileges, table
 
 
 def test_ensure_script_reapplies_revokes(migrated_engine, monkeypatch):

@@ -167,7 +167,7 @@ def test_no_delete_routes_on_instrument_catalog(client, config_headers):
     retired = client.patch(
         f"/v1/instrument-types/{t['id']}",
         headers=config_headers,
-        json={"active": False},
+        json={"active": False, "reason": "retire unused type"},
     )
     assert retired.status_code == 200
     assert retired.json()["active"] is False

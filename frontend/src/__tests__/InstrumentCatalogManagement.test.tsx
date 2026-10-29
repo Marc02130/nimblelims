@@ -181,11 +181,14 @@ describe('InstrumentCatalogManagement', () => {
     expect(track).toBeChecked();
     fireEvent.click(track);
     expect(screen.queryByRole('dialog', { name: /confirm/i })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('maintenance-tracked-reason'), {
+      target: { value: '  stop tracking  ' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('Instrument updated');
     expect(api.updateInstrument).toHaveBeenCalledWith(
       'i1',
-      expect.objectContaining({ maintenance_tracked: false }),
+      expect.objectContaining({ maintenance_tracked: false, reason: 'stop tracking' }),
     );
     expect(screen.queryByText(/are you sure/i)).not.toBeInTheDocument();
   });
@@ -328,5 +331,56 @@ describe('InstrumentCatalogManagement', () => {
     fireEvent.mouseDown(await screen.findByLabelText('Reason'));
     expect(await screen.findByRole('option', { name: 'Breakdown' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Retired reason' })).not.toBeInTheDocument();
+  });
+
+  test('deactivating a type requires a reason on save', async () => {
+    api.updateInstrumentType.mockResolvedValue({ id: 't1', active: false });
+    wrap(<InstrumentCatalogManagement />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    expect(await screen.findByLabelText('Active')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Active'));
+    expect(await screen.findByTestId('type-deactivate-reason')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(api.updateInstrumentType).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId('type-deactivate-reason'), {
+      target: { value: 'no longer used' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Instrument type updated')).toBeInTheDocument();
+    expect(api.updateInstrumentType).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({ active: false, reason: 'no longer used' })
+    );
+  });
+
+  test('first due requires a trimmed reason', async () => {
+    api.setInstrumentScheduleFirstDue.mockResolvedValue({ id: 's1' });
+    api.getInstrumentMaintenanceSchedules.mockResolvedValue([
+      {
+        id: 's1',
+        instrument_id: 'i1',
+        instrument_name: 'PR-1',
+        kind_id: 'k1',
+        kind_name: 'PM',
+        interval_days: 365,
+        last_done: null,
+        next_due: null,
+        active: true,
+      },
+    ]);
+    wrap(<InstrumentCatalogManagement maintenanceOnly />);
+    expect(await screen.findByText('Awaiting first due date')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Set first due date' }));
+    expect(await screen.findByRole('dialog', { name: 'Set first due date' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('First due date'), { target: { value: '2026-11-01' } });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    fireEvent.change(screen.getByTestId('first-due-reason'), { target: { value: '  start calendar  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('First due date set')).toBeInTheDocument();
+    expect(api.setInstrumentScheduleFirstDue).toHaveBeenCalledWith(
+      's1',
+      '2026-11-01',
+      'start calendar'
+    );
   });
 });

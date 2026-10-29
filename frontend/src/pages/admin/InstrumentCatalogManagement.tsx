@@ -222,6 +222,18 @@ const InstrumentCatalogManagement: React.FC<{
   const [stopReason, setStopReason] = useState<string | null>(null);
   const [firstDueId, setFirstDueId] = useState<string | null>(null);
   const [firstDueDate, setFirstDueDate] = useState('');
+  const [firstDueReason, setFirstDueReason] = useState('');
+  const [firstDueReasonError, setFirstDueReasonError] = useState('');
+  const [changeReason, setChangeReason] = useState('');
+  const [changeReasonError, setChangeReasonError] = useState('');
+  const [originalTypeActive, setOriginalTypeActive] = useState(true);
+  const [originalTracked, setOriginalTracked] = useState(false);
+  const [originalSchedule, setOriginalSchedule] = useState({
+    active: true,
+    interval_days: '365',
+    kind_id: '',
+    service_vendor_id: '',
+  });
   const [voidEventId, setVoidEventId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState('');
 
@@ -348,19 +360,49 @@ const InstrumentCatalogManagement: React.FC<{
       performed_on: new Date().toISOString().slice(0, 10),
     });
     setStopReason(null);
+    setChangeReason('');
+    setChangeReasonError('');
+    setOriginalTypeActive(true);
+    setOriginalTracked(false);
+    setOriginalSchedule({
+      active: true,
+      interval_days: '365',
+      kind_id: '',
+      service_vendor_id: '',
+    });
     setDialogOpen(true);
+  };
+
+  const trimmedChangeReason = () => changeReason.trim();
+
+  const requireChangeReason = (message: string) => {
+    const text = trimmedChangeReason();
+    if (!text) {
+      setChangeReasonError(message);
+      return null;
+    }
+    if (text.length > 4000) {
+      setChangeReasonError('Reason must be at most 4000 characters.');
+      return null;
+    }
+    setChangeReasonError('');
+    return text;
   };
 
   const openEdit = (row: any) => {
     setEditingId(row.id);
     setStopReason(null);
+    setChangeReason('');
+    setChangeReasonError('');
     if (tab === 'types') {
+      setOriginalTypeActive(Boolean(row.active));
       setTypeForm({
         name: row.name,
         description: row.description || '',
         active: row.active,
       });
     } else if (tab === 'instances') {
+      setOriginalTracked(Boolean(row.maintenance_tracked));
       setInstrumentForm({
         name: row.name,
         description: row.description || '',
@@ -381,6 +423,12 @@ const InstrumentCatalogManagement: React.FC<{
         active: row.active,
       });
     } else if (tab === 'maintenance') {
+      setOriginalSchedule({
+        active: Boolean(row.active),
+        interval_days: String(row.interval_days),
+        kind_id: row.kind_id,
+        service_vendor_id: row.service_vendor_id || '',
+      });
       setScheduleForm({
         instrument_id: row.instrument_id,
         kind_id: row.kind_id,
@@ -415,14 +463,28 @@ const InstrumentCatalogManagement: React.FC<{
     setSubmitting(true);
     setError(null);
     setStopReason(null);
+    setChangeReasonError('');
     try {
       if (tab === 'types') {
-        const payload = {
+        const payload: {
+          name: string;
+          description?: string;
+          active: boolean;
+          reason?: string;
+        } = {
           name: typeForm.name.trim(),
           description: typeForm.description.trim() || undefined,
           active: typeForm.active,
         };
         if (!payload.name) throw new Error('Name is required');
+        if (editingId && originalTypeActive && !typeForm.active) {
+          const reason = requireChangeReason('A reason is required to deactivate an instrument type.');
+          if (!reason) {
+            setSubmitting(false);
+            return;
+          }
+          payload.reason = reason;
+        }
         if (editingId) await apiService.updateInstrumentType(editingId, payload);
         else await apiService.createInstrumentType(payload);
         setSuccess(editingId ? 'Instrument type updated' : 'Instrument type created');
@@ -440,6 +502,14 @@ const InstrumentCatalogManagement: React.FC<{
         };
         if (canSetMaintenanceTracked) {
           payload.maintenance_tracked = instrumentForm.maintenance_tracked;
+          if (editingId && originalTracked !== instrumentForm.maintenance_tracked) {
+            const reason = requireChangeReason('A reason is required to change maintenance tracking.');
+            if (!reason) {
+              setSubmitting(false);
+              return;
+            }
+            payload.reason = reason;
+          }
         }
         if (!payload.name) throw new Error('Name is required');
         if (!payload.instrument_type_id) throw new Error('Instrument type is required');
@@ -458,7 +528,7 @@ const InstrumentCatalogManagement: React.FC<{
         else await apiService.createCroSource(payload);
         setSuccess(editingId ? 'CRO source updated' : 'CRO source created');
       } else if (tab === 'maintenance') {
-        const payload = {
+        const payload: Record<string, unknown> = {
           instrument_id: scheduleForm.instrument_id,
           kind_id: scheduleForm.kind_id,
           interval_days: Number(scheduleForm.interval_days),
@@ -466,8 +536,24 @@ const InstrumentCatalogManagement: React.FC<{
           active: scheduleForm.active,
         };
         if (!payload.instrument_id || !payload.kind_id) throw new Error('Instrument and kind are required');
-        if (editingId) await apiService.updateInstrumentMaintenanceSchedule(editingId, payload);
-        else await apiService.createInstrumentMaintenanceSchedule(payload);
+        if (editingId) {
+          const scheduleChanged =
+            originalSchedule.active !== scheduleForm.active ||
+            originalSchedule.interval_days !== scheduleForm.interval_days ||
+            originalSchedule.kind_id !== scheduleForm.kind_id ||
+            originalSchedule.service_vendor_id !== (scheduleForm.service_vendor_id || '');
+          if (scheduleChanged) {
+            const reason = requireChangeReason('A reason is required to change a maintenance schedule.');
+            if (!reason) {
+              setSubmitting(false);
+              return;
+            }
+            payload.reason = reason;
+          }
+          await apiService.updateInstrumentMaintenanceSchedule(editingId, payload);
+        } else {
+          await apiService.createInstrumentMaintenanceSchedule(payload);
+        }
         setSuccess(editingId ? 'Schedule updated' : 'Schedule created');
       } else if (tab === 'events') {
         if (editingId) {
@@ -538,14 +624,25 @@ const InstrumentCatalogManagement: React.FC<{
   };
 
   const submitFirstDue = async () => {
+    const reason = firstDueReason.trim();
     if (!firstDueId || !firstDueDate) return;
+    if (!reason) {
+      setFirstDueReasonError('A reason is required to set the first due date.');
+      return;
+    }
+    if (reason.length > 4000) {
+      setFirstDueReasonError('Reason must be at most 4000 characters.');
+      return;
+    }
+    setFirstDueReasonError('');
     setSubmitting(true);
     setError(null);
     try {
-      await apiService.setInstrumentScheduleFirstDue(firstDueId, firstDueDate);
+      await apiService.setInstrumentScheduleFirstDue(firstDueId, firstDueDate, reason);
       setSuccess('First due date set');
       setFirstDueId(null);
       setFirstDueDate('');
+      setFirstDueReason('');
       await loadAll();
     } catch (err: any) {
       const detail = err.response?.data?.detail;
@@ -698,6 +795,8 @@ const InstrumentCatalogManagement: React.FC<{
           onClick={() => {
             setFirstDueId(p.row.id);
             setFirstDueDate('');
+            setFirstDueReason('');
+            setFirstDueReasonError('');
           }}
         />,
       ];
@@ -894,6 +993,22 @@ const InstrumentCatalogManagement: React.FC<{
                 }
                 label="Active"
               />
+              {editingId && originalTypeActive && !typeForm.active && (
+                <TextField
+                  label="Reason"
+                  fullWidth
+                  margin="normal"
+                  required
+                  value={changeReason}
+                  onChange={(e) => {
+                    setChangeReason(e.target.value);
+                    setChangeReasonError('');
+                  }}
+                  error={Boolean(changeReasonError)}
+                  helperText={changeReasonError || 'Required. Trimmed length 1–4000.'}
+                  inputProps={{ maxLength: 4000, 'data-testid': 'type-deactivate-reason' }}
+                />
+              )}
             </>
           )}
           {tab === 'instances' && (
@@ -997,6 +1112,24 @@ const InstrumentCatalogManagement: React.FC<{
                   An Administrator can turn on maintenance tracking.
                 </Typography>
               )}
+              {editingId &&
+                canSetMaintenanceTracked &&
+                originalTracked !== instrumentForm.maintenance_tracked && (
+                  <TextField
+                    label="Reason"
+                    fullWidth
+                    margin="normal"
+                    required
+                    value={changeReason}
+                    onChange={(e) => {
+                      setChangeReason(e.target.value);
+                      setChangeReasonError('');
+                    }}
+                    error={Boolean(changeReasonError)}
+                    helperText={changeReasonError || 'Required. Trimmed length 1–4000.'}
+                    inputProps={{ maxLength: 4000, 'data-testid': 'maintenance-tracked-reason' }}
+                  />
+                )}
             </>
           )}
           {tab === 'cro' && (
@@ -1085,6 +1218,22 @@ const InstrumentCatalogManagement: React.FC<{
                 }
                 label="Active"
               />
+              {editingId && (
+                <TextField
+                  label="Reason"
+                  fullWidth
+                  margin="normal"
+                  required
+                  value={changeReason}
+                  onChange={(e) => {
+                    setChangeReason(e.target.value);
+                    setChangeReasonError('');
+                  }}
+                  error={Boolean(changeReasonError)}
+                  helperText={changeReasonError || 'Required when the schedule changes. Trimmed length 1–4000.'}
+                  inputProps={{ maxLength: 4000, 'data-testid': 'schedule-change-reason' }}
+                />
+              )}
             </>
           )}
           {tab === 'events' && (
@@ -1277,7 +1426,16 @@ const InstrumentCatalogManagement: React.FC<{
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(firstDueId)} onClose={() => setFirstDueId(null)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={Boolean(firstDueId)}
+        onClose={() => {
+          setFirstDueId(null);
+          setFirstDueReason('');
+          setFirstDueReasonError('');
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>Set first due date</DialogTitle>
         <DialogContent>
           <TextField
@@ -1289,10 +1447,36 @@ const InstrumentCatalogManagement: React.FC<{
             value={firstDueDate}
             onChange={(e) => setFirstDueDate(e.target.value)}
           />
+          <TextField
+            label="Reason"
+            fullWidth
+            margin="normal"
+            required
+            value={firstDueReason}
+            onChange={(e) => {
+              setFirstDueReason(e.target.value);
+              setFirstDueReasonError('');
+            }}
+            error={Boolean(firstDueReasonError)}
+            helperText={firstDueReasonError || 'Required. Trimmed length 1–4000.'}
+            inputProps={{ maxLength: 4000, 'data-testid': 'first-due-reason' }}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setFirstDueId(null)}>Cancel</Button>
-          <Button onClick={submitFirstDue} disabled={submitting || !firstDueDate} variant="contained">
+          <Button
+            onClick={() => {
+              setFirstDueId(null);
+              setFirstDueReason('');
+              setFirstDueReasonError('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={submitFirstDue}
+            disabled={submitting || !firstDueDate || !firstDueReason.trim()}
+            variant="contained"
+          >
             Save
           </Button>
         </DialogActions>
