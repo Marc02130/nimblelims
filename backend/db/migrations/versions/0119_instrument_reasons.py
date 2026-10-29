@@ -87,6 +87,10 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
     END IF;
+    IF NEW.active IS TRUE AND OLD.active IS FALSE THEN
+        RAISE EXCEPTION 'voided_event_stays_voided'
+            USING ERRCODE = '23514';
+    END IF;
     IF OLD.schedule_id IS NOT NULL THEN
         PERFORM 1
            FROM public.instrument_maintenance_schedules s

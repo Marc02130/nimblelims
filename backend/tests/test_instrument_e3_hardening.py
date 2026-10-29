@@ -142,13 +142,16 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
         "SET active = false, void_reason = 'db reason' WHERE id = :id",
         {"id": ids["event"]},
     )
-    _run_as_lims_app(
-        migrated_engine,
-        ids["uid"],
-        "UPDATE instrument_maintenance_events "
-        "SET active = true, void_reason = NULL WHERE id = :id",
-        {"id": ids["event"]},
-    )
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as restored:
+        _run_as_lims_app(
+            migrated_engine,
+            ids["uid"],
+            "UPDATE instrument_maintenance_events "
+            "SET active = true, void_reason = NULL WHERE id = :id",
+            {"id": ids["event"]},
+        )
+    assert pgcode(restored.value) == "23514"
+    assert "voided_event_stays_voided" in str(restored.value.orig)
 
 
 def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(
@@ -567,11 +570,27 @@ def test_0119_revision_id_and_single_head():
     assert "U&'\\2007'" in text_src
     assert "'maintenance_tracked')" in text_src
     assert "instrument_type_deactivations" in text_src
+    assert "voided_event_stays_voided" in text_src
     cfg = Config(str(backend / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     assert heads == ["0119_instrument_reasons"], heads
+
+
+def test_live_void_trigger_body_keeps_reason_lock_nbsp_and_final_void(migrated_engine):
+    with migrated_engine.connect() as conn:
+        body = conn.execute(
+            text("SELECT pg_get_functiondef('public.refuse_void_only_passing_event()'::regprocedure)")
+        ).scalar()
+    assert body
+    assert "void_reason_required" in body
+    assert "FOR UPDATE" in body
+    assert "voided_event_stays_voided" in body
+    assert "maintenance_event_update_forbidden" in body
+    assert r"\00A0" in body or "00A0" in body
+    assert r"\2007" in body or "2007" in body
+    assert "is_lab_manager_or_admin" in body
 
 
 def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
@@ -1003,11 +1022,11 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
             )
         )
 
-    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     with migrated_engine.begin() as conn:
         _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
     db_rows = []
     for name, char in _UNICODE_REASON_CASES:
+        ids = _seed_schedule_event(migrated_engine, next_due=date.today())
         try:
             _run_as_lims_app(
                 migrated_engine,
@@ -1017,14 +1036,6 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
                 {"id": ids["event"], "r": char},
             )
             db_rows.append((name, "accepted", None))
-            # FLAG: the manager-only trigger still allows active false→true.
-            _run_as_lims_app(
-                migrated_engine,
-                ids["uid"],
-                "UPDATE instrument_maintenance_events "
-                "SET active = true, void_reason = NULL WHERE id = :id",
-                {"id": ids["event"]},
-            )
         except (IntegrityError, InternalError, ProgrammingError) as exc:
             db_rows.append((name, "rejected", pgcode(exc)))
 
@@ -1049,11 +1060,9 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
 
 
 def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
-    """FLAG: API refuses restore; a Lab Manager / Admin UPDATE as lims_app does not.
+    """Converted: DB refuses false→true with 23514 voided_event_stays_voided.
 
-    refuse_void_only_passing_event checks manager/admin, void_reason on
-    true→false, and locks the schedule. It does not refuse false→true.
-    Blocking that at the DB needs a migration Edmund has not approved.
+    Technician UPDATE is still 42501 maintenance_event_update_forbidden.
     """
     ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     failed = _seed_schedule_event(migrated_engine, next_due=date.today(), passed=False)
@@ -1066,11 +1075,23 @@ def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
         "SET active = true WHERE id = :id"
     )
     _run_as_lims_app(migrated_engine, ids["uid"], void_sql, {"id": ids["event"]})
-    _run_as_lims_app(migrated_engine, ids["uid"], restore_sql, {"id": ids["event"]})
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as passing:
+        _run_as_lims_app(migrated_engine, ids["uid"], restore_sql, {"id": ids["event"]})
+    assert pgcode(passing.value) == "23514"
+    assert "voided_event_stays_voided" in str(passing.value.orig)
     _run_as_lims_app(migrated_engine, failed["uid"], void_sql, {"id": failed["event"]})
-    _run_as_lims_app(migrated_engine, failed["uid"], restore_sql, {"id": failed["event"]})
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as failed_restore:
+        _run_as_lims_app(
+            migrated_engine, failed["uid"], restore_sql, {"id": failed["event"]}
+        )
+    assert pgcode(failed_restore.value) == "23514"
+    assert "voided_event_stays_voided" in str(failed_restore.value.orig)
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as tech:
+        _run_as_lims_app(migrated_engine, ids["tech"], restore_sql, {"id": ids["event"]})
+    assert pgcode(tech.value) == "42501"
+    assert "maintenance_event_update_forbidden" in str(tech.value.orig)
     with migrated_engine.connect() as conn:
-        passing = conn.execute(
+        passing_active = conn.execute(
             text("SELECT active FROM instrument_maintenance_events WHERE id = :id"),
             {"id": ids["event"]},
         ).scalar()
@@ -1078,5 +1099,5 @@ def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
             text("SELECT active FROM instrument_maintenance_events WHERE id = :id"),
             {"id": failed["event"]},
         ).scalar()
-    assert passing is True
-    assert failed_active is True
+    assert passing_active is False
+    assert failed_active is False

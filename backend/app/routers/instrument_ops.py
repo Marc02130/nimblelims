@@ -67,6 +67,7 @@ INSTRUMENT_NOT_ON_EXPERIMENT = "instrument_not_on_experiment"
 USE_TARGET_REQUIRED = "use_target_required"
 VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
 VOIDED_EVENT_STAYS_VOIDED = "voided_event_stays_voided"
+MAINTENANCE_EVENT_VOIDED = "maintenance_event_voided"
 
 
 def _refuse(code: str, message: str) -> None:
@@ -710,6 +711,11 @@ def create_downtime(
         )
         if ev is None:
             raise HTTPException(status_code=404, detail="Maintenance event not found")
+        if ev.active is False:
+            _refuse(
+                MAINTENANCE_EVENT_VOIDED,
+                "That maintenance event is voided and cannot be linked.",
+            )
     row = InstrumentDowntime(
         **body.model_dump(),
         created_by=current_user.id,
@@ -793,6 +799,23 @@ def update_downtime(
             allow_inactive=data["reason_id"] == row.reason_id,
         )
     new_event_id = data["maintenance_event_id"] if "maintenance_event_id" in data else row.maintenance_event_id
+    if (
+        "maintenance_event_id" in data
+        and new_event_id is not None
+        and new_event_id != row.maintenance_event_id
+    ):
+        ev = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == new_event_id)
+            .first()
+        )
+        if ev is None:
+            raise HTTPException(status_code=404, detail="Maintenance event not found")
+        if ev.active is False:
+            _refuse(
+                MAINTENANCE_EVENT_VOIDED,
+                "That maintenance event is voided and cannot be linked.",
+            )
     old_schedule_id = _schedule_id_for_event(db, row.maintenance_event_id)
     new_schedule_id = (
         _schedule_id_for_event(db, new_event_id)

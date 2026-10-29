@@ -42,7 +42,6 @@ def test_void_reason_whitespace_parity_api_and_db(
         headers=admin_h,
         json={"next_due": date.today().isoformat(), "reason": "set first due"},
     )
-    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     with migrated_engine.begin() as conn:
         _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
     for name, char, visible in _PARITY:
@@ -68,14 +67,8 @@ def test_void_reason_whitespace_parity_api_and_db(
         else:
             assert api.status_code == 422, (name, api.text)
             assert api.json()["detail"]["code"] == "void_reason_required"
+        ids = _seed_schedule_event(migrated_engine, next_due=date.today())
         try:
-            _run_as_lims_app(
-                migrated_engine,
-                ids["uid"],
-                "UPDATE instrument_maintenance_events "
-                "SET active = true, void_reason = NULL WHERE id = :id",
-                {"id": ids["event"]},
-            )
             _run_as_lims_app(
                 migrated_engine,
                 ids["uid"],
@@ -322,3 +315,100 @@ def test_admin_create_tracked_false_writes_no_schedule_tracked_audit(
     assert maint[0].previous_value is False
     assert maint[0].new_value is False
     assert maint[0].reason is None
+
+
+def test_downtime_refuses_a_voided_maintenance_event(client, admin_h, test_admin_user):
+    from datetime import datetime, timezone
+
+    inst = _instrument(client, admin_h, maintenance_tracked=True)
+    sched = _schedule(client, admin_h, inst["id"], interval=10)
+    client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": date.today().isoformat(), "reason": "set first due"},
+    )
+    event = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(test_admin_user.id),
+            "passed": True,
+        },
+    )
+    assert event.status_code == 201, event.text
+    event_id = event.json()["id"]
+    later = client.post(
+        "/v1/instrument-maintenance-events",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "schedule_id": sched["id"],
+            "performed_on": date.today().isoformat(),
+            "performed_by_user_id": str(test_admin_user.id),
+            "passed": True,
+        },
+    )
+    assert later.status_code == 201, later.text
+    reason = client.get("/lists/downtime_reasons/entries", headers=admin_h).json()
+    if isinstance(reason, dict):
+        reason = reason.get("entries") or reason.get("items") or []
+    reason_id = next(row["id"] for row in reason if row["name"] == "Breakdown")
+    started = datetime.now(timezone.utc).isoformat()
+    linked = client.post(
+        "/v1/instrument-downtime",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "started_at": started,
+            "reason_id": reason_id,
+            "maintenance_event_id": event_id,
+        },
+    )
+    assert linked.status_code == 201, linked.text
+    voided = client.patch(
+        f"/v1/instrument-maintenance-events/{event_id}",
+        headers=admin_h,
+        json={"active": False, "reason": "wrong date"},
+    )
+    assert voided.status_code == 200, voided.text
+    keep = client.patch(
+        f"/v1/instrument-downtime/{linked.json()['id']}",
+        headers=admin_h,
+        json={"note": "still linked after void"},
+    )
+    assert keep.status_code == 200, keep.text
+    assert keep.json()["maintenance_event_id"] == event_id
+    create_voided = client.post(
+        "/v1/instrument-downtime",
+        headers=admin_h,
+        json={
+            "instrument_id": inst["id"],
+            "started_at": started,
+            "reason_id": reason_id,
+            "maintenance_event_id": event_id,
+        },
+    )
+    assert create_voided.status_code == 422, create_voided.text
+    assert create_voided.json()["detail"]["code"] == "maintenance_event_voided"
+    retarget = client.patch(
+        f"/v1/instrument-downtime/{linked.json()['id']}",
+        headers=admin_h,
+        json={"maintenance_event_id": later.json()["id"]},
+    )
+    assert retarget.status_code == 200, retarget.text
+    void_later = client.patch(
+        f"/v1/instrument-maintenance-events/{later.json()['id']}",
+        headers=admin_h,
+        json={"active": False, "reason": "also wrong"},
+    )
+    assert void_later.status_code == 200, void_later.text
+    back = client.patch(
+        f"/v1/instrument-downtime/{linked.json()['id']}",
+        headers=admin_h,
+        json={"maintenance_event_id": event_id},
+    )
+    assert back.status_code == 422, back.text
+    assert back.json()["detail"]["code"] == "maintenance_event_voided"
