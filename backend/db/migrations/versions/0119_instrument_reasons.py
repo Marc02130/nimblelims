@@ -56,7 +56,7 @@ _0118_VOID_REASON_LEN = (
 _ACTION_CHECK = (
     "action IN ('first_due', 'schedule_active', 'schedule_interval', "
     "'schedule_kind', 'schedule_vendor', 'event_void', 'event_restore', "
-    "'maintenance_tracked')"
+    "'maintenance_tracked', 'event_note', 'event_certificate')"
 )
 _0118_ACTION_CHECK = (
     "action IN ('first_due', 'schedule_active', 'schedule_interval', "
@@ -540,6 +540,15 @@ def upgrade() -> None:
     )
     op.execute("ALTER TABLE instrument_type_deactivations FORCE ROW LEVEL SECURITY")
     op.execute(
+        "DROP POLICY IF EXISTS instrument_maintenance_events_insert "
+        "ON instrument_maintenance_events"
+    )
+    op.execute(
+        "CREATE POLICY instrument_maintenance_events_insert "
+        "ON instrument_maintenance_events FOR INSERT "
+        f"WITH CHECK ({_CATALOG_INSERT})"
+    )
+    op.execute(
         "REVOKE EXECUTE ON FUNCTION public.require_schedule_change_reason() FROM PUBLIC"
     )
     op.execute(
@@ -558,12 +567,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     leftover = op.get_bind().exec_driver_sql(
         "SELECT count(*) FROM instrument_schedule_audits "
-        "WHERE action = 'maintenance_tracked'"
+        "WHERE action IN ("
+        "'maintenance_tracked', 'event_note', 'event_certificate')"
     ).scalar()
     if leftover:
         raise RuntimeError(
             "0119 downgrade refuses: instrument_schedule_audits "
-            "maintenance_tracked rows exist"
+            "maintenance_tracked/event_note/event_certificate rows exist"
         )
     _unregister()
     op.execute(
@@ -616,4 +626,13 @@ def downgrade() -> None:
         "instrument_maintenance_events",
         "ck_instrument_events_void_reason",
         _0118_VOID_REASON_LEN,
+    )
+    op.execute(
+        "DROP POLICY IF EXISTS instrument_maintenance_events_insert "
+        "ON instrument_maintenance_events"
+    )
+    op.execute(
+        "CREATE POLICY instrument_maintenance_events_insert "
+        "ON instrument_maintenance_events FOR INSERT "
+        f"WITH CHECK ({_CATALOG_POLICY})"
     )

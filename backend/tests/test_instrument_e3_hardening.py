@@ -568,9 +568,13 @@ def test_0119_revision_id_and_single_head():
     assert "GRANT DELETE" not in text_src
     assert "U&'\\00A0'" in text_src
     assert "U&'\\2007'" in text_src
-    assert "'maintenance_tracked')" in text_src
+    assert "'maintenance_tracked'" in text_src
+    assert "'event_note'" in text_src
+    assert "'event_certificate'" in text_src
     assert "instrument_type_deactivations" in text_src
     assert "voided_event_stays_voided" in text_src
+    assert "_CATALOG_INSERT" in text_src
+    assert "instrument_maintenance_events_insert" in text_src
     cfg = Config(str(backend / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)

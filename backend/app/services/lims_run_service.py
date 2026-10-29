@@ -1175,6 +1175,13 @@ class LimsRunService:
 
         run = self._get_run_for_update(run_id)
         self._assert_import_allowed(run)
+        self.db.expire(run, ["experiment_template"])
+        self._refuse_cro_source_on_standard_run(
+            run,
+            cro_source_id=cro_source_id,
+            instrument_id=instrument_id,
+            parser=parser,
+        )
         if run.analysis_id != analysis_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

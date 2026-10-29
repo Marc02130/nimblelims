@@ -411,6 +411,16 @@ def update_schedule(
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
 
 
+def _lock_wait_conflict(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "schedule_busy",
+            "message": message,
+        },
+    )
+
+
 def _lock_schedule(db: Session, schedule_id: UUID) -> InstrumentMaintenanceSchedule:
     from sqlalchemy.exc import OperationalError
     from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
@@ -426,18 +436,36 @@ def _lock_schedule(db: Session, schedule_id: UUID) -> InstrumentMaintenanceSched
         if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
             raise
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "schedule_busy",
-                "message": (
-                    "Another change to this schedule is in progress. "
-                    "Wait for it to finish, then try again."
-                ),
-            },
+        raise _lock_wait_conflict(
+            "Another change to this schedule is in progress. "
+            "Wait for it to finish, then try again."
         ) from exc
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    return row
+
+
+def _lock_event(db: Session, event_id: UUID) -> InstrumentMaintenanceEvent:
+    from sqlalchemy.exc import OperationalError
+    from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
+
+    try:
+        row = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == event_id)
+            .with_for_update()
+            .first()
+        )
+    except OperationalError as exc:
+        if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+            raise
+        db.rollback()
+        raise _lock_wait_conflict(
+            "Another change to this maintenance event is in progress. "
+            "Wait for it to finish, then try again."
+        ) from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
     return row
 
 
@@ -536,13 +564,7 @@ def create_event(
         raise HTTPException(status_code=400, detail="Invalid performed_by_vendor_id")
     schedule = None
     if body.schedule_id:
-        schedule = (
-            db.query(InstrumentMaintenanceSchedule)
-            .filter(InstrumentMaintenanceSchedule.id == body.schedule_id)
-            .first()
-        )
-        if schedule is None:
-            raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+        schedule = _lock_schedule(db, body.schedule_id)
         if schedule.instrument_id != body.instrument_id:
             raise HTTPException(status_code=400, detail="Schedule belongs to a different instrument")
     row = InstrumentMaintenanceEvent(
@@ -571,13 +593,7 @@ def update_event(
     current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(InstrumentMaintenanceEvent)
-        .filter(InstrumentMaintenanceEvent.id == event_id)
-        .first()
-    )
-    if row is None:
-        raise HTTPException(status_code=404, detail="Maintenance event not found")
+    row = _lock_event(db, event_id)
     if row.schedule_id:
         _lock_schedule(db, row.schedule_id)
     data = explicit_updates(body, row, refuse_null={"active"})
@@ -597,6 +613,8 @@ def update_event(
             message="A reason is required to void a maintenance event.",
             max_length=VOID_REASON_MAX,
         )
+    previous_note = row.note
+    previous_certificate = row.certificate_url
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -637,6 +655,28 @@ def update_event(
             new_value=None,
             overdue=None,
             reason=row.void_reason,
+        )
+    if "note" in data and row.note != previous_note:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.schedule_id,
+            event_id=row.id,
+            action="event_note",
+            user=current_user,
+            previous_value=previous_note,
+            new_value=row.note,
+        )
+    if "certificate_url" in data and row.certificate_url != previous_certificate:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.schedule_id,
+            event_id=row.id,
+            action="event_certificate",
+            user=current_user,
+            previous_value=previous_certificate,
+            new_value=row.certificate_url,
         )
     try:
         db.commit()

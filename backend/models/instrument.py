@@ -152,7 +152,7 @@ class InstrumentScheduleAudit(Base):
         CheckConstraint(
             "action IN ('first_due', 'schedule_active', 'schedule_interval', "
             "'schedule_kind', 'schedule_vendor', 'event_void', 'event_restore', "
-            "'maintenance_tracked')",
+            "'maintenance_tracked', 'event_note', 'event_certificate')",
             name="ck_instrument_schedule_audits_action",
         ),
     )

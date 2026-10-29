@@ -1362,9 +1362,12 @@ def test_0115_inactivates_untyped_referenced_templates(migrated_engine):
 
 
 def test_0115_revision_id_and_single_head():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
     from pathlib import Path
 
-    path = Path(__file__).resolve().parents[1] / "db/migrations/versions/0115_instrument_type_slots.py"
+    backend = Path(__file__).resolve().parents[1]
+    path = backend / "db/migrations/versions/0115_instrument_type_slots.py"
     text_src = path.read_text()
     assert 'revision = "0115_instrument_type_slots"' in text_src
     assert len("0115_instrument_type_slots") == 26
@@ -1372,10 +1375,15 @@ def test_0115_revision_id_and_single_head():
     assert "REVOKE DELETE ON lims_run_type_substitutions FROM lims_app" in text_src
     assert "GRANT DELETE" not in text_src
     assert "created_by = current_user_id()" in text_src
-    versions = Path(__file__).resolve().parents[1] / "db/migrations/versions"
-    heads = [
+    versions = backend / "db/migrations/versions"
+    files = [
         p.name
         for p in versions.glob("*.py")
         if p.name.startswith("0115")
     ]
-    assert heads == ["0115_instrument_type_slots.py"]
+    assert files == ["0115_instrument_type_slots.py"]
+    cfg = Config(str(backend / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend / "db/migrations"))
+    live_heads = ScriptDirectory.from_config(cfg).get_heads()
+    assert live_heads == ["0119_instrument_reasons"], live_heads
+    assert "0115_instrument_type_slots" not in live_heads
