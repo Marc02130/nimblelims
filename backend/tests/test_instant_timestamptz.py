@@ -352,6 +352,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "lims_run_type_substitutions",
         "instrument_template_inactivations",
         "instrument_entry_slot_audits",
+        "instrument_type_deactivations",
     }
     assert extra <= allowed_extra
     nonempty_ok = {

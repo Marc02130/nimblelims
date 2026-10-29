@@ -761,7 +761,7 @@ def test_first_due_lock_timeout_is_409_schedule_busy(migrated_engine):
             try:
                 set_first_due(
                     ids["sched"],
-                    FirstDueCreate(next_due=date.today() + timedelta(days=2)),
+                    FirstDueCreate(next_due=date.today() + timedelta(days=2), reason="set first due"),
                     current_user=user,
                     db=s,
                 )
@@ -873,7 +873,7 @@ def test_voided_event_cannot_be_restored(client, admin_h, db_session, test_admin
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": date.today().isoformat()},
+        json={"next_due": date.today().isoformat(), "reason": "set first due"},
     )
     first = client.post(
         "/v1/instrument-maintenance-events",
@@ -956,13 +956,19 @@ def test_reason_fields_max_length_1000(client, admin_h):
         headers=admin_h,
         json={"instrument_id": inst["id"], "kind_id": kind_id, "interval_days": 10},
     ).json()
-    too_long = "x" * 1001
+    too_long_change = "x" * 4001
     first = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": date.today().isoformat(), "reason": too_long},
+        json={"next_due": date.today().isoformat(), "reason": too_long_change},
     )
     assert first.status_code == 422, first.text
+    ok = client.post(
+        f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
+        headers=admin_h,
+        json={"next_due": date.today().isoformat(), "reason": "x" * 4000},
+    )
+    assert ok.status_code == 200, ok.text
 
 
 def test_create_entry_validates_instrument_slots(client, admin_h):

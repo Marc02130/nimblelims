@@ -940,6 +940,7 @@ export class ApiService {
       name: string;
       description?: string;
       active?: boolean;
+      reason?: string;
     }>
   ) {
     const response: AxiosResponse = await this.api.patch(`/v1/instrument-types/${id}`, data);
@@ -1015,10 +1016,10 @@ export class ApiService {
     return response.data;
   }
 
-  async setInstrumentScheduleFirstDue(id: string, nextDue: string) {
+  async setInstrumentScheduleFirstDue(id: string, nextDue: string, reason: string) {
     const response: AxiosResponse = await this.api.post(
       `/v1/instrument-maintenance-schedules/${id}/first-due`,
-      { next_due: nextDue }
+      { next_due: nextDue, reason }
     );
     return response.data;
   }

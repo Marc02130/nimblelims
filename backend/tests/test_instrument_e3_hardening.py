@@ -61,7 +61,7 @@ def test_void_event_requires_reason_api_and_audit(
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": date.today().isoformat()},
+        json={"next_due": date.today().isoformat(), "reason": "set first due"},
     )
     created = client.post(
         "/v1/instrument-maintenance-events",
@@ -126,6 +126,7 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
     assert "void_reason_required" in str(blank.value.orig) or "ck_instrument_events_void_reason" in str(
         blank.value.orig
     )
+    assert pgcode(blank.value) == "23514"
     with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
         _run_as_lims_app(
             migrated_engine,
@@ -141,13 +142,16 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
         "SET active = false, void_reason = 'db reason' WHERE id = :id",
         {"id": ids["event"]},
     )
-    _run_as_lims_app(
-        migrated_engine,
-        ids["uid"],
-        "UPDATE instrument_maintenance_events "
-        "SET active = true, void_reason = NULL WHERE id = :id",
-        {"id": ids["event"]},
-    )
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as restored:
+        _run_as_lims_app(
+            migrated_engine,
+            ids["uid"],
+            "UPDATE instrument_maintenance_events "
+            "SET active = true, void_reason = NULL WHERE id = :id",
+            {"id": ids["event"]},
+        )
+    assert pgcode(restored.value) == "23514"
+    assert "voided_event_stays_voided" in str(restored.value.orig)
 
 
 def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(
@@ -167,7 +171,7 @@ def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(
     admin_on = client.patch(
         f"/v1/instruments/{inst['id']}",
         headers=admin_h,
-        json={"maintenance_tracked": True},
+        json={"maintenance_tracked": True, "reason": "start tracking"},
     )
     assert admin_on.status_code == 200, admin_on.text
     assert admin_on.json()["maintenance_tracked"] is True
@@ -180,7 +184,7 @@ def test_lab_manager_cannot_toggle_maintenance_tracked_admin_can(
     admin_off = client.patch(
         f"/v1/instruments/{inst['id']}",
         headers=admin_h,
-        json={"maintenance_tracked": False},
+        json={"maintenance_tracked": False, "reason": "stop tracking"},
     )
     assert admin_off.status_code == 200, admin_off.text
     assert admin_off.json()["maintenance_tracked"] is False
@@ -551,6 +555,48 @@ def test_0118_revision_id_and_single_head():
     assert files == ["0118_e3_followups.py"]
 
 
+def test_0119_revision_id_and_single_head():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parents[1]
+    text_src = (backend / "db/migrations/versions/0119_instrument_reasons.py").read_text()
+    assert 'revision = "0119_instrument_reasons"' in text_src
+    assert len("0119_instrument_reasons") <= 32
+    assert 'down_revision = "0118_e3_followups"' in text_src
+    assert "GRANT DELETE" not in text_src
+    assert "U&'\\00A0'" in text_src
+    assert "U&'\\2007'" in text_src
+    assert "'maintenance_tracked'" in text_src
+    assert "'event_note'" in text_src
+    assert "'event_certificate'" in text_src
+    assert "instrument_type_deactivations" in text_src
+    assert "voided_event_stays_voided" in text_src
+    assert "_CATALOG_INSERT" in text_src
+    assert "instrument_maintenance_events_insert" in text_src
+    cfg = Config(str(backend / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend / "db/migrations"))
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    assert heads == ["0119_instrument_reasons"], heads
+
+
+def test_live_void_trigger_body_keeps_reason_lock_nbsp_and_final_void(migrated_engine):
+    with migrated_engine.connect() as conn:
+        body = conn.execute(
+            text("SELECT pg_get_functiondef('public.refuse_void_only_passing_event()'::regprocedure)")
+        ).scalar()
+    assert body
+    assert "void_reason_required" in body
+    assert "FOR UPDATE" in body
+    assert "voided_event_stays_voided" in body
+    assert "maintenance_event_update_forbidden" in body
+    assert r"\00A0" in body or "00A0" in body
+    assert r"\2007" in body or "2007" in body
+    assert "is_lab_manager_or_admin" in body
+
+
 def test_direct_lims_app_void_and_reset_role_still_enforce(migrated_engine):
     ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as blank:
@@ -698,7 +744,7 @@ def test_whitespace_only_reasons_are_blank_api_and_db(
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": date.today().isoformat()},
+        json={"next_due": date.today().isoformat(), "reason": "set first due"},
     )
     created = client.post(
         "/v1/instrument-maintenance-events",
@@ -909,6 +955,8 @@ def test_direct_lims_app_guards_survive_reset_and_set_role_none(migrated_engine)
         "run_created_by_immutable": "42501",
         "imported_row_immutable": "42501",
     }
+    assert guards
+    assert modes
     with _import_write_grants(migrated_engine):
         for sql, params, needle in guards:
             for mode in modes:
@@ -936,7 +984,7 @@ _UNICODE_REASON_CASES = (
 def test_unicode_whitespace_reason_behavior_is_recorded(
     client, admin_h, db_session, test_admin_user, migrated_engine
 ):
-    """Record API vs DB for Unicode whitespace. Marc decides whether they should match."""
+    """API and DB refuse NBSP/U+2007; ZWSP and BOM stay visible on both."""
     from app.core.visible_text import has_visible_text
 
     inst = _instrument(client, admin_h, maintenance_tracked=True)
@@ -944,7 +992,7 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": date.today().isoformat()},
+        json={"next_due": date.today().isoformat(), "reason": "set first due"},
     )
     api_rows = []
     for name, char in _UNICODE_REASON_CASES:
@@ -978,11 +1026,11 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
             )
         )
 
-    ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     with migrated_engine.begin() as conn:
         _grant_if_missing(conn, "instrument_maintenance_events", "UPDATE")
     db_rows = []
     for name, char in _UNICODE_REASON_CASES:
+        ids = _seed_schedule_event(migrated_engine, next_due=date.today())
         try:
             _run_as_lims_app(
                 migrated_engine,
@@ -992,14 +1040,6 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
                 {"id": ids["event"], "r": char},
             )
             db_rows.append((name, "accepted", None))
-            # FLAG: the manager-only trigger still allows active false→true.
-            _run_as_lims_app(
-                migrated_engine,
-                ids["uid"],
-                "UPDATE instrument_maintenance_events "
-                "SET active = true, void_reason = NULL WHERE id = :id",
-                {"id": ids["event"]},
-            )
         except (IntegrityError, InternalError, ProgrammingError) as exc:
             db_rows.append((name, "rejected", pgcode(exc)))
 
@@ -1010,12 +1050,9 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
         ("zwsp", True, 200, None),
         ("bom", True, 200, None),
     ]
-    db_expected = [("nbsp", "accepted", None)]
+    db_expected = [("nbsp", "rejected", "23514")]
     for code in range(0x2000, 0x200B):
-        if code == 0x2007:
-            db_expected.append((f"u{code:04x}", "accepted", None))
-        else:
-            db_expected.append((f"u{code:04x}", "rejected", "23514"))
+        db_expected.append((f"u{code:04x}", "rejected", "23514"))
     db_expected.extend(
         [
             ("u3000", "rejected", "23514"),
@@ -1027,11 +1064,9 @@ def test_unicode_whitespace_reason_behavior_is_recorded(
 
 
 def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
-    """FLAG: API refuses restore; a Lab Manager / Admin UPDATE as lims_app does not.
+    """Converted: DB refuses false→true with 23514 voided_event_stays_voided.
 
-    refuse_void_only_passing_event checks manager/admin, void_reason on
-    true→false, and locks the schedule. It does not refuse false→true.
-    Blocking that at the DB needs a migration Edmund has not approved.
+    Technician UPDATE is still 42501 maintenance_event_update_forbidden.
     """
     ids = _seed_schedule_event(migrated_engine, next_due=date.today())
     failed = _seed_schedule_event(migrated_engine, next_due=date.today(), passed=False)
@@ -1044,11 +1079,23 @@ def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
         "SET active = true WHERE id = :id"
     )
     _run_as_lims_app(migrated_engine, ids["uid"], void_sql, {"id": ids["event"]})
-    _run_as_lims_app(migrated_engine, ids["uid"], restore_sql, {"id": ids["event"]})
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as passing:
+        _run_as_lims_app(migrated_engine, ids["uid"], restore_sql, {"id": ids["event"]})
+    assert pgcode(passing.value) == "23514"
+    assert "voided_event_stays_voided" in str(passing.value.orig)
     _run_as_lims_app(migrated_engine, failed["uid"], void_sql, {"id": failed["event"]})
-    _run_as_lims_app(migrated_engine, failed["uid"], restore_sql, {"id": failed["event"]})
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as failed_restore:
+        _run_as_lims_app(
+            migrated_engine, failed["uid"], restore_sql, {"id": failed["event"]}
+        )
+    assert pgcode(failed_restore.value) == "23514"
+    assert "voided_event_stays_voided" in str(failed_restore.value.orig)
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)) as tech:
+        _run_as_lims_app(migrated_engine, ids["tech"], restore_sql, {"id": ids["event"]})
+    assert pgcode(tech.value) == "42501"
+    assert "maintenance_event_update_forbidden" in str(tech.value.orig)
     with migrated_engine.connect() as conn:
-        passing = conn.execute(
+        passing_active = conn.execute(
             text("SELECT active FROM instrument_maintenance_events WHERE id = :id"),
             {"id": ids["event"]},
         ).scalar()
@@ -1056,5 +1103,5 @@ def test_db_manager_can_still_reactivate_voided_event(migrated_engine):
             text("SELECT active FROM instrument_maintenance_events WHERE id = :id"),
             {"id": failed["event"]},
         ).scalar()
-    assert passing is True
-    assert failed_active is True
+    assert passing_active is False
+    assert failed_active is False

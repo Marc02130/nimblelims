@@ -218,7 +218,7 @@ def test_awaiting_first_due_blocks_uses_and_imports(
     due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() + timedelta(days=30))},
+        json={"next_due": str(date.today() + timedelta(days=30)), "reason": "set first due"},
     )
     assert due.status_code == 200, due.text
     cleared = client.get(f"/v1/instruments/{inst['id']}/eligibility", headers=admin_h).json()
@@ -265,19 +265,19 @@ def test_first_due_and_schedule_writes_are_lab_manager_only(
         due = client.post(
             f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
             headers=headers,
-            json={"next_due": str(date.today())},
+            json={"next_due": str(date.today()), "reason": "set first due"},
         )
         assert due.status_code == 403, due.text
     first = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=manager_h,
-        json={"next_due": str(date.today())},
+        json={"next_due": str(date.today()), "reason": "set first due"},
     )
     assert first.status_code == 200, first.text
     admin_again = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() + timedelta(days=1))},
+        json={"next_due": str(date.today() + timedelta(days=1)), "reason": "set first due"},
     )
     assert admin_again.status_code == 422
     assert admin_again.json()["detail"]["code"] == "first_due_already_set"
@@ -336,7 +336,7 @@ def test_event_recomputes_only_after_first_due(client, admin_h, test_admin_user)
     due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today())},
+        json={"next_due": str(date.today()), "reason": "set first due"},
     )
     assert due.status_code == 200, due.text
     after_event = client.post(
@@ -366,7 +366,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today())},
+        json={"next_due": str(date.today()), "reason": "set first due"},
     )
     first_day = date.today() - timedelta(days=4)
     first = client.post(
@@ -404,7 +404,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     client.post(
         f"/v1/instrument-maintenance-schedules/{other_sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today())},
+        json={"next_due": str(date.today()), "reason": "set first due"},
     )
     first_keep = client.post(
         "/v1/instrument-maintenance-events",
@@ -440,7 +440,7 @@ def test_voided_only_event_returns_to_awaiting_first_due(
     reset = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() + timedelta(days=7))},
+        json={"next_due": str(date.today() + timedelta(days=7)), "reason": "set first due"},
     )
     assert reset.status_code == 200, reset.text
     assert client.get(
@@ -453,7 +453,7 @@ def test_api_patch_off_writes_one_audit_row(client, admin_h, db_session, test_ad
     patched = client.patch(
         f"/v1/instruments/{inst['id']}",
         headers=admin_h,
-        json={"maintenance_tracked": False},
+        json={"maintenance_tracked": False, "reason": "stop tracking"},
     )
     assert patched.status_code == 200
     rows = (
@@ -689,8 +689,8 @@ def test_m2_audits_append_only_as_lims_app(migrated_engine):
         conn.execute(
             text(
                 "INSERT INTO instrument_maintenance_audits "
-                "(id, instrument_id, previous_value, new_value, created_by) "
-                "VALUES (:id, :i, true, false, :u)"
+                "(id, instrument_id, previous_value, new_value, reason, created_by) "
+                "VALUES (:id, :i, true, false, 'x', :u)"
             ),
             {"id": audit, "i": inst, "u": uid},
         )
@@ -799,7 +799,7 @@ def test_first_due_writes_one_audit_second_call_is_422(
     first = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(due)},
+        json={"next_due": str(due), "reason": "set first due"},
     )
     assert first.status_code == 200, first.text
     db_session.expire_all()
@@ -810,10 +810,11 @@ def test_first_due_writes_one_audit_second_call_is_422(
     assert rows[0].created_by == test_admin_user.id
     assert rows[0].created_at is not None
     assert rows[0].instrument_id == uuid.UUID(inst["id"])
+    assert rows[0].reason == "set first due"
     second = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(due + timedelta(days=1))},
+        json={"next_due": str(due + timedelta(days=1)), "reason": "set first due"},
     )
     assert second.status_code == 422, second.text
     assert second.json()["detail"]["code"] == "first_due_already_set"
@@ -916,7 +917,7 @@ def test_first_due_waits_on_held_schedule_lock(migrated_engine):
             try:
                 box["value"] = set_first_due(
                     sched,
-                    FirstDueCreate(next_due=date.today() + timedelta(days=2)),
+                    FirstDueCreate(next_due=date.today() + timedelta(days=2), reason="set first due"),
                     user,
                     s,
                 )
@@ -973,13 +974,13 @@ def test_update_schedule_audits_active_and_interval_when_overdue(
     due = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(past)},
+        json={"next_due": str(past), "reason": "set first due"},
     )
     assert due.status_code == 200, due.text
     retired = client.patch(
         f"/v1/instrument-maintenance-schedules/{sched['id']}",
         headers=admin_h,
-        json={"active": False},
+        json={"active": False, "reason": "retire overdue schedule"},
     )
     assert retired.status_code == 200, retired.text
     db_session.expire_all()
@@ -993,7 +994,7 @@ def test_update_schedule_audits_active_and_interval_when_overdue(
     restored = client.patch(
         f"/v1/instrument-maintenance-schedules/{sched['id']}",
         headers=admin_h,
-        json={"active": True, "interval_days": 21},
+        json={"active": True, "interval_days": 21, "reason": "reactivate and change interval"},
     )
     assert restored.status_code == 200, restored.text
     db_session.expire_all()
@@ -1011,7 +1012,7 @@ def test_update_schedule_audits_active_and_interval_when_overdue(
     kind_only = client.patch(
         f"/v1/instrument-maintenance-schedules/{sched['id']}",
         headers=admin_h,
-        json={"kind_id": kind["id"]},
+        json={"kind_id": kind["id"], "reason": "kind change"},
     )
     assert kind_only.status_code == 200, kind_only.text
     db_session.expire_all()
@@ -1028,7 +1029,7 @@ def test_void_last_event_is_audited_and_keeps_ruling_7(
     client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(first_due)},
+        json={"next_due": str(first_due), "reason": "set first due"},
     )
     performed = date.today() - timedelta(days=4)
     created = client.post(
@@ -1067,7 +1068,7 @@ def test_void_last_event_is_audited_and_keeps_ruling_7(
     reset = client.post(
         f"/v1/instrument-maintenance-schedules/{sched['id']}/first-due",
         headers=admin_h,
-        json={"next_due": str(date.today() + timedelta(days=7))},
+        json={"next_due": str(date.today() + timedelta(days=7)), "reason": "set first due"},
     )
     assert reset.status_code == 200, reset.text
     db_session.expire_all()

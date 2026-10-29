@@ -137,6 +137,7 @@ class InstrumentMaintenanceAudit(Base):
     )
     previous_value = Column(Boolean, nullable=False)
     new_value = Column(Boolean, nullable=False)
+    reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
@@ -150,7 +151,8 @@ class InstrumentScheduleAudit(Base):
     __table_args__ = (
         CheckConstraint(
             "action IN ('first_due', 'schedule_active', 'schedule_interval', "
-            "'schedule_kind', 'schedule_vendor', 'event_void', 'event_restore')",
+            "'schedule_kind', 'schedule_vendor', 'event_void', 'event_restore', "
+            "'maintenance_tracked', 'event_note', 'event_certificate')",
             name="ck_instrument_schedule_audits_action",
         ),
     )
@@ -381,6 +383,25 @@ class InstrumentEntrySlotAudit(Base):
     new_instrument_type_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True
     )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+
+
+class InstrumentTypeDeactivation(Base):
+    """Append-only ledger of instrument types set inactive."""
+
+    __tablename__ = "instrument_type_deactivations"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=False,
+        index=True,
+    )
+    reason = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False

@@ -4,6 +4,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from pydantic import Field, ConfigDict, field_validator
+from app.core.required_reason import CHANGE_REASON_MAX, VOID_REASON_MAX, optional_reason
 from app.schemas._instants import APIModel as BaseModel
 
 
@@ -20,20 +21,22 @@ class MaintenanceScheduleUpdate(BaseModel):
     interval_days: Optional[int] = Field(None, gt=0)
     service_vendor_id: Optional[UUID] = None
     active: Optional[bool] = None
-
-
-class FirstDueCreate(BaseModel):
-    next_due: date
-    reason: Optional[str] = Field(None, max_length=1000)
+    reason: Optional[str] = Field(None, max_length=CHANGE_REASON_MAX)
 
     @field_validator("reason")
     @classmethod
     def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
-        from app.core.visible_text import has_visible_text
+        return optional_reason(value)
 
-        if value is not None and not has_visible_text(value):
-            return None
-        return value
+
+class FirstDueCreate(BaseModel):
+    next_due: date
+    reason: Optional[str] = Field(None, max_length=CHANGE_REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 class MaintenanceScheduleResponse(BaseModel):
@@ -69,16 +72,12 @@ class MaintenanceEventUpdate(BaseModel):
     active: Optional[bool] = None
     note: Optional[str] = None
     certificate_url: Optional[str] = Field(None, max_length=1024)
-    reason: Optional[str] = Field(None, max_length=1000)
+    reason: Optional[str] = Field(None, max_length=VOID_REASON_MAX)
 
     @field_validator("reason")
     @classmethod
     def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
-        from app.core.visible_text import has_visible_text
-
-        if value is not None and not has_visible_text(value):
-            return None
-        return value
+        return optional_reason(value)
 
 
 class MaintenanceEventResponse(BaseModel):

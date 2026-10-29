@@ -20,6 +20,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.core.lab_time import current_lab_day
 from app.core.patch_fields import explicit_updates
 from app.core.rbac import require_experiment_manage, require_lab_manager
+from app.core.required_reason import CHANGE_REASON_MAX, VOID_REASON_MAX, require_reason
 from app.core.security import get_current_user
 from app.database import get_db
 from app.schemas.instrument_ops import (
@@ -66,6 +67,7 @@ INSTRUMENT_NOT_ON_EXPERIMENT = "instrument_not_on_experiment"
 USE_TARGET_REQUIRED = "use_target_required"
 VOIDED_USE_STAYS_VOIDED = "voided_use_stays_voided"
 VOIDED_EVENT_STAYS_VOIDED = "voided_event_stays_voided"
+MAINTENANCE_EVENT_VOIDED = "maintenance_event_voided"
 
 
 def _refuse(code: str, message: str) -> None:
@@ -319,6 +321,7 @@ def update_schedule(
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
     data = explicit_updates(body, row, refuse_null={"active", "interval_days", "kind_id"})
+    data.pop("reason", None)
     if "kind_id" in data:
         _list_entry(
             db,
@@ -335,6 +338,20 @@ def update_schedule(
     previous_interval = row.interval_days
     previous_kind = row.kind_id
     previous_vendor = row.service_vendor_id
+    changing = (
+        ("active" in data and data["active"] is not previous_active)
+        or ("interval_days" in data and data["interval_days"] != previous_interval)
+        or ("kind_id" in data and data["kind_id"] != previous_kind)
+        or ("service_vendor_id" in data and data["service_vendor_id"] != previous_vendor)
+    )
+    change_reason = None
+    if changing:
+        change_reason = require_reason(
+            body.reason,
+            code="schedule_change_reason_required",
+            message="A reason is required to change a maintenance schedule.",
+            max_length=CHANGE_REASON_MAX,
+        )
     for k, v in data.items():
         setattr(row, k, v)
     # A new interval applies from the next passing event. Recomputing now
@@ -351,6 +368,7 @@ def update_schedule(
             previous_value=previous_active,
             new_value=row.active,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     if "interval_days" in data and row.interval_days != previous_interval:
         _write_schedule_audit(
@@ -362,6 +380,7 @@ def update_schedule(
             previous_value=previous_interval,
             new_value=row.interval_days,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     if "kind_id" in data and row.kind_id != previous_kind:
         _write_schedule_audit(
@@ -373,6 +392,7 @@ def update_schedule(
             previous_value=previous_kind,
             new_value=row.kind_id,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     if "service_vendor_id" in data and row.service_vendor_id != previous_vendor:
         _write_schedule_audit(
@@ -384,10 +404,21 @@ def update_schedule(
             previous_value=previous_vendor,
             new_value=row.service_vendor_id,
             overdue=overdue_at_time,
+            reason=change_reason,
         )
     row.modified_by = current_user.id
     _commit(db, row, "Could not update maintenance schedule")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
+
+
+def _lock_wait_conflict(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "schedule_busy",
+            "message": message,
+        },
+    )
 
 
 def _lock_schedule(db: Session, schedule_id: UUID) -> InstrumentMaintenanceSchedule:
@@ -405,18 +436,36 @@ def _lock_schedule(db: Session, schedule_id: UUID) -> InstrumentMaintenanceSched
         if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
             raise
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "schedule_busy",
-                "message": (
-                    "Another change to this schedule is in progress. "
-                    "Wait for it to finish, then try again."
-                ),
-            },
+        raise _lock_wait_conflict(
+            "Another change to this schedule is in progress. "
+            "Wait for it to finish, then try again."
         ) from exc
     if row is None:
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    return row
+
+
+def _lock_event(db: Session, event_id: UUID) -> InstrumentMaintenanceEvent:
+    from sqlalchemy.exc import OperationalError
+    from app.core.db_errors import LOCK_NOT_AVAILABLE, QUERY_CANCELED, pgcode
+
+    try:
+        row = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == event_id)
+            .with_for_update()
+            .first()
+        )
+    except OperationalError as exc:
+        if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+            raise
+        db.rollback()
+        raise _lock_wait_conflict(
+            "Another change to this maintenance event is in progress. "
+            "Wait for it to finish, then try again."
+        ) from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="Maintenance event not found")
     return row
 
 
@@ -436,6 +485,12 @@ def set_first_due(
             "first_due_already_set",
             "The first due date is already set.",
         )
+    first_due_reason = require_reason(
+        body.reason,
+        code="schedule_change_reason_required",
+        message="A reason is required to change a maintenance schedule.",
+        max_length=CHANGE_REASON_MAX,
+    )
     row.next_due = body.next_due
     row.modified_by = current_user.id
     _write_schedule_audit(
@@ -447,7 +502,7 @@ def set_first_due(
         previous_value=None,
         new_value=body.next_due,
         overdue=_schedule_overdue(row),
-        reason=body.reason,
+        reason=first_due_reason,
     )
     _commit(db, row, "Could not set the first due date")
     return _schedule_out(_schedule_query(db).filter(InstrumentMaintenanceSchedule.id == schedule_id).first())
@@ -509,13 +564,7 @@ def create_event(
         raise HTTPException(status_code=400, detail="Invalid performed_by_vendor_id")
     schedule = None
     if body.schedule_id:
-        schedule = (
-            db.query(InstrumentMaintenanceSchedule)
-            .filter(InstrumentMaintenanceSchedule.id == body.schedule_id)
-            .first()
-        )
-        if schedule is None:
-            raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+        schedule = _lock_schedule(db, body.schedule_id)
         if schedule.instrument_id != body.instrument_id:
             raise HTTPException(status_code=400, detail="Schedule belongs to a different instrument")
     row = InstrumentMaintenanceEvent(
@@ -544,13 +593,7 @@ def update_event(
     current_user: User = Depends(require_lab_manager),
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(InstrumentMaintenanceEvent)
-        .filter(InstrumentMaintenanceEvent.id == event_id)
-        .first()
-    )
-    if row is None:
-        raise HTTPException(status_code=404, detail="Maintenance event not found")
+    row = _lock_event(db, event_id)
     if row.schedule_id:
         _lock_schedule(db, row.schedule_id)
     data = explicit_updates(body, row, refuse_null={"active"})
@@ -564,15 +607,14 @@ def update_event(
         )
     voiding = "active" in data and data["active"] is False and row.active is True
     if voiding:
-        from app.core.visible_text import has_visible_text
-
-        text = (body.reason or "").strip()
-        if not has_visible_text(body.reason):
-            _refuse(
-                "void_reason_required",
-                "A reason is required to void a maintenance event.",
-            )
-        row.void_reason = text
+        row.void_reason = require_reason(
+            body.reason,
+            code="void_reason_required",
+            message="A reason is required to void a maintenance event.",
+            max_length=VOID_REASON_MAX,
+        )
+    previous_note = row.note
+    previous_certificate = row.certificate_url
     for k, v in data.items():
         setattr(row, k, v)
     row.modified_by = current_user.id
@@ -613,6 +655,28 @@ def update_event(
             new_value=None,
             overdue=None,
             reason=row.void_reason,
+        )
+    if "note" in data and row.note != previous_note:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.schedule_id,
+            event_id=row.id,
+            action="event_note",
+            user=current_user,
+            previous_value=previous_note,
+            new_value=row.note,
+        )
+    if "certificate_url" in data and row.certificate_url != previous_certificate:
+        _write_schedule_audit(
+            db,
+            instrument_id=row.instrument_id,
+            schedule_id=row.schedule_id,
+            event_id=row.id,
+            action="event_certificate",
+            user=current_user,
+            previous_value=previous_certificate,
+            new_value=row.certificate_url,
         )
     try:
         db.commit()
@@ -687,6 +751,11 @@ def create_downtime(
         )
         if ev is None:
             raise HTTPException(status_code=404, detail="Maintenance event not found")
+        if ev.active is False:
+            _refuse(
+                MAINTENANCE_EVENT_VOIDED,
+                "That maintenance event is voided and cannot be linked.",
+            )
     row = InstrumentDowntime(
         **body.model_dump(),
         created_by=current_user.id,
@@ -770,6 +839,23 @@ def update_downtime(
             allow_inactive=data["reason_id"] == row.reason_id,
         )
     new_event_id = data["maintenance_event_id"] if "maintenance_event_id" in data else row.maintenance_event_id
+    if (
+        "maintenance_event_id" in data
+        and new_event_id is not None
+        and new_event_id != row.maintenance_event_id
+    ):
+        ev = (
+            db.query(InstrumentMaintenanceEvent)
+            .filter(InstrumentMaintenanceEvent.id == new_event_id)
+            .first()
+        )
+        if ev is None:
+            raise HTTPException(status_code=404, detail="Maintenance event not found")
+        if ev.active is False:
+            _refuse(
+                MAINTENANCE_EVENT_VOIDED,
+                "That maintenance event is voided and cannot be linked.",
+            )
     old_schedule_id = _schedule_id_for_event(db, row.maintenance_event_id)
     new_schedule_id = (
         _schedule_id_for_event(db, new_event_id)

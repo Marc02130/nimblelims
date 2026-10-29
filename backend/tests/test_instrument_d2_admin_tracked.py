@@ -87,14 +87,14 @@ def test_config_editor_and_other_roles_cannot_set_maintenance_tracked(
     admin_on = client.patch(
         f"/v1/instruments/{inst['id']}",
         headers=admin_h,
-        json={"maintenance_tracked": True},
+        json={"maintenance_tracked": True, "reason": "start tracking"},
     )
     assert admin_on.status_code == 200, admin_on.text
     assert admin_on.json()["maintenance_tracked"] is True
     admin_off = client.patch(
         f"/v1/instruments/{inst['id']}",
         headers=admin_h,
-        json={"maintenance_tracked": False},
+        json={"maintenance_tracked": False, "reason": "stop tracking"},
     )
     assert admin_off.status_code == 200, admin_off.text
     assert admin_off.json()["maintenance_tracked"] is False
@@ -216,7 +216,7 @@ def test_camel_case_maintenance_tracked_is_ignored(client, admin_h):
     assert created.json()["maintenance_tracked"] is False
 
 
-def test_admin_create_with_tracked_true_writes_no_audit(
+def test_admin_create_with_tracked_true_writes_no_maintenance_audit(
     client, admin_h, db_session
 ):
     type_id = _seeded_type(client, admin_h)["id"]
