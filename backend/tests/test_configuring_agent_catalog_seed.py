@@ -78,6 +78,15 @@ def test_frozen_migration_list_matches_the_live_display_rule():
     assert len(_migration(MIGRATION_0116).revision) <= 32
     assert len(_migration(MIGRATION_0117).revision) <= 32
     assert len(_migration(MIGRATION_0119).revision) <= 32
+    m0120 = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "db",
+        "migrations",
+        "versions",
+        "0120_void_reason_4000.py",
+    )
+    assert len(_migration(m0120).revision) <= 32
 
 
 def test_fresh_seed_db_has_catalog_rows_before_any_run(migrated_engine):

@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError, InternalError, ProgrammingError
 from app.core.db_errors import pgcode
 
 from models.instrument import InstrumentMaintenanceAudit, InstrumentScheduleAudit
+from tests.conftest import clip_long_reasons_for_0120_downgrade
 from tests.test_instrument_e2_review_fixes import _seed_schedule_event
 from tests.test_instrument_e2_type_slots import _create_run, _create_template, _start_run
 from tests.test_instrument_hardening_e1 import (
@@ -133,7 +134,7 @@ def test_void_reason_db_check_and_trigger(migrated_engine):
             ids["uid"],
             "UPDATE instrument_maintenance_events "
             "SET active = false, void_reason = :r WHERE id = :id",
-            {"id": ids["event"], "r": "x" * 1001},
+            {"id": ids["event"], "r": "x" * 4001},
         )
     _run_as_lims_app(
         migrated_engine,
@@ -469,12 +470,13 @@ def test_reason_length_check_on_substitution(migrated_engine):
         conn.execute(
             text(
                 "INSERT INTO users (id, name, username, email, password_hash, role_id, client_id, active) "
-                "VALUES (:id, 'e3r', :u, :e, 'x', :r, :c, true)"
+                "VALUES (:id, :n, :u, :e, 'x', :r, :c, true)"
             ),
             {
                 "id": uid,
-                "u": f"e3r-{uid.hex[:6]}",
-                "e": f"e3r-{uid.hex[:6]}@x.org",
+                "n": f"e3r-{uid.hex[:8]}",
+                "u": f"e3r-{uid.hex[:8]}",
+                "e": f"e3r-{uid.hex[:8]}@x.org",
                 "r": admin,
                 "c": client_id,
             },
@@ -487,15 +489,26 @@ def test_reason_length_check_on_substitution(migrated_engine):
             ),
             {"id": run_id, "n": f"e3rr-{run_id.hex[:6]}", "u": uid},
         )
-        with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
+    with pytest.raises((IntegrityError, InternalError, ProgrammingError)):
+        with migrated_engine.begin() as conn:
             conn.execute(
                 text(
                     "INSERT INTO lims_run_type_substitutions "
                     "(lims_run_id, to_instrument_type_id, reason, created_by) "
                     "VALUES (:r, :t, :reason, :u)"
                 ),
-                {"r": run_id, "t": type_id, "u": uid, "reason": "x" * 1001},
+                {"r": run_id, "t": type_id, "u": uid, "reason": "x" * 4001},
             )
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO lims_run_type_substitutions "
+                "(lims_run_id, to_instrument_type_id, reason, created_by) "
+                "VALUES (:r, :t, :reason, :u)"
+            ),
+            {"r": run_id, "t": type_id, "u": uid, "reason": "x" * 4000},
+        )
+    clip_long_reasons_for_0120_downgrade(migrated_engine)
 
 
 def test_blank_current_user_id_guc_is_sentinel(migrated_engine):
@@ -579,7 +592,7 @@ def test_0119_revision_id_and_single_head():
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0119_instrument_reasons"], heads
+    assert heads == ["0120_void_reason_4000"], heads
 
 
 def test_live_void_trigger_body_keeps_reason_lock_nbsp_and_final_void(migrated_engine):

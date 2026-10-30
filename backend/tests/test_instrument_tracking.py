@@ -590,6 +590,8 @@ def test_migration_carries_types_and_downgrade_is_safe(migrated_engine):
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     with migrated_engine.begin() as conn:
+        conn.execute(text("RESET ROLE"))
+        conn.execute(text("SET LOCAL row_security = off"))
         conn.execute(text("DELETE FROM instrument_maintenance_audits"))
         conn.execute(text("DELETE FROM instrument_schedule_audits"))
         conn.execute(text("DELETE FROM lims_run_type_substitutions"))

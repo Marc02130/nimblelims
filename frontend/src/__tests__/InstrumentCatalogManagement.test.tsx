@@ -268,6 +268,36 @@ describe('InstrumentCatalogManagement', () => {
     });
   });
 
+  test('void reason accepts 4000 characters and rejects 4001', async () => {
+    api.updateInstrumentMaintenanceEvent.mockResolvedValue({ id: 'e1', active: false });
+    api.getInstrumentMaintenanceEvents.mockResolvedValue([
+      {
+        id: 'e1',
+        instrument_id: 'i1',
+        performed_on: '2026-10-26',
+        passed: true,
+        note: 'PM done',
+        active: true,
+      },
+    ]);
+    wrap(<InstrumentCatalogManagement eventsOnly />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Void' }));
+    const field = await screen.findByTestId('void-event-reason');
+    expect(field).toHaveAttribute('maxLength', '4000');
+    expect(screen.getByText(/1–4000/)).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: 'x'.repeat(4001) } });
+    fireEvent.click(screen.getByTestId('void-event-confirm'));
+    expect(await screen.findByText('Reason must be at most 4000 characters.')).toBeInTheDocument();
+    expect(api.updateInstrumentMaintenanceEvent).not.toHaveBeenCalled();
+    fireEvent.change(field, { target: { value: 'x'.repeat(4000) } });
+    fireEvent.click(screen.getByTestId('void-event-confirm'));
+    expect(await screen.findByText('Event voided')).toBeInTheDocument();
+    expect(api.updateInstrumentMaintenanceEvent).toHaveBeenCalledWith('e1', {
+      active: false,
+      reason: 'x'.repeat(4000),
+    });
+  });
+
   test('voided event has no restore action and edit does not send active true', async () => {
     api.updateInstrumentMaintenanceEvent.mockResolvedValue({ id: 'e1', active: false });
     api.getInstrumentMaintenanceEvents.mockResolvedValue([

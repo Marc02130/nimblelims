@@ -222,6 +222,9 @@ def test_0118_upgrade_revokes_historical_role_grants(migrated_engine):
         "lims_run_data",
     )
     try:
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0117_e3_hardening")
         with migrated_engine.begin() as conn:
             exists = conn.execute(

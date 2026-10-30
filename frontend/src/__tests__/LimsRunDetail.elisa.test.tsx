@@ -260,6 +260,35 @@ describe('LimsRunDetail ELISA gaps', () => {
     });
   });
 
+  test('substitute reason accepts 4000 characters and rejects 4001', async () => {
+    mockGetLimsRun.mockResolvedValue({
+      ...runningRun,
+      instrument_type_id: 't-plate',
+      instrument_type_name: 'Plate reader',
+      can_substitute_instrument_type: true,
+    });
+    renderRun();
+    fireEvent.click(await screen.findByTestId('substitute-instrument-type-button'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('New instrument type'));
+    fireEvent.click(await screen.findByRole('option', { name: 'qPCR' }));
+    const field = screen.getByTestId('substitute-instrument-type-reason');
+    expect(field).toHaveAttribute('maxLength', '4000');
+    expect(screen.getByText(/1–4000/)).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: 'x'.repeat(4001) } });
+    fireEvent.click(screen.getByTestId('substitute-instrument-type-confirm'));
+    expect(await screen.findByText('Reason must be at most 4000 characters.')).toBeInTheDocument();
+    expect(mockSubstituteLimsRunInstrumentType).not.toHaveBeenCalled();
+    fireEvent.change(field, { target: { value: 'x'.repeat(4000) } });
+    fireEvent.click(screen.getByTestId('substitute-instrument-type-confirm'));
+    await waitFor(() => {
+      expect(mockSubstituteLimsRunInstrumentType).toHaveBeenCalledWith('run-1', {
+        instrument_type_id: 't-qpcr',
+        reason: 'x'.repeat(4000),
+      });
+    });
+  });
+
   test('a tech does not see substitute on another person\'s run', async () => {
     mockGetLimsRun.mockResolvedValue({
       ...runningRun,

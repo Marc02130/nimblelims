@@ -36,12 +36,57 @@ def reset_migrated_engine_sessions(engine) -> None:
     engine.dispose()
 
 
-def clear_0117_downgrade_blockers(engine) -> None:
-    """Void-reason and slot-audit rows refuse 0117 downgrade. Tests that walk
-    through 0117 must clear them first on the shared migrated_engine."""
+def clip_long_reasons_for_0120_downgrade(engine) -> None:
+    """Test isolation only. 0120 itself never truncates or deletes.
+
+    A 4000-character void or substitute reason on the shared migrated_engine
+    makes any later downgrade through 0120 refuse. Clip those rows to 1000
+    so older migration tests can still walk the chain.
+    """
     reset_migrated_engine_sessions(engine)
     with engine.begin() as conn:
         conn.execute(text("RESET ROLE"))
+        conn.execute(text("SET LOCAL row_security = off"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_maintenance_events' "
+                "AND column_name = 'void_reason'"
+            )
+        ).scalar():
+            conn.execute(
+                text(
+                    "UPDATE instrument_maintenance_events "
+                    "SET void_reason = left(void_reason, 1000) "
+                    "WHERE void_reason IS NOT NULL "
+                    "AND char_length(btrim(void_reason)) > 1000"
+                )
+            )
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'lims_run_type_substitutions'"
+            )
+        ).scalar():
+            conn.execute(
+                text(
+                    "UPDATE lims_run_type_substitutions "
+                    "SET reason = left(reason, 1000) "
+                    "WHERE char_length(btrim(reason)) > 1000"
+                )
+            )
+
+
+def clear_0117_downgrade_blockers(engine) -> None:
+    """Void-reason and slot-audit rows refuse 0117 downgrade. Tests that walk
+    through 0117 must clear them first on the shared migrated_engine."""
+    clip_long_reasons_for_0120_downgrade(engine)
+    reset_migrated_engine_sessions(engine)
+    with engine.begin() as conn:
+        conn.execute(text("RESET ROLE"))
+        conn.execute(text("SET LOCAL row_security = off"))
         admin = conn.execute(
             text(
                 "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id "
@@ -60,6 +105,14 @@ def clear_0117_downgrade_blockers(engine) -> None:
             )
         ).scalar():
             conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'lims_run_type_substitutions'"
+            )
+        ).scalar():
+            conn.execute(text("DELETE FROM lims_run_type_substitutions"))
         if conn.execute(
             text(
                 "SELECT 1 FROM information_schema.columns "
