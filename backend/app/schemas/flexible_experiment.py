@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import Field, field_validator
-from app.core.required_reason import REASON_MAX
+from app.core.required_reason import REASON_MAX, optional_reason
 from app.schemas._instants import APIModel as BaseModel
 
 from models.flexible_experiment import LimsRunStatus, SopParseJobStatus
@@ -117,16 +117,12 @@ class LimsRunStartRequest(BaseModel):
 
 class LimsRunSubstituteInstrumentTypeRequest(BaseModel):
     instrument_type_id: uuid.UUID
-    reason: str = Field(..., min_length=1, max_length=REASON_MAX)
+    reason: Optional[str] = Field(None, max_length=REASON_MAX)
 
     @field_validator("reason")
     @classmethod
-    def reason_has_visible_text(cls, value: str) -> str:
-        from app.core.visible_text import has_visible_text
-
-        if not has_visible_text(value):
-            raise ValueError("reason must contain a non-whitespace character")
-        return value
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 class LimsRunCohort(BaseModel):
@@ -203,7 +199,12 @@ class LimsRunDataRead(BaseModel):
 class FailRunRequest(BaseModel):
     """Fail a run (plate). Status becomes failed. Rows stay."""
 
-    reason: str = Field(..., min_length=1, max_length=4000)
+    reason: Optional[str] = Field(None, max_length=REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 RejectRunRequest = FailRunRequest
@@ -246,8 +247,13 @@ class AcceptValueRequest(BaseModel):
     analyte_id: uuid.UUID
     replicate: int = Field(default=1, ge=1)
     accepted_lims_run_id: uuid.UUID
-    reason: str = Field(..., min_length=1, max_length=4000)
+    reason: Optional[str] = Field(None, max_length=REASON_MAX)
     override_failed: bool = False
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 class LimsRunDataListResponse(BaseModel):

@@ -1,10 +1,12 @@
-"""Shared required-reason rules for instrument voids and audited changes.
+"""Shared rules for every user-entered reason.
 
-All required reasons (void, schedule, maintenance_tracked, type
-deactivate, substitute-instrument-type) share one max of 4000
-characters (Marc 2026-10-29).
+Covers instrument voids and audited changes (void, schedule,
+maintenance_tracked, type deactivate), substitute-instrument-type,
+fail / reject run, accept value, reset fit, and the optional
+data-point exclusion reason. All share one max of 4000 characters
+(Marc 2026-10-29).
 Visible-text (including NBSP / U+2007 as blank) is the same check for
-every caller.
+every caller. ZWSP / BOM stay visible.
 """
 from __future__ import annotations
 
