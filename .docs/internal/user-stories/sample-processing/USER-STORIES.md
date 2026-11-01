@@ -201,6 +201,7 @@ Future: Instrument integration, automated calculations.
   - After a result is marked Reported: amendment creates a **new version** linked to the original.  
   - Original result remains retrievable and visible (not overwritten or soft-deleted).  
   - Amendment requires: reason, amended_by, amended_at.  
+  - That amendment reason is this story's requirement. On `main` (`36ccd96`) there is no amendment route and no `amendment_reason` validator. It is not fail-run, void, schedule change, `maintenance_tracked` change, instrument type deactivation, or substitute type. Those six are in product PRD §4.9. The shared 4000-character rule, including refusal of NBSP (U+00A0) and figure space (U+2007), is not applied to this story. No new required reason is added here ([#248](https://github.com/Marc02130/nimblelims/issues/248)).  
   - Both original and amended results are returned by API (with version/amendment markers).  
   - A transcription fix **before** Reported status is an audited change (via US-33), not necessarily a formal amendment.  
   - Silent overwrite is forbidden (validation error if attempted).  
