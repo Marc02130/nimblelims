@@ -85,6 +85,7 @@ Priority: Medium | Estimate: 8 points
   - Not in atomic-receive P0 receive body. P0 records receipt as `received_date` only. Do not seed a receipt-event table for that packet.  
   - Receipt event captures: **datetime** (date and time), who received, condition (intact/leaking/damaged/tampered), manifest match (yes/no/partial), temperature or "dry ice sufficient".  
   - Disposition at receipt: Accept, Reject, or Quarantine with reason.  
+  - That disposition reason is this story's requirement. On `main` (`36ccd96`) there is no receipt-event reason column and no length or whitespace validator for it. It is not fail-run, void, schedule change, `maintenance_tracked` change, instrument type deactivation, or substitute type. Those six are in product PRD §4.9. The shared 4000-character rule, including refusal of NBSP (U+00A0) and figure space (U+2007), is not applied to this story. No new required reason is added here ([#248](https://github.com/Marc02130/nimblelims/issues/248)).  
   - Manifest mismatch can still create a receipt event (discrepancy is recorded, not blocked).  
   - Rejected samples are **not hard-deleted**; record survives physical disposal.  
   - Quarantine is a real disposition (not a comment field); samples remain segregated until ID/quality checks resolve.  

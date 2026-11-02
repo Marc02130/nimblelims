@@ -40,6 +40,7 @@ NimbleLIMS enables BioTech and Pharma startup labs to manage compound and biolog
 - Version 1.9: **WO-7 fold** — Test row is created at **LimsRun start** (refuse publish if missing), not at accession or bare order. Accessioning assigns identity + first vessel only. Sequencing: AR P0 -> work-order packet -> registration/lots -> intake profiles. August 26, 2026.
 - Version 1.10: Post-receive work spine opened — asked-for (lake) → work_order → results persist → SOP+AI process apply → parser setup. Wizard removed. August 28, 2026.
 - Version 1.11: **Product north star locked** (Leadership Core 2026-09-20): (1) Framework first — DB config not recode per lab; (2) AI configuration from SOPs with human edit. AI for login/reporting/storage parked until sample processing closes. September 20, 2026.
+- Version 1.12: User-entered reasons in §4.9 checked against `main` (`36ccd96`, merge of #233) on November 1, 2026. Fail-run matches the 4000-character and whitespace rule at the API. Void, schedule change, `maintenance_tracked` change, instrument type deactivation, and substitute type are not in that tree. No revision `0121` pull request exists for the substitute NBSP / U+2007 refusal. Configurable required-reasons stay backlog [#248](https://github.com/Marc02130/nimblelims/issues/248).
 
 ## 2. Goals and Objectives
 
@@ -137,6 +138,8 @@ Work that is explicitly **not required** to release a basic LIMS and should **no
 **Product discipline:** These adjacent features must be labeled as **not MVP** in all documentation and must **not** spawn new requirements, user stories, or open questions until a specific customer need is validated.
 
 ## 4. Scope (Detailed Feature Breakdown)
+
+User-entered reason rules that were checked against production `main` are in §4.9. Receipt, disposition, amendment, retest, and audit reasons in §4.1, §4.3, §4.4, and §4.7 remain the version 1.6 product requirements (US-31, US-36, and the related stories). `main` has no length or whitespace validator for those fields. They are not given the §4.9 rule. No new required reason is added without Marc's say-so ([#248](https://github.com/Marc02130/nimblelims/issues/248)).
 
 ### 4.1 Sample Tracking (MVP Release Bar + Shipped Enhancements)
 **MVP Core:**
@@ -312,6 +315,31 @@ Work that is explicitly **not required** to release a basic LIMS and should **no
   - Original result: version=1, parent_result_id=null
   - Amended result: version=2+, parent_result_id points to original
 - Relationships: Normalized with FKs (e.g., samples → projects, tests → samples/analyses, audit_events → users)
+
+### 4.9 User-entered reasons (checked against `main`)
+
+Checked on November 1, 2026 against production `main` at `36ccd96` (merge of [#233](https://github.com/Marc02130/nimblelims/pull/233)). This section records what that tree does.
+
+Marc's rule for these six user-entered reasons: maximum 4000 characters, and blank or whitespace-only input is refused, including NBSP (U+00A0) and figure space (U+2007). A maintenance-event void is final, with no restore ([#245](https://github.com/Marc02130/nimblelims/pull/245)). Whether each reason is required is backlog [#248](https://github.com/Marc02130/nimblelims/issues/248) and is not built. No new required reason is added without Marc's say-so.
+
+| Reason | Where the code is | Endpoint or validator on `main` | Max on `main` | Blank, whitespace, NBSP, U+2007 on `main` |
+|--------|-------------------|----------------------------------|---------------|-------------------------------------------|
+| Void (maintenance event) | Not on `main`. [#245](https://github.com/Marc02130/nimblelims/pull/245) merged to `instrument-tracking` only. | No void route, no `void_reason` column, no restore route. | None. | None. |
+| Schedule change | Not on `main`. | No maintenance-schedule routes. | None. | None. |
+| `maintenance_tracked` change | Not on `main`. | No `maintenance_tracked` column. | None. | None. |
+| Instrument type deactivation | On `main`, and it does not match the rule. | `DELETE /v1/instrument-types/{id}` (`delete_instrument_type` in `backend/app/routers/instrument_catalog.py`). A type that an instrument uses is set `active=false`. An unused type is deleted. The body has no reason. | None. The request has no reason field. | The handler does not read a reason, so blank, whitespace, NBSP, and U+2007 are not refused. |
+| Substitute instrument type | Not on `main`. | No `POST /v1/lims-runs/{id}/substitute-instrument-type`. | None. | The NBSP / U+2007 refusal is not on `main`. See below. |
+| Fail-run | On `main`. | `POST /v1/lims-runs/{id}/fail` and `POST /v1/lims-runs/{id}/reject` (same handler). Schema `FailRunRequest.reason` in `backend/app/schemas/flexible_experiment.py`. Service `LimsRunService.fail_run` in `backend/app/services/lims_run_service.py`. | 4000 on the submitted string (`Field` `min_length=1`, `max_length=4000`). `lims_runs.status_reason` is nullable `Text` with no CHECK. | An empty string fails the schema (422). A whitespace-only string, including NBSP and U+2007, passes `min_length` and is refused after `str.strip()` with 422 and detail `A reason is required to fail the run`. Python `str.strip()` removes those two characters (Unicode category Zs). The stored value is the stripped string. `test_fail_requires_a_reason_and_reject_is_the_same_action` covers `""` and three spaces. It does not send NBSP or U+2007. |
+
+**Fail-run detail.** Any non-terminal run can move to `failed`. The 4000 cap is applied to the raw string, before `strip()`. A submitted string longer than 4000 is refused even when the stripped text would be shorter. A 4000-character string of spaces fails the empty-after-strip check. The database column does not enforce the max or the blank check. A direct write can store a blank `status_reason`.
+
+**The other five reasons.** `main` has no `require_reason` helper, no `has_visible_text` helper, and no migrations `0111` through `0120`. Those live on `instrument-tracking` (tip `989abbf`, merge of [#247](https://github.com/Marc02130/nimblelims/pull/247)), which is not production. On that branch, void, schedule change (including first due), `maintenance_tracked` change, and instrument type deactivation call `require_reason` with max 4000 and refuse a string that Python `\S` does not match, which treats NBSP and U+2007 as blank. That behavior is not on `main`, so this PRD does not call it shipped.
+
+**Void.** [#245](https://github.com/Marc02130/nimblelims/pull/245) removes restore on `instrument-tracking`: a voided event stays voided, and the correction is a new event. `main` has neither void nor restore.
+
+**Substitute NBSP / U+2007.** Not shipped. A search of open pull requests (including drafts), remote branches, and migration filenames on November 1, 2026 found no revision `0121` and no open pull request that carries it. There is no PR number to cite. On `instrument-tracking`, revision `0120_void_reason_4000` raises the substitution CHECK to 4000 and leaves its trim set as space, tab, carriage return, and line feed. That CHECK still accepts a reason made only of NBSP or U+2007, because PostgreSQL `\S` treats those characters as non-space and `btrim` is not given them. The branch's API (`has_visible_text` plus `require_reason` on `POST /v1/lims-runs/{id}/substitute-instrument-type`) would refuse that string. That API is not on `main` either.
+
+**Backlog.** [#248](https://github.com/Marc02130/nimblelims/issues/248) asks for an Administrator setting per reason (required or optional), with the shared max and whitespace rules when a reason is present. It is open and not scheduled. This section adds no new required reason.
 
 ## 5. Out of Scope for MVP Release (Defer Until Customer Need)
 The following are explicitly **not required** to ship a basic LIMS and should be deferred until specific customer requirements are validated:
