@@ -288,6 +288,46 @@ def _cleanup(conn, rows: list) -> None:
     project_ids = [row["project_id"] for row in rows]
     user_ids = [row["user_id"] for row in rows]
     client_ids = [row["client_id"] for row in rows]
+    conn.execute(
+        text(
+            "DELETE FROM schema_privileges WHERE client_id = ANY(:ids) "
+            "OR table_id IN (SELECT id FROM schema_tables WHERE client_id = ANY(:ids)) "
+            "OR column_id IN (SELECT id FROM schema_columns WHERE client_id = ANY(:ids))"
+        ),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_layout_fields WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_layouts WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM ui_schema_ddl_log WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_changes WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text(
+            "DELETE FROM schema_relations WHERE client_id = ANY(:ids) "
+            "OR from_table_id IN (SELECT id FROM schema_tables WHERE client_id = ANY(:ids)) "
+            "OR to_table_id IN (SELECT id FROM schema_tables WHERE client_id = ANY(:ids))"
+        ),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_columns WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
+    conn.execute(
+        text("DELETE FROM schema_tables WHERE client_id = ANY(:ids)"),
+        {"ids": client_ids},
+    )
     conn.execute(text("DELETE FROM tests WHERE id = ANY(:ids)"), {"ids": test_ids})
     conn.execute(text("DELETE FROM analyses WHERE id = ANY(:ids)"), {"ids": analysis_ids})
     conn.execute(
@@ -632,6 +672,9 @@ def test_downgrade_drops_the_function(migrated_engine, batch_world):
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0097_list_entry_code")
         with migrated_engine.connect() as conn:
             present = conn.execute(
@@ -853,6 +896,9 @@ def test_migration_role_cannot_execute_and_lims_app_still_403(
             conn.commit()
             assert _privilege(conn, MIGRATION_ROLE) is True
 
+        from tests.conftest import clear_0117_downgrade_blockers
+
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, "0100_calendar_dates")
         with migrated_engine.connect() as conn:
             assert _privilege(conn, MIGRATION_ROLE) is True

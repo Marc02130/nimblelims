@@ -55,7 +55,9 @@ def committed_run(db_engine):
     tag = uuid.uuid4().hex[:8]
     with Session() as s:
         org = Client(name=f"R229 {tag}")
-        role = Role(name=f"r229 {tag}", description="r229")
+        # Administrator may JSON-import without a source. Other roles get
+        # import_source_required before the row lock and bulk_create run.
+        role = Role(name="Administrator", description=f"r229 {tag}")
         s.add_all([org, role])
         s.flush()
         user = User(name=f"R229 {tag}", username=f"r229{tag}", email=f"r229{tag}@x", password_hash="x",

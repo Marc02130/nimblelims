@@ -44,6 +44,24 @@ REAGENT_LOT_GAP = (
     "(POST /v1/reagent-uses). A lot number or expiry in an SOP is example data."
 )
 _REAGENT_BENCH = ("/v1/reagent-lots", "/v1/reagent-uses")
+INSTRUMENT_BENCH_GAP = (
+    "Instrument maintenance events, downtime and instrument use are recorded at the bench, "
+    "not by this configuration run: log them on the Instruments screen "
+    "(POST /v1/instrument-maintenance-events, POST /v1/instrument-downtime, POST /v1/instrument-uses). "
+    "An instrument serial or asset tag in an SOP is example data."
+)
+INSTRUMENT_SCHEDULE_GAP = (
+    "Lab admins or managers set schedules and the first due date in the admin UI"
+)
+INSTRUMENT_SUBSTITUTE_GAP = (
+    "The configuring agent cannot substitute a run's instrument type."
+)
+_INSTRUMENT_BENCH = (
+    "/v1/instrument-maintenance-events",
+    "/v1/instrument-downtime",
+    "/v1/instrument-uses",
+)
+_INSTRUMENT_SCHEDULE = ("/v1/instrument-maintenance-schedules",)
 
 _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/schema/tables$"), "schema_tables", "schema:edit", "table"),
@@ -76,6 +94,10 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/v1/vendors$"), "other", "config:edit", "vendor"),
     ("POST", re.compile(r"^/v1/reagents$"), "other", "config:edit", "reagent"),
     ("POST", re.compile(r"^/v1/reagent-vendors$"), "other", "config:edit", "reagent_vendor"),
+    ("POST", re.compile(r"^/v1/instruments$"), "other", "config:edit", "instrument"),
+    ("PATCH", re.compile(r"^/v1/instruments/[^/]+$"), "other", "config:edit", "instrument"),
+    ("POST", re.compile(r"^/v1/instrument-types$"), "other", "config:edit", "instrument_type"),
+    ("PATCH", re.compile(r"^/v1/instrument-types/[^/]+$"), "other", "config:edit", "instrument_type"),
 )
 
 DROP_DELETE_GAP = (
@@ -114,8 +136,34 @@ def verb_for(method: str, path: str, body: Any) -> str:
     return "Update"
 
 
+def _template_sets_run_import_type(body: Any) -> bool:
+    if not isinstance(body, dict):
+        return False
+    definition = body.get("template_definition")
+    if not isinstance(definition, dict):
+        return False
+    entries = definition.get("entries") or []
+    if not isinstance(entries, list):
+        return False
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("entry_type") != "instrument" and entry.get("predefined_entry_key") != "instruments":
+            continue
+        config = entry.get("config") if isinstance(entry.get("config"), dict) else {}
+        for slot in config.get("slots") or []:
+            if not isinstance(slot, dict):
+                continue
+            if slot.get("run_import") is True and slot.get("instrument_type_id"):
+                return True
+    return False
+
+
 def needs_second_confirm(method: str, path: str, body: Any, kind: Optional[str]) -> bool:
     if (kind or "") in HIGH_IMPACT_KINDS:
+        return True
+    path = _norm_path(path)
+    if path.startswith("/v1/experiment-templates") and _template_sets_run_import_type(body):
         return True
     return verb_for(method, path, body) in ("Set inactive", "Amount \u2192 0")
 
@@ -182,6 +230,29 @@ def _body_gap(method: str, path: str, body: Any) -> Optional[str]:
                 "The only container change this run makes is Amount \u2192 0 (retire). "
                 "Send amount 0 and nothing else."
             )
+    if path == "/v1/instrument-maintenance-schedules" or path.startswith(
+        "/v1/instrument-maintenance-schedules/"
+    ):
+        return INSTRUMENT_SCHEDULE_GAP
+    if path == "/v1/instrument-types" or re.match(r"^/v1/instrument-types/[^/]+$", path):
+        if isinstance(body, dict) and "maintenance_tracked" in body:
+            return (
+                "Instrument types are a plain list. "
+                "Maintenance tracking is set per instrument."
+            )
+    if path == "/v1/instruments" or re.match(r"^/v1/instruments/[^/]+$", path):
+        blocked = {"status", "active", "next_due", "last_done"} & set(body or {})
+        if blocked:
+            return (
+                "Instrument status and active are not set by this configuration run. "
+                "Schedules and due dates are set by a lab admin or manager. "
+                "Send name, type, and vendor only."
+            )
+        if isinstance(body, dict) and "maintenance_tracked" in body:
+            return (
+                "The configuring agent does not set maintenance tracking. "
+                "An Administrator can turn it on for the instrument."
+            )
     return None
 
 
@@ -200,6 +271,14 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
     for prefix in _REAGENT_BENCH:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, REAGENT_LOT_GAP)
+    for prefix in _INSTRUMENT_BENCH:
+        if path == prefix or path.startswith(prefix + "/"):
+            return Classified(False, "other", None, None, INSTRUMENT_BENCH_GAP)
+    for prefix in _INSTRUMENT_SCHEDULE:
+        if path == prefix or path.startswith(prefix + "/"):
+            return Classified(False, "other", None, None, INSTRUMENT_SCHEDULE_GAP)
+    if "substitute-instrument-type" in path:
+        return Classified(False, "other", None, None, INSTRUMENT_SUBSTITUTE_GAP)
     for prefix, reason in _OUT_OF_SCOPE:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, reason)

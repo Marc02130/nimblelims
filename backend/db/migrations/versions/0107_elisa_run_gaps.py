@@ -17,8 +17,9 @@ result_acceptances is registered in the Schema catalog the same way 0089
 registers a lab table. New columns on samples and lims_runs are added to the
 existing catalog rows so the column list matches Postgres.
 
-0106_instrument_tracking may land on main first. This revision still revises
-0105. A merge of main adds an Alembic merge revision if both heads exist.
+This revision revises 0105. After merge, 0108_elisa_followups revises this
+revision, then 0109_revoke_reagent_delete, 0110_lims_run_failed_by, and
+0111_instrument_tracking, so the chain is a single head.
 """
 from __future__ import annotations
 

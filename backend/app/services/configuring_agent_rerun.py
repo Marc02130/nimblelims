@@ -83,6 +83,12 @@ def existing_change(db, user: User, method: str, path: str, body: Any):
         row = db.query(model).filter(func.lower(model.name) == name.lower()).first()
         return AppliedChange("analysis" if model is Analysis else "analyte", row.name, row.id) if row else None
 
+    if path == "/v1/instruments" and name:
+        from models.instrument import Instrument
+
+        row = db.query(Instrument).filter(func.lower(Instrument.name) == name.lower()).first()
+        return AppliedChange("instrument", row.name, row.id) if row else None
+
     if path in ("/v1/vendors", "/v1/reagents") and name:
         from models.reagent import Reagent, Vendor
 

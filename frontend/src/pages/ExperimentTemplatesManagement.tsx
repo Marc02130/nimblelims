@@ -20,6 +20,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Checkbox,
   IconButton,
   Table,
   TableHead,
@@ -93,6 +94,7 @@ interface TemplateEntryDeclaration {
     | 'experiment_data'
     | 'predefined_action'
     | 'reagent'
+    | 'instrument'
     | 'display_table'
     | 'sample_data'
     | 'experiment_detail';
@@ -107,6 +109,14 @@ interface TemplateEntryDeclaration {
     status?: string;
     depends_on?: string[];
     allowed_reagent_ids?: string[];
+    allowed_instrument_ids?: string[];
+    slots?: Array<{
+      key: string;
+      label?: string;
+      instrument_type_id?: string | null;
+      required?: boolean;
+      run_import?: boolean;
+    }>;
     [key: string]: unknown;
   };
   fields?: TemplateEntryField[];
@@ -145,6 +155,12 @@ const ENTRY_TYPE_OPTIONS: {
     label: 'Reagent',
     helper:
       'Default catalog reagents for this experiment. The lab tech can add any active reagent, then picks the lot.',
+  },
+  {
+    value: 'instrument',
+    label: 'Instruments',
+    helper:
+      'Named instrument slots. The run_import slot on a LIMS run template must have a type from the active types list.',
   },
 ];
 
@@ -301,6 +317,18 @@ const PREDEFINED_PRESETS: {
       fields: [],
     },
   },
+  {
+    key: 'instruments',
+    label: 'Instruments',
+    entry: {
+      entry_type: 'instrument',
+      name: 'Instruments',
+      description: 'Named instrument slots. The run_import slot must have a type.',
+      predefined_entry_key: 'instruments',
+      config: { slots: [], allowed_instrument_ids: [] },
+      fields: [],
+    },
+  },
 ];
 
 /** New templates start with Header + Samples so create always yields a reusable entry spine. */
@@ -322,8 +350,9 @@ const blankDefinition = (): TemplateDefinition => ({
 const ExperimentTemplatesManagement: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { hasPermission } = useUser();
+  const { hasPermission, user } = useUser();
   const canManage = hasPermission('experiment:manage');
+  const canSeeInactive = user?.role === 'Administrator' || user?.role === 'Lab Manager';
 
   // List state
   const [rows, setRows] = useState<ExperimentTemplateRow[]>([]);
@@ -353,6 +382,8 @@ const ExperimentTemplatesManagement: React.FC = () => {
     Array<{ id: string; name: string; operation: string }>
   >([]);
   const [reagentOptions, setReagentOptions] = useState<{ id: string; name: string }[]>([]);
+  const [instrumentOptions, setInstrumentOptions] = useState<{ id: string; name: string }[]>([]);
+  const [instrumentTypeOptions, setInstrumentTypeOptions] = useState<{ id: string; name: string }[]>([]);
 
   // Create FieldDefinition (entry columns — not Custom Fields for Sample/Test)
   const [createFieldOpen, setCreateFieldOpen] = useState(false);
@@ -389,7 +420,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getExperimentTemplates();
+      const data = await apiService.getExperimentTemplates({
+        include_inactive: canSeeInactive,
+        page: 1,
+        size: 500,
+      });
       setRows(Array.isArray(data) ? data : (data?.templates ?? data?.items ?? []));
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
@@ -424,6 +459,36 @@ const ExperimentTemplatesManagement: React.FC = () => {
         );
       })
       .catch(() => setReagentOptions([]));
+    apiService
+      .getInstrumentTypes({ active: true })
+      .then((raw) => {
+        const list = (Array.isArray(raw) ? raw : raw?.items || []) as Array<{
+          id?: string;
+          name?: string;
+          active?: boolean;
+        }>;
+        setInstrumentTypeOptions(
+          list
+            .filter((row) => row?.id && row?.name && row.active !== false)
+            .map((row) => ({ id: String(row.id), name: String(row.name) })),
+        );
+      })
+      .catch(() => setInstrumentTypeOptions([]));
+    apiService
+      .getInstruments({ active: true })
+      .then((raw) => {
+        const list = (Array.isArray(raw) ? raw : []) as Array<{
+          id?: string;
+          name?: string;
+          active?: boolean;
+        }>;
+        setInstrumentOptions(
+          list
+            .filter((row) => row?.id && row?.name && row.active !== false)
+            .map((row) => ({ id: String(row.id), name: String(row.name) })),
+        );
+      })
+      .catch(() => setInstrumentOptions([]));
   }, []);
 
   useEffect(() => {
@@ -560,6 +625,22 @@ const ExperimentTemplatesManagement: React.FC = () => {
           break;
         }
       }
+      if (e.entry_type === 'instrument') {
+        const slots = Array.isArray(e.config?.slots) ? e.config.slots : [];
+        const runImport = slots.filter((s) => s?.run_import);
+        if (runImport.length > 1) {
+          errors[1] = true;
+          break;
+        }
+        if (runImport.length === 1 && !runImport[0].instrument_type_id) {
+          errors[1] = true;
+          break;
+        }
+        if (slots.some((s) => !s?.key?.trim())) {
+          errors[1] = true;
+          break;
+        }
+      }
     }
     return { valid: !errors.some(Boolean), tabErrors: errors };
   };
@@ -591,7 +672,20 @@ const ExperimentTemplatesManagement: React.FC = () => {
           ...(next.config || {}),
           allowed_reagent_ids: Array.isArray(prior) ? prior : [],
         };
-      } else if (patch.entry_type !== undefined && e.predefined_entry_key === 'reagents') {
+      } else if (patch.entry_type === 'instrument') {
+        const priorSlots = next.config?.slots;
+        const prior = next.config?.allowed_instrument_ids;
+        next.predefined_entry_key = 'instruments';
+        next.fields = [];
+        next.config = {
+          ...(next.config || {}),
+          slots: Array.isArray(priorSlots) ? priorSlots : [],
+          allowed_instrument_ids: Array.isArray(prior) ? prior : [],
+        };
+      } else if (
+        patch.entry_type !== undefined &&
+        (e.predefined_entry_key === 'reagents' || e.predefined_entry_key === 'instruments')
+      ) {
         next.predefined_entry_key = undefined;
       }
       return next;
@@ -1116,13 +1210,29 @@ const ExperimentTemplatesManagement: React.FC = () => {
               {tabErrors[1] && (
                 <div>
                   Tables &amp; forms: each entry needs a name and a type.
-                  {(formDef.entries ?? []).some((entry) => {
-                    if (entry.entry_type !== 'reagent') return false;
-                    const ids = entry.config?.allowed_reagent_ids;
-                    return !Array.isArray(ids) || ids.length === 0;
-                  })
-                    ? ' A Reagent entry needs at least one default reagent from the catalog.'
-                    : ' These are the reusable capture places instantiated when an experiment is created from this template.'}
+                  {(() => {
+                    const entries = formDef.entries ?? [];
+                    const reagentEmpty = entries.some((entry) => {
+                      if (entry.entry_type !== 'reagent') return false;
+                      const ids = entry.config?.allowed_reagent_ids;
+                      return !Array.isArray(ids) || ids.length === 0;
+                    });
+                    const instrumentEmpty = entries.some((entry) => {
+                      if (entry.entry_type !== 'instrument') return false;
+                      const ids = entry.config?.allowed_instrument_ids;
+                      return !Array.isArray(ids) || ids.length === 0;
+                    });
+                    if (reagentEmpty && instrumentEmpty) {
+                      return ' A Reagent or Instruments entry needs at least one default from the catalog.';
+                    }
+                    if (reagentEmpty) {
+                      return ' A Reagent entry needs at least one default reagent from the catalog.';
+                    }
+                    if (instrumentEmpty) {
+                      return ' An Instruments entry needs at least one default instrument from the catalog.';
+                    }
+                    return ' These are the reusable capture places instantiated when an experiment is created from this template.';
+                  })()}
                 </div>
               )}
             </Alert>
@@ -1330,6 +1440,127 @@ const ExperimentTemplatesManagement: React.FC = () => {
                       {ENTRY_TYPE_OPTIONS.find((o) => o.value === entry.entry_type)?.helper ||
                         entry.entry_type}
                     </Typography>
+
+                    {entry.entry_type === 'instrument' && (
+                      <Box sx={{ mb: 1.5 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                          Instrument slots
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                          The run_import slot is required on a LIMS run template and must have a type.
+                          Other slots may omit a type. At most one run_import slot.
+                        </Typography>
+                        {(Array.isArray(entry.config?.slots) ? entry.config.slots : []).map((slot, si) => (
+                          <Box
+                            key={`${ei}-slot-${si}`}
+                            sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1, alignItems: 'center' }}
+                          >
+                            <TextField
+                              size="small"
+                              label="Key"
+                              value={slot.key || ''}
+                              onChange={(e) => {
+                                const slots = [...(entry.config?.slots || [])];
+                                slots[si] = { ...slots[si], key: e.target.value };
+                                updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                              }}
+                              sx={{ minWidth: 120 }}
+                            />
+                            <TextField
+                              size="small"
+                              label="Label"
+                              value={slot.label || ''}
+                              onChange={(e) => {
+                                const slots = [...(entry.config?.slots || [])];
+                                slots[si] = { ...slots[si], label: e.target.value };
+                                updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                              }}
+                              sx={{ minWidth: 140 }}
+                            />
+                            <FormControl size="small" sx={{ minWidth: 180 }} required={Boolean(slot.run_import)}>
+                              <InputLabel id={`slot-type-${ei}-${si}`}>Instrument type</InputLabel>
+                              <Select
+                                labelId={`slot-type-${ei}-${si}`}
+                                label="Instrument type"
+                                inputProps={{ 'aria-label': 'Instrument type' }}
+                                value={slot.instrument_type_id || ''}
+                                onChange={(e) => {
+                                  const slots = [...(entry.config?.slots || [])];
+                                  slots[si] = {
+                                    ...slots[si],
+                                    instrument_type_id: e.target.value || null,
+                                  };
+                                  updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                                }}
+                              >
+                                {!slot.run_import && <MenuItem value="">None</MenuItem>}
+                                {instrumentTypeOptions.map((row) => (
+                                  <MenuItem key={row.id} value={row.id}>
+                                    {row.name}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={Boolean(slot.required)}
+                                  onChange={(e) => {
+                                    const slots = [...(entry.config?.slots || [])];
+                                    slots[si] = { ...slots[si], required: e.target.checked };
+                                    updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                                  }}
+                                />
+                              }
+                              label="Required"
+                            />
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={Boolean(slot.run_import)}
+                                  onChange={(e) => {
+                                    const slots = [...(entry.config?.slots || [])];
+                                    slots[si] = { ...slots[si], run_import: e.target.checked };
+                                    updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                                  }}
+                                />
+                              }
+                              label="Run import"
+                            />
+                            <IconButton
+                              size="small"
+                              color="error"
+                              aria-label="Remove slot"
+                              onClick={() => {
+                                const slots = (entry.config?.slots || []).filter((_, i) => i !== si);
+                                updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                              }}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        ))}
+                        <Button
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => {
+                            const slots = [...(entry.config?.slots || [])];
+                            slots.push({
+                              key: slots.length === 0 ? 'run_import' : `slot_${slots.length + 1}`,
+                              label: slots.length === 0 ? 'Import instrument' : '',
+                              instrument_type_id: null,
+                              required: slots.length === 0,
+                              run_import: slots.length === 0,
+                            });
+                            updateEntry(ei, { config: { ...(entry.config || {}), slots } });
+                          }}
+                        >
+                          Add slot
+                        </Button>
+                      </Box>
+                    )}
 
                     {entry.entry_type === 'reagent' && (
                       <FormControl
@@ -1666,6 +1897,11 @@ const ExperimentTemplatesManagement: React.FC = () => {
                     {!isDataTable && entry.entry_type === 'reagent' && (
                       <Typography variant="body2" color="text.secondary">
                         Lots are recorded on the experiment. This entry stores the default reagents.
+                      </Typography>
+                    )}
+                    {!isDataTable && entry.entry_type === 'instrument' && (
+                      <Typography variant="body2" color="text.secondary">
+                        Instrument use is recorded on the experiment. This entry stores the default instruments.
                       </Typography>
                     )}
                   </Box>

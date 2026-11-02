@@ -26,6 +26,105 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
+
+def reset_migrated_engine_sessions(engine) -> None:
+    """Drop pooled connections that leaked SET ROLE lims_app.
+
+    SET ROLE is transactional. A pooled RESET ROLE that then rolls back
+    leaves the next checkout as lims_app with a blank current_user_id.
+    """
+    engine.dispose()
+
+
+def clip_long_reasons_for_0120_downgrade(engine) -> None:
+    """Test isolation only. 0120 itself never truncates or deletes.
+
+    A 4000-character void or substitute reason on the shared migrated_engine
+    makes any later downgrade through 0120 refuse. Clip those rows to 1000
+    so older migration tests can still walk the chain.
+    """
+    reset_migrated_engine_sessions(engine)
+    with engine.begin() as conn:
+        conn.execute(text("RESET ROLE"))
+        conn.execute(text("SET LOCAL row_security = off"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_maintenance_events' "
+                "AND column_name = 'void_reason'"
+            )
+        ).scalar():
+            conn.execute(
+                text(
+                    "UPDATE instrument_maintenance_events "
+                    "SET void_reason = left(void_reason, 1000) "
+                    "WHERE void_reason IS NOT NULL "
+                    "AND char_length(btrim(void_reason)) > 1000"
+                )
+            )
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'lims_run_type_substitutions'"
+            )
+        ).scalar():
+            conn.execute(
+                text(
+                    "UPDATE lims_run_type_substitutions "
+                    "SET reason = left(reason, 1000) "
+                    "WHERE char_length(btrim(reason)) > 1000"
+                )
+            )
+
+
+def clear_0117_downgrade_blockers(engine) -> None:
+    """Void-reason and slot-audit rows refuse 0117 downgrade. Tests that walk
+    through 0117 must clear them first on the shared migrated_engine."""
+    clip_long_reasons_for_0120_downgrade(engine)
+    reset_migrated_engine_sessions(engine)
+    with engine.begin() as conn:
+        conn.execute(text("RESET ROLE"))
+        conn.execute(text("SET LOCAL row_security = off"))
+        admin = conn.execute(
+            text(
+                "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id "
+                "WHERE r.name = 'Administrator' ORDER BY u.created_at LIMIT 1"
+            )
+        ).scalar()
+        conn.execute(
+            text("SELECT set_config('app.current_user_id', :u, false)"),
+            {"u": str(admin or "00000000-0000-0000-0000-000000000000")},
+        )
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_entry_slot_audits'"
+            )
+        ).scalar():
+            conn.execute(text("DELETE FROM instrument_entry_slot_audits"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'lims_run_type_substitutions'"
+            )
+        ).scalar():
+            conn.execute(text("DELETE FROM lims_run_type_substitutions"))
+        if conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = 'public' "
+                "AND table_name = 'instrument_maintenance_events' "
+                "AND column_name = 'void_reason'"
+            )
+        ).scalar():
+            conn.execute(
+                text("UPDATE instrument_maintenance_events SET void_reason = NULL")
+            )
+
 from app.main import app
 from app.database import get_db
 from app.core.bootstrap_roles import (
@@ -120,6 +219,66 @@ def _install_access_functions(engine):
         conn.commit()
 
 
+def _seed_instrument_tracking_lists(engine) -> None:
+    """Seed the lists 0108 would insert so create_all tests match a migrated DB."""
+    from models.instrument import (
+        DOWNTIME_REASONS_LIST_ID,
+        INSTRUMENT_TYPES_LIST_ID,
+        MAINTENANCE_TYPES_LIST_ID,
+    )
+
+    types = [
+        (INSTRUMENT_TYPES_LIST_ID, "instrument_types", "Instrument kinds",
+         [
+             ("a1000001-0002-4001-8001-000000000001", "Plate reader", "plate_reader"),
+             ("a1000001-0002-4001-8001-000000000002", "qPCR", "qpcr"),
+             ("a1000001-0002-4001-8001-000000000003", "LC-MS", "lc_ms"),
+             ("a1000001-0002-4001-8001-000000000004", "Liquid handler", "liquid_handler"),
+             ("a1000001-0002-4001-8001-000000000005", "Balance", "balance"),
+             ("a1000001-0002-4001-8001-000000000006", "Centrifuge", "centrifuge"),
+         ]),
+        (MAINTENANCE_TYPES_LIST_ID, "maintenance_types", "Instrument maintenance kinds",
+         [
+             ("a1000001-0003-4001-8001-000000000001", "PM", "pm"),
+             ("a1000001-0003-4001-8001-000000000002", "calibration", "calibration"),
+             ("a1000001-0003-4001-8001-000000000003", "qualification", "qualification"),
+         ]),
+        (DOWNTIME_REASONS_LIST_ID, "downtime_reasons", "Why an instrument is down",
+         [
+             ("a1000001-0004-4001-8001-000000000001", "Breakdown", "breakdown"),
+             ("a1000001-0004-4001-8001-000000000002", "Preventive maintenance", "preventive_maintenance"),
+             ("a1000001-0004-4001-8001-000000000003", "Calibration", "calibration_downtime"),
+             ("a1000001-0004-4001-8001-000000000004", "Qualification", "qualification_downtime"),
+             ("a1000001-0004-4001-8001-000000000005", "Facility", "facility"),
+             ("a1000001-0004-4001-8001-000000000006", "Other", "other"),
+         ]),
+    ]
+    with engine.begin() as conn:
+        for list_id, name, description, entries in types:
+            conn.execute(
+                text(
+                    "INSERT INTO lists (id, name, description, active, created_at, modified_at) "
+                    "VALUES (:id, :name, :description, true, NOW(), NOW()) "
+                    "ON CONFLICT (id) DO NOTHING"
+                ),
+                {"id": list_id, "name": name, "description": description},
+            )
+            for entry_id, entry_name, _code in entries:
+                conn.execute(
+                    text(
+                        "INSERT INTO list_entries "
+                        "(id, name, description, code, active, created_at, modified_at, list_id) "
+                        "VALUES (:id, :name, :name, NULL, true, NOW(), NOW(), :list_id) "
+                        "ON CONFLICT (id) DO NOTHING"
+                    ),
+                    {
+                        "id": entry_id,
+                        "name": entry_name,
+                        "list_id": list_id,
+                    },
+                )
+
+
 def _install_lab_day_function(engine) -> None:
     """results.entry_date defaults to current_lab_day(), which must exist first."""
     import importlib.util
@@ -149,6 +308,7 @@ def db_engine(pg_container):
     _install_lab_day_function(engine)
     Base.metadata.create_all(bind=engine)
     _install_access_functions(engine)
+    _seed_instrument_tracking_lists(engine)
     # Commit UTC so parallel connections see it. db_session also upserts
     # UTC inside the test transaction because some tests commit a delete
     # of this row (test_load_parallel) and later tests must still have a zone.
@@ -246,6 +406,10 @@ def migrated_engine(migrated_pg_container):
         conn.execute(text(
             "GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO app_test_role"
         ))
+        conn.execute(text(
+            "ALTER DEFAULT PRIVILEGES FOR ROLE lims_migrate IN SCHEMA public "
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_test_role"
+        ))
         conn.commit()
 
     yield engine
@@ -265,6 +429,17 @@ def _reset_published_lab_zone():
     clear_published_lab_zone()
     yield
     clear_published_lab_zone()
+
+
+@pytest.fixture(autouse=True)
+def _reset_migrated_engine_sessions(request):
+    """Close leaked SET ROLE sessions before a migrated_engine test."""
+    if "migrated_engine" not in request.fixturenames:
+        yield
+        return
+    engine = request.getfixturevalue("migrated_engine")
+    reset_migrated_engine_sessions(engine)
+    yield
 
 
 @pytest.fixture(scope="function")

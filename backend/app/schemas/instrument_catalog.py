@@ -1,80 +1,117 @@
-"""Pydantic schemas for instrument types, instruments (instances), and CRO sources."""
+"""Pydantic schemas for instrument types (list), instruments, and CRO sources."""
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, field_validator
+from app.core.required_reason import CHANGE_REASON_MAX, optional_reason
 from app.schemas._instants import APIModel as BaseModel
 
+InstrumentStatus = Literal["in_service", "out_of_service", "retired"]
 
-class InstrumentTypeBase(BaseModel):
+
+class InstrumentTypeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    vendor: Optional[str] = Field(None, max_length=255)
-    model: Optional[str] = Field(None, max_length=255)
     active: bool = True
 
 
-class InstrumentTypeCreate(InstrumentTypeBase):
-    pass
-
-
 class InstrumentTypeUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    vendor: Optional[str] = Field(None, max_length=255)
-    model: Optional[str] = Field(None, max_length=255)
     active: Optional[bool] = None
+    reason: Optional[str] = Field(None, max_length=CHANGE_REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
-class InstrumentTypeResponse(InstrumentTypeBase):
+class InstrumentTypeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str
+    description: Optional[str] = None
+    active: bool
     created_at: datetime
     modified_at: datetime
 
 
-class InstrumentBase(BaseModel):
+class InstrumentCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     instrument_type_id: UUID
+    vendor_id: Optional[UUID] = None
+    model: Optional[str] = Field(None, max_length=255)
     serial_number: Optional[str] = Field(None, max_length=255)
+    asset_tag: Optional[str] = Field(None, max_length=255)
+    location_id: Optional[UUID] = None
+    status: InstrumentStatus = "in_service"
     active: bool = True
-
-
-class InstrumentCreate(InstrumentBase):
-    pass
+    maintenance_tracked: Optional[bool] = None
 
 
 class InstrumentUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     instrument_type_id: Optional[UUID] = None
+    vendor_id: Optional[UUID] = None
+    model: Optional[str] = Field(None, max_length=255)
     serial_number: Optional[str] = Field(None, max_length=255)
+    asset_tag: Optional[str] = Field(None, max_length=255)
+    location_id: Optional[UUID] = None
+    status: Optional[InstrumentStatus] = None
     active: Optional[bool] = None
+    maintenance_tracked: Optional[bool] = None
+    reason: Optional[str] = Field(None, max_length=CHANGE_REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
-class InstrumentResponse(InstrumentBase):
+class InstrumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str
+    description: Optional[str] = None
+    instrument_type_id: UUID
+    vendor_id: Optional[UUID] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    asset_tag: Optional[str] = None
+    location_id: Optional[UUID] = None
+    status: str
+    active: bool
+    maintenance_tracked: bool
     created_at: datetime
     modified_at: datetime
     instrument_type_name: Optional[str] = None
-    instrument_type_vendor: Optional[str] = None
-    instrument_type_model: Optional[str] = None
+    vendor_name: Optional[str] = None
+    location_name: Optional[str] = None
 
 
-class CroSourceBase(BaseModel):
+class InstrumentEligibilityResponse(BaseModel):
+    instrument_id: UUID
+    allowed: bool
+    maintenance_tracked: bool
+    code: Optional[str] = None
+    message: Optional[str] = None
+
+
+class CroSourceCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     client_id: Optional[UUID] = None
     active: bool = True
-
-
-class CroSourceCreate(CroSourceBase):
-    pass
 
 
 class CroSourceUpdate(BaseModel):
@@ -84,10 +121,14 @@ class CroSourceUpdate(BaseModel):
     active: Optional[bool] = None
 
 
-class CroSourceResponse(CroSourceBase):
+class CroSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str
+    description: Optional[str] = None
+    client_id: Optional[UUID] = None
+    active: bool
     created_at: datetime
     modified_at: datetime
     client_name: Optional[str] = None

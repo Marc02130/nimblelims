@@ -1,6 +1,7 @@
 """
 Repository layer for the flexible experiment engine.
-Pure DB access — no business logic, no HTTP exceptions.
+Pure DB access — no HTTP exceptions. Status writes lock the run row
+and refuse an illegal transition before assigning ``status``.
 """
 from __future__ import annotations
 
@@ -27,7 +28,10 @@ class LimsRunRepository:
         from sqlalchemy.orm import joinedload
         return (
             self.db.query(LimsRun)
-            .options(joinedload(LimsRun.experiment_template))
+            .options(
+                joinedload(LimsRun.experiment_template),
+                joinedload(LimsRun.instrument_type),
+            )
             .filter(LimsRun.id == run_id)
             .first()
         )
@@ -53,7 +57,10 @@ class LimsRunRepository:
         total = q.count()
         from sqlalchemy.orm import selectinload
         items = (
-            q.options(selectinload(LimsRun.experiment_template))
+            q.options(
+                selectinload(LimsRun.experiment_template),
+                selectinload(LimsRun.instrument_type),
+            )
             .order_by(LimsRun.created_at.desc())
             .offset((page - 1) * size)
             .limit(size)
@@ -110,16 +117,45 @@ class LimsRunRepository:
         new_status: LimsRunStatus,
         modified_by: Optional[uuid.UUID],
     ) -> LimsRun:
+        """Lock the run, refuse an illegal transition, then write status.
+
+        Status is not assigned anywhere else. A caller that already holds
+        the row lock keeps it; a caller that does not waits here. The
+        transition check uses the status seen after the lock.
+        """
         from datetime import datetime, timezone
-        run.status = new_status
-        run.modified_by = modified_by
-        if new_status == LimsRunStatus.running and not run.started_at:
-            run.started_at = datetime.now(timezone.utc)
-        elif new_status == LimsRunStatus.complete and not run.completed_at:
-            run.completed_at = datetime.now(timezone.utc)
-        elif new_status == LimsRunStatus.published and not run.published_at:
-            run.published_at = datetime.now(timezone.utc)
-        return run
+        from sqlalchemy import select
+
+        from models.flexible_experiment import LIFECYCLE_TRANSITIONS, VALID_TRANSITIONS
+
+        locked = self.db.execute(
+            select(LimsRun)
+            .where(LimsRun.id == run.id)
+            .with_for_update(of=LimsRun, key_share=True)
+            .execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+        if locked is None:
+            raise ValueError("LIMS run not found")
+        current = LimsRunStatus(locked.status)
+        if new_status != current:
+            lifecycle = (
+                getattr(getattr(locked, "experiment_template", None), "lifecycle_type", None)
+                or "standard"
+            )
+            allowed = LIFECYCLE_TRANSITIONS.get(lifecycle, VALID_TRANSITIONS)
+            if new_status not in allowed.get(current, set()):
+                raise ValueError(
+                    f"Cannot transition from '{current.value}' to '{new_status.value}'"
+                )
+        locked.status = new_status
+        locked.modified_by = modified_by
+        if new_status == LimsRunStatus.running and not locked.started_at:
+            locked.started_at = datetime.now(timezone.utc)
+        elif new_status == LimsRunStatus.complete and not locked.completed_at:
+            locked.completed_at = datetime.now(timezone.utc)
+        elif new_status == LimsRunStatus.published and not locked.published_at:
+            locked.published_at = datetime.now(timezone.utc)
+        return locked
 
 
 class LimsRunDataRepository:

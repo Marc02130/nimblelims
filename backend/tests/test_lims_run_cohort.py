@@ -26,13 +26,9 @@ def analysis_and_template(client: TestClient, auth_headers, db_session, test_adm
     db_session.flush()
     t = ExperimentTemplate(
         name=f"Tpl Run {uuid4().hex[:6]}",
-        template_definition={
-            "experiment_name": "R",
-            "protocol_steps": [],
-            "transfer_steps": [],
-            "result_columns": [],
-            "mandatory_review_count": 0,
-        },
+        template_definition=__import__(
+            "tests.test_flexible_experiment", fromlist=["VALID_TEMPLATE_DEF"]
+        ).VALID_TEMPLATE_DEF,
         created_by=test_admin_user.id,
         modified_by=test_admin_user.id,
     )

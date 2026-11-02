@@ -2,7 +2,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, field_validator
+from app.core.required_reason import REASON_MAX, optional_reason
 from app.schemas._instants import APIModel as BaseModel
 
 from models.dose_response import CurveCategory, ReviewStatus
@@ -21,11 +22,25 @@ class BatchReviewRequest(BaseModel):
 
 
 class ExcludeRequest(BaseModel):
-    reason: Optional[str] = None
+    reason: Optional[str] = Field(None, max_length=REASON_MAX)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 class ResetFitRequest(BaseModel):
-    reason: str = Field(..., min_length=1, description="Why the fit_in_progress flag is being cleared (audit trail)")
+    reason: Optional[str] = Field(
+        None,
+        max_length=REASON_MAX,
+        description="Why the fit_in_progress flag is being cleared (audit trail)",
+    )
+
+    @field_validator("reason")
+    @classmethod
+    def reason_has_visible_text(cls, value: Optional[str]) -> Optional[str]:
+        return optional_reason(value)
 
 
 # ── Response schemas ───────────────────────────────────────────────────────────

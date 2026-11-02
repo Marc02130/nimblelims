@@ -27,6 +27,7 @@ from app.core.instant_columns import (
 )
 from checks.naive_instants import scan_tree
 from models.base import Base
+from tests.conftest import clear_0117_downgrade_blockers
 
 BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
@@ -120,6 +121,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
     os.environ["DATABASE_URL"] = url
     os.environ["MIGRATE_DATABASE_URL"] = url
     try:
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             targets = _stamp_sample(conn)
@@ -151,6 +153,7 @@ def test_instant_columns_round_trip(migrated_engine) -> None:
             _assert_catalog(conn, instants_are_aware=True)
             _assert_upgraded_values(conn, targets)
 
+        clear_0117_downgrade_blockers(migrated_engine)
         command.downgrade(cfg, BEFORE)
         with migrated_engine.connect() as conn:
             assert _counts(conn) == before_counts
@@ -274,18 +277,44 @@ def _expect_date(conn, table: str, column: str, row_id) -> None:
         raise AssertionError(f"{table}.{column} is {value!r}, expected {LAB_DAY}")
 
 
+def _instant_names(conn, names: set[str]) -> set[str]:
+    """0111 renames instrument_types; 0102's frozen list still uses the old name."""
+    tables = {
+        row[0]
+        for row in conn.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
+        )
+    }
+    out = set()
+    for qualified in names:
+        table, column = qualified.split(".", 1)
+        if (
+            table == "instrument_types"
+            and "instrument_types" not in tables
+            and "instrument_types_legacy" in tables
+        ):
+            out.add(f"instrument_types_legacy.{column}")
+        else:
+            out.add(qualified)
+    return out
+
+
 def _assert_catalog(conn, instants_are_aware: bool) -> None:
     naive = _typed(conn, "timestamp without time zone")
     aware = _typed(conn, "timestamp with time zone")
     dates = _typed(conn, "date")
+    instants = _instant_names(conn, set(INSTANT_TIMESTAMP_COLUMNS))
     assert set(SQL_DATE_COLUMNS) <= dates
     assert set(CALENDAR_TIMESTAMP_COLUMNS) <= naive
     if instants_are_aware:
-        assert set(INSTANT_TIMESTAMP_COLUMNS) <= aware
-        assert set(INSTANT_TIMESTAMP_COLUMNS).isdisjoint(naive)
+        assert instants <= aware
+        assert instants.isdisjoint(naive)
     else:
-        assert set(INSTANT_TIMESTAMP_COLUMNS) <= naive
-        assert naive == set(INSTANT_TIMESTAMP_COLUMNS) | set(CALENDAR_TIMESTAMP_COLUMNS)
+        assert instants <= naive
+        assert naive == instants | set(CALENDAR_TIMESTAMP_COLUMNS)
 
 
 def _typed(conn, data_type: str) -> set[str]:
@@ -304,15 +333,48 @@ def _typed(conn, data_type: str) -> set[str]:
 
 
 def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
-    """0101 is before ELISA catalog rows. Head adds an empty table and catalog rows.
+    """0101 is before ELISA and instrument-tracking catalog rows.
 
-    Every other table keeps the same row count. The new table is empty.
+    Head adds empty tables, renames instrument_types, and seeds lists.
+    Every other table keeps the same row count.
     """
     extra = set(after) - set(before)
-    assert extra <= {"result_acceptances"}
+    allowed_extra = {
+        "result_acceptances",
+        "instrument_downtime",
+        "instrument_maintenance_events",
+        "instrument_maintenance_schedules",
+        "instrument_uses",
+        "instrument_types_legacy",
+        "instrument_type_defaults",
+        "instrument_maintenance_audits",
+        "instrument_schedule_audits",
+        "lims_run_type_substitutions",
+        "instrument_template_inactivations",
+        "instrument_entry_slot_audits",
+        "instrument_type_deactivations",
+    }
+    assert extra <= allowed_extra
+    nonempty_ok = {
+        "instrument_template_inactivations",
+        "instrument_types_legacy",
+    }
     for name in extra:
-        assert after[name] == 0
-    skip = {"schema_tables", "schema_columns", "schema_privileges"} | extra
+        if name in nonempty_ok:
+            continue
+        assert after[name] == 0, name
+    missing = set(before) - set(after)
+    assert missing <= {"instrument_types"}
+    # 0111 seeds instrument_types / maintenance_types / downtime_reasons and
+    # their entries. The 0102 frozen counts cannot include lists/list_entries
+    # after that, or the round-trip would treat those seed rows as drift.
+    skip = {
+        "schema_tables",
+        "schema_columns",
+        "schema_privileges",
+        "lists",
+        "list_entries",
+    } | extra | missing
     left = {key: value for key, value in before.items() if key not in skip}
     right = {key: value for key, value in after.items() if key not in skip}
     assert left == right

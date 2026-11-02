@@ -349,6 +349,22 @@ def update_list_entry(
             )
     
     update_data = explicit_updates(entry_data, entry, refuse_null={"active"})
+    if (
+        list_name == "instrument_types"
+        and "active" in update_data
+        and update_data["active"] is False
+        and entry.active is True
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "instrument_type_deactivate_reason_required",
+                "message": (
+                    "Deactivate an instrument type with "
+                    "PATCH /v1/instrument-types/{id} and a reason."
+                ),
+            },
+        )
     if "code" in update_data and update_data["code"] is not None:
         _reject_duplicate_code(db, list_obj.id, update_data["code"], entry.id)
     for field, value in update_data.items():
@@ -388,6 +404,17 @@ def delete_list_entry(
             detail=f"Entry not found in list '{list_name}'"
         )
     
+    if list_name == "instrument_types" and entry.active is True:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "instrument_type_deactivate_reason_required",
+                "message": (
+                    "Deactivate an instrument type with "
+                    "PATCH /v1/instrument-types/{id} and a reason."
+                ),
+            },
+        )
     # Soft delete
     entry.active = False
     entry.modified_by = current_user.id

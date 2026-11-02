@@ -24,8 +24,11 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import uuid
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -55,6 +58,7 @@ from models.flexible_experiment import (
     LimsRunStatus,
     LimsRunData,
     LimsRunImport,
+    LimsRunTypeSubstitution,
     VALID_TRANSITIONS,
     LIFECYCLE_TRANSITIONS,
 )
@@ -106,6 +110,22 @@ class LimsRunService:
                 detail="analysis_id is required on every LIMS run",
             )
         self._require_analysis(data.analysis_id)
+        if data.experiment_template_id:
+            from models.experiment import ExperimentTemplate
+            from app.services.instrument_slots import require_typed_run_import
+
+            template = (
+                self.db.query(ExperimentTemplate)
+                .filter(ExperimentTemplate.id == data.experiment_template_id)
+                .first()
+            )
+            if template is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Experiment template not found",
+                )
+            self._require_active_template(template)
+            require_typed_run_import(template.template_definition)
         run = self.run_repo.create(
             name=data.name,
             experiment_template_id=data.experiment_template_id,
@@ -115,6 +135,17 @@ class LimsRunService:
         )
         self._commit_refresh(run)
         return run
+
+    def _require_active_template(self, template) -> None:
+        if getattr(template, "active", True) is True:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "template_inactive",
+                "message": "This experiment template is inactive and cannot start a run.",
+            },
+        )
 
     def _require_analysis(self, analysis_id: uuid.UUID) -> None:
         from models.analysis import Analysis
@@ -130,6 +161,19 @@ class LimsRunService:
 
     def update_run(self, run_id: uuid.UUID, data: LimsRunUpdate) -> LimsRun:
         run = self._get_run_for_update(run_id)
+        if getattr(data, "instrument_type_id", None) is not None:
+            from app.services.instrument_slots import RUN_TYPE_LOCKED
+
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": RUN_TYPE_LOCKED,
+                    "message": (
+                        "The run instrument type is locked. "
+                        "Use POST /v1/lims-runs/{id}/substitute-instrument-type."
+                    ),
+                },
+            )
         kwargs: dict = {"modified_by": self._user_id()}
         if data.name is not None:
             other = self.run_repo.get_by_name(data.name)
@@ -218,7 +262,7 @@ class LimsRunService:
         lifecycle = getattr(run.experiment_template, "lifecycle_type", "standard") or "standard"
         return LIFECYCLE_TRANSITIONS.get(lifecycle, VALID_TRANSITIONS)
 
-    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+    def _assert_can_transition(self, run: LimsRun, new_status: LimsRunStatus) -> None:
         current = LimsRunStatus(run.status)
         transitions = self._lifecycle_transitions(run)
         if new_status not in transitions.get(current, set()):
@@ -226,7 +270,34 @@ class LimsRunService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot transition from '{current.value}' to '{new_status.value}'",
             )
-        self.run_repo.update_status(run, new_status, self._user_id())
+
+    def _write_status(self, run: LimsRun, new_status: LimsRunStatus) -> None:
+        """The only status write. update_status locks and checks the transition."""
+        try:
+            self.run_repo.update_status(run, new_status, self._user_id())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        except OperationalError as exc:
+            if pgcode(exc) not in (LOCK_NOT_AVAILABLE, QUERY_CANCELED):
+                raise
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "run_busy",
+                    "message": (
+                        "Another change to this run is in progress. "
+                        "Wait for it to finish, then try again."
+                    ),
+                },
+            ) from exc
+
+    def _transition(self, run: LimsRun, new_status: LimsRunStatus) -> LimsRun:
+        self._assert_can_transition(run, new_status)
+        self._write_status(run, new_status)
         self._commit_refresh(run)
         return run
 
@@ -240,6 +311,7 @@ class LimsRunService:
         run_id: uuid.UUID,
         *,
         sample_ids: Optional[List[uuid.UUID]] = None,
+        instrument_type_id: Optional[uuid.UUID] = None,
         acknowledge_no_analysis: bool = False,  # ignored; analysis always required
     ) -> LimsRun:
         """
@@ -320,8 +392,128 @@ class LimsRunService:
             run.modified_by = self._user_id()
             self.db.flush()
 
+        self._apply_start_instrument_type(run, instrument_type_id=instrument_type_id)
         self._mint_tests_at_start(run)
         return self._transition(run, LimsRunStatus.running)
+
+    def _apply_start_instrument_type(
+        self,
+        run: LimsRun,
+        *,
+        instrument_type_id: Optional[uuid.UUID] = None,
+    ) -> None:
+        """Snapshot the run type at start. Template copies the run_import slot."""
+        from app.services.instrument_slots import (
+            RUN_TYPE_REQUIRED,
+            require_active_instrument_type,
+            require_typed_run_import,
+        )
+
+        if run.experiment_template_id:
+            template = run.experiment_template
+            if template is None:
+                from models.experiment import ExperimentTemplate
+
+                template = (
+                    self.db.query(ExperimentTemplate)
+                    .filter(ExperimentTemplate.id == run.experiment_template_id)
+                    .first()
+                )
+            if template is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Experiment template not found",
+                )
+            self._require_active_template(template)
+            run.instrument_type_id = require_typed_run_import(template.template_definition)
+            run.modified_by = self._user_id()
+            self.db.flush()
+            return
+        if instrument_type_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": RUN_TYPE_REQUIRED,
+                    "message": (
+                        "An ad hoc LIMS run must send instrument_type_id at start."
+                    ),
+                },
+            )
+        require_active_instrument_type(self.db, instrument_type_id)
+        run.instrument_type_id = instrument_type_id
+        run.modified_by = self._user_id()
+        self.db.flush()
+
+    def substitute_instrument_type(
+        self,
+        run_id: uuid.UUID,
+        *,
+        instrument_type_id: uuid.UUID,
+        reason: Optional[str],
+    ) -> LimsRun:
+        """Person running the experiment may substitute the type on this run.
+
+        Ownership is ``lims_runs.created_by`` (the run). LIMS runs have no
+        ``experiment_id`` and no ``started_by``. The person who created the
+        run may substitute, whether Lab Technician or Lab Manager.
+        Administrator and Lab Manager may also substitute any non-terminal run.
+        """
+        from app.services.instrument_slots import (
+            RUN_TERMINAL,
+            require_active_instrument_type,
+        )
+
+        run = self._get_run_for_update(run_id)
+        terminal = {
+            LimsRunStatus.published,
+            LimsRunStatus.failed,
+            LimsRunStatus.canceled,
+        }
+        if run.status in terminal:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": RUN_TERMINAL,
+                    "message": "A terminal run cannot change its instrument type.",
+                },
+            )
+        role = getattr(getattr(self.current_user, "role", None), "name", None)
+        if role not in ("Administrator", "Lab Manager"):
+            if run.created_by != self._user_id():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "substitute_not_own_run",
+                        "message": (
+                            "Only the person who created this run "
+                            "(lims_runs.created_by) can substitute its type, "
+                            "unless they are an Administrator or Lab Manager."
+                        ),
+                    },
+                )
+        require_active_instrument_type(self.db, instrument_type_id)
+        from app.core.required_reason import REASON_MAX, require_reason
+
+        reason = require_reason(
+            reason,
+            code="substitute_reason_required",
+            message="A reason is required to substitute the instrument type.",
+            max_length=REASON_MAX,
+        )
+        previous = run.instrument_type_id
+        run.instrument_type_id = instrument_type_id
+        run.modified_by = self._user_id()
+        self.db.add(
+            LimsRunTypeSubstitution(
+                lims_run_id=run.id,
+                from_instrument_type_id=previous,
+                to_instrument_type_id=instrument_type_id,
+                reason=reason,
+                created_by=self._user_id(),
+            )
+        )
+        self._commit_refresh(run)
+        return run
 
     def _mint_tests_at_start(self, run: LimsRun) -> None:
         """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
@@ -616,7 +808,7 @@ class LimsRunService:
             )
         promo.apply_plan(run, plan)
 
-        self.run_repo.update_status(run, LimsRunStatus.published, self._user_id())
+        self._write_status(run, LimsRunStatus.published)
         self._commit_refresh(run)
         return run
 
@@ -701,26 +893,32 @@ class LimsRunService:
             )
         return self._transition(run, LimsRunStatus.canceled)
 
-    def fail_run(self, run_id: uuid.UUID, reason: str) -> LimsRun:
+    def fail_run(self, run_id: uuid.UUID, reason: Optional[str]) -> LimsRun:
         """Mark the run failed and keep every imported row.
 
         SOP §13: one failed acceptance criterion fails the whole plate.
         Every cohort sample is rerun on a new plate. Nothing is deleted.
         """
-        text = (reason or "").strip()
-        if not text:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A reason is required to fail the run",
-            )
+        from app.core.required_reason import require_reason
+
+        text = require_reason(
+            reason,
+            code="fail_reason_required",
+            message="A reason is required to fail the run.",
+        )
         run = self._get_run_for_update(run_id)
+        self._assert_can_transition(run, LimsRunStatus.failed)
         from datetime import datetime, timezone
 
+        # Write status first. update_status reloads the row; setting the fail
+        # fields afterwards keeps them from being wiped by that refresh.
+        self._write_status(run, LimsRunStatus.failed)
         run.status_reason = text
         run.rejected_at = datetime.now(timezone.utc)
         run.failed_by = self._user_id()
         run.modified_by = self._user_id()
-        return self._transition(run, LimsRunStatus.failed)
+        self._commit_refresh(run)
+        return run
 
     def create_rerun(self, run_id: uuid.UUID, name: Optional[str] = None) -> LimsRun:
         """Draft run that replaces this one, with the same cohort samples.
@@ -817,16 +1015,62 @@ class LimsRunService:
             raise HTTPException(400, "Run requires analysis_id before import")
 
         import_id = None
+        parser = None
+        if not (instrument_id or cro_source_id or parser_id):
+            role = getattr(getattr(self.current_user, "role", None), "name", None)
+            if role != "Administrator":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "import_source_required",
+                        "message": "JSON import requires an instrument or CRO source.",
+                    },
+                )
+            logger.info(
+                "json_import_without_instrument run_id=%s user_id=%s",
+                run_id,
+                self._user_id(),
+            )
+            imp = self._create_import_event(
+                run_id=run_id,
+                instrument_id=None,
+                cro_source_id=None,
+                parser_id=None,
+                filename="admin_override",
+                note="type not checked",
+            )
+            import_id = imp.id
         if instrument_id or cro_source_id or parser_id:
+            self._refuse_cro_source_on_standard_run(
+                run, cro_source_id=cro_source_id, instrument_id=instrument_id
+            )
+            resolved_instrument = instrument_id
+            if resolved_instrument:
+                from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+                refuse_ineligible_instrument(self.db, resolved_instrument)
             parser = self.data_parser_svc.resolve_for_import(
                 analysis_id=run.analysis_id,
                 instrument_id=instrument_id,
                 cro_source_id=cro_source_id,
                 parser_id=parser_id,
+                run_instrument_type_id=self._run_type_for_import(run),
             )
+            self._refuse_cro_source_on_standard_run(
+                run,
+                cro_source_id=cro_source_id,
+                instrument_id=instrument_id,
+                parser=parser,
+            )
+            resolved_instrument = instrument_id or parser.instrument_id
+            if resolved_instrument:
+                self._assert_import_instrument_type(run, resolved_instrument)
+                from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+                refuse_ineligible_instrument(self.db, resolved_instrument)
             imp = self._create_import_event(
                 run_id=run_id,
-                instrument_id=instrument_id or parser.instrument_id,
+                instrument_id=resolved_instrument,
                 cro_source_id=cro_source_id or parser.cro_source_id,
                 parser_id=parser.id,
                 filename=filename,
@@ -855,10 +1099,8 @@ class LimsRunService:
             }
             for row in rows
         ]
-        parser_config = None
-        if import_id is not None:
-            parser_config = parser.parser_config
-        elif rows and any(r.sample_key for r in rows):
+        parser_config = parser.parser_config if parser is not None else None
+        if parser_config is None and rows and any(r.sample_key for r in rows):
             parser_config = {"sample_col": "__explicit__", "columns": []}
         link_rows(
             self.db,
@@ -898,12 +1140,32 @@ class LimsRunService:
             raise HTTPException(400, "Run requires analysis_id before import")
         analysis_id = run.analysis_id
 
+        self._refuse_cro_source_on_standard_run(
+            run, cro_source_id=cro_source_id, instrument_id=instrument_id
+        )
+        if instrument_id:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, instrument_id)
         parser = self.data_parser_svc.resolve_for_import(
             analysis_id=analysis_id,
             instrument_id=instrument_id,
             cro_source_id=cro_source_id,
             parser_id=parser_id,
+            run_instrument_type_id=self._run_type_for_import(run),
         )
+        self._refuse_cro_source_on_standard_run(
+            run,
+            cro_source_id=cro_source_id,
+            instrument_id=instrument_id,
+            parser=parser,
+        )
+        resolved_instrument = instrument_id or parser.instrument_id
+        if resolved_instrument:
+            self._assert_import_instrument_type(run, resolved_instrument)
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, resolved_instrument)
         rows, warnings, _hard = InstrumentDataService(parser.parser_config).parse(
             file_bytes, raise_on_hard=True
         )
@@ -912,6 +1174,13 @@ class LimsRunService:
 
         run = self._get_run_for_update(run_id)
         self._assert_import_allowed(run)
+        self.db.expire(run, ["experiment_template"])
+        self._refuse_cro_source_on_standard_run(
+            run,
+            cro_source_id=cro_source_id,
+            instrument_id=instrument_id,
+            parser=parser,
+        )
         if run.analysis_id != analysis_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -920,10 +1189,21 @@ class LimsRunService:
                     "message": "The run's analysis changed while the file was parsed. Import again.",
                 },
             )
+        # The instrument may have gone down, retired, or overdue while the
+        # file was parsed or while this caller waited on the run lock.
+        if instrument_id:
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, instrument_id)
+        if resolved_instrument:
+            self._assert_import_instrument_type(run, resolved_instrument)
+            from app.services.instrument_eligibility import refuse_ineligible_instrument
+
+            refuse_ineligible_instrument(self.db, resolved_instrument)
 
         imp = self._create_import_event(
             run_id=run_id,
-            instrument_id=instrument_id or parser.instrument_id,
+            instrument_id=resolved_instrument,
             cro_source_id=cro_source_id or parser.cro_source_id,
             parser_id=parser.id,
             filename=filename,
@@ -982,6 +1262,7 @@ class LimsRunService:
                     cro_source_id=r.cro_source_id,
                     parser_id=r.parser_id,
                     filename=r.filename,
+                    note=r.note,
                     imported_at=r.imported_at,
                     imported_by=r.imported_by,
                     parser_name=r.parser.name if r.parser else None,
@@ -1003,14 +1284,71 @@ class LimsRunService:
                 ),
             )
 
+    def _run_type_for_import(self, run: LimsRun) -> Optional[uuid.UUID]:
+        from app.services.instrument_slots import run_is_cro
+
+        if run_is_cro(run):
+            return None
+        return run.instrument_type_id
+
+    def _refuse_cro_source_on_standard_run(
+        self,
+        run: LimsRun,
+        *,
+        cro_source_id: Optional[uuid.UUID],
+        instrument_id: Optional[uuid.UUID] = None,
+        parser=None,
+    ) -> None:
+        """CRO-source import on a non-CRO run is 422 unless a typed instrument is present.
+
+        CRO-lifecycle runs keep skipping the type and eligibility gates.
+        """
+        from app.services.instrument_slots import (
+            CRO_IMPORT_REQUIRES_CRO_RUN,
+            run_is_cro,
+        )
+
+        if run_is_cro(run):
+            return
+        cro = cro_source_id or getattr(parser, "cro_source_id", None)
+        resolved = instrument_id or getattr(parser, "instrument_id", None)
+        if cro and not resolved:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": CRO_IMPORT_REQUIRES_CRO_RUN,
+                    "message": (
+                        "A CRO source import is allowed only on a CRO-lifecycle "
+                        "run, or together with a typed instrument."
+                    ),
+                },
+            )
+
+    def _assert_import_instrument_type(
+        self, run: LimsRun, instrument_id: uuid.UUID
+    ) -> None:
+        from app.services.instrument_slots import (
+            assert_run_instrument_type,
+            run_is_cro,
+        )
+
+        if run_is_cro(run):
+            return
+        assert_run_instrument_type(
+            self.db,
+            run_type_id=run.instrument_type_id,
+            instrument_id=instrument_id,
+        )
+
     def _create_import_event(
         self,
         *,
         run_id: uuid.UUID,
         instrument_id: Optional[uuid.UUID],
         cro_source_id: Optional[uuid.UUID],
-        parser_id: uuid.UUID,
+        parser_id: Optional[uuid.UUID],
         filename: Optional[str],
+        note: Optional[str] = None,
     ) -> LimsRunImport:
         imp = LimsRunImport(
             id=uuid.uuid4(),
@@ -1019,10 +1357,26 @@ class LimsRunService:
             cro_source_id=cro_source_id,
             parser_id=parser_id,
             filename=filename,
+            note=note,
             imported_by=self._user_id(),
         )
         self.db.add(imp)
         self.db.flush()
+        if instrument_id:
+            from app.core.lab_time import current_lab_day
+            from models.instrument import InstrumentUse
+
+            use = InstrumentUse(
+                instrument_id=instrument_id,
+                lims_run_id=run_id,
+                analysis_id=self.get_run(run_id).analysis_id,
+                used_on=current_lab_day(),
+                note="Recorded automatically from import",
+                created_by=self._user_id(),
+                modified_by=self._user_id(),
+            )
+            self.db.add(use)
+            self.db.flush()
         return imp
 
     def get_data_rows(

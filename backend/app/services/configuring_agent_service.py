@@ -1133,7 +1133,7 @@ def apply_run(
                         kind=change.kind,
                         name=(change.name or step.target)[:255],
                         target_id=change.target_id,
-                        detail=step.action,
+                        detail=change.detail or step.action,
                         agent_assisted=True,
                         agent_provider=provider,
                         agent_model=model,

@@ -30,6 +30,8 @@ from models.user import User, Role, Permission  # noqa: F401
 # Helpers / fixtures
 # ──────────────────────────────────────────────────────────────────────────────
 
+PLATE_READER_TYPE_ID = "a1000001-0002-4001-8001-000000000001"
+
 VALID_TEMPLATE_DEF = {
     "experiment_name": "Cell Viability",
     "description": "Live/dead cell count",
@@ -54,7 +56,40 @@ VALID_TEMPLATE_DEF = {
     ],
     "acceptance_criteria": "viability > 80%",
     "mandatory_review_count": 0,
+    "entries": [
+        {
+            "entry_type": "instrument",
+            "predefined_entry_key": "instruments",
+            "name": "Instruments",
+            "config": {
+                "slots": [
+                    {
+                        "key": "run_import",
+                        "label": "Import instrument",
+                        "instrument_type_id": PLATE_READER_TYPE_ID,
+                        "required": True,
+                        "run_import": True,
+                    }
+                ]
+            },
+        }
+    ],
 }
+
+
+def typed_run_template_def(base: dict | None = None) -> dict:
+    """Copy ``base`` and ensure a typed run_import slot is present."""
+    out = dict(base or VALID_TEMPLATE_DEF)
+    entries = [dict(e) if isinstance(e, dict) else e for e in (out.get("entries") or [])]
+    has_instrument = any(
+        isinstance(e, dict)
+        and (e.get("entry_type") == "instrument" or e.get("predefined_entry_key") == "instruments")
+        for e in entries
+    )
+    if not has_instrument:
+        entries.extend(VALID_TEMPLATE_DEF["entries"])
+    out["entries"] = entries
+    return out
 
 VALID_PARSER_CONFIG = {
     "columns": [
@@ -144,11 +179,15 @@ def running_run(client: TestClient, auth_headers, draft_run, cohort_sample_id):
 @pytest.fixture
 def run_instrument_id(db_session: Session):
     """An instrument with no data parser attached."""
-    from models.instrument import Instrument, InstrumentType
+    from models.instrument import Instrument
+    from models.list import List, ListEntry
 
-    itype = InstrumentType(name=f"Plate Reader {uuid4().hex[:6]}")
-    db_session.add(itype)
-    db_session.flush()
+    lst = db_session.query(List).filter(List.name == "instrument_types").first()
+    itype = (
+        db_session.query(ListEntry)
+        .filter(ListEntry.list_id == lst.id, ListEntry.active.is_(True))
+        .first()
+    )
     inst = Instrument(name=f"PR-{uuid4().hex[:6]}", instrument_type_id=itype.id)
     db_session.add(inst)
     db_session.flush()
@@ -343,7 +382,7 @@ class TestInstrumentImport:
         """No active data parser for the run's analysis + instrument → import is rejected.
 
         Parser validation only runs when a source is given, so this goes through
-        multipart /import-file (JSON /import takes no instrument/CRO source).
+        multipart /import-file (JSON /import requires a source unless admin).
         """
         run_id = running_run["id"]
         r = client.post(
@@ -354,6 +393,29 @@ class TestInstrumentImport:
         )
         assert r.status_code == 400
         assert "no active data parser" in r.json()["detail"].lower()
+
+    def test_import_file_records_instrument_use(self, client, auth_headers, running_run,
+                                                 template_with_parser, run_instrument_id):
+        """An import on a run with an instrument writes instrument_uses."""
+        run_id = running_run["id"]
+        r = client.post(
+            f"/v1/lims-runs/{run_id}/import-file",
+            files={"file": ("plate.csv", INSTRUMENT_CSV.encode(), "text/csv")},
+            data={"instrument_id": run_instrument_id},
+            headers=auth_headers,
+        )
+        assert r.status_code == 200, r.text
+        uses = client.get(
+            "/v1/instrument-uses",
+            headers=auth_headers,
+            params={"lims_run_id": run_id},
+        )
+        assert uses.status_code == 200, uses.text
+        rows = uses.json()
+        assert len(rows) == 1
+        assert rows[0]["instrument_id"] == run_instrument_id
+        assert rows[0]["lims_run_id"] == run_id
+        assert rows[0]["active"] is True
 
     def test_import_missing_expected_columns_returns_422(self, client, auth_headers,
                                                           running_run, template_with_parser,

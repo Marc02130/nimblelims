@@ -144,9 +144,17 @@ class LimsRun(Base):
     created_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     modified_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    # Per-run type snapshot taken at start. Required on every new LIMS run.
+    instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('list_entries.id'),
+        nullable=True,
+        index=True,
+    )
 
     experiment_template = relationship("ExperimentTemplate")
     analysis = relationship("Analysis", foreign_keys=[analysis_id])
+    instrument_type = relationship("ListEntry", foreign_keys=[instrument_type_id])
     data_rows = relationship(
         "LimsRunData",
         back_populates="lims_run",
@@ -217,7 +225,8 @@ class DataParser(Base):
     Versioned declarative parse instructions for instrument or CRO files.
 
     Each row is one immutable version. Logical parser = version_group_id.
-    Exactly one of instrument_id / cro_source_id. At most one active per group.
+    Exactly one of instrument_id / cro_source_id / instrument_type_id.
+    At most one active per group.
     """
     __tablename__ = 'data_parsers'
 
@@ -237,6 +246,12 @@ class DataParser(Base):
         nullable=True,
         index=True,
     )
+    instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('list_entries.id'),
+        nullable=True,
+        index=True,
+    )
     version_group_id = Column(PostgresUUID(as_uuid=True), nullable=False, index=True)
     version = Column(Integer, nullable=False, default=1)
     active = Column(Boolean, nullable=False, default=False)
@@ -247,6 +262,7 @@ class DataParser(Base):
 
     instrument = relationship("Instrument", foreign_keys=[instrument_id])
     cro_source = relationship("CroSource", foreign_keys=[cro_source_id])
+    instrument_type = relationship("ListEntry", foreign_keys=[instrument_type_id])
     analyses_links = relationship(
         "ParserAnalysis",
         back_populates="parser",
@@ -332,10 +348,11 @@ class LimsRunImport(Base):
     parser_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey('data_parsers.id'),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     filename = Column(String(512), nullable=True)
+    note = Column(Text, nullable=True)
     imported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     imported_by = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
@@ -344,6 +361,45 @@ class LimsRunImport(Base):
     cro_source = relationship("CroSource")
     parser = relationship("DataParser")
     importer = relationship("User", foreign_keys=[imported_by])
+
+
+class LimsRunTypeSubstitution(Base):
+    """Append-only audit when a run's instrument type is substituted."""
+
+    __tablename__ = "lims_run_type_substitutions"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("lims_runs.id"),
+        nullable=False,
+        index=True,
+    )
+    from_instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=True,
+    )
+    to_instrument_type_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("list_entries.id"),
+        nullable=False,
+    )
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+    lims_run = relationship("LimsRun")
+    from_instrument_type = relationship(
+        "ListEntry", foreign_keys=[from_instrument_type_id]
+    )
+    to_instrument_type = relationship(
+        "ListEntry", foreign_keys=[to_instrument_type_id]
+    )
 
 
 class RobotWorklistConfig(Base):

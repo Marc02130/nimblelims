@@ -25,6 +25,10 @@ describe('WRAPPER_CATALOG', () => {
     expect(wrapperMateKey('reagents')).toBeNull();
     expect(WRAPPER_CATALOG.reagents.cardinality).toBe(1);
     expect(WRAPPER_CATALOG.reagents.mint).toBe(false);
+    expect(wrapperIdForKey('instruments')).toBe('instruments');
+    expect(wrapperMateKey('instruments')).toBeNull();
+    expect(WRAPPER_CATALOG.instruments.cardinality).toBe(1);
+    expect(WRAPPER_CATALOG.instruments.mint).toBe(false);
   });
 
   it('treats one pair as at capacity', () => {

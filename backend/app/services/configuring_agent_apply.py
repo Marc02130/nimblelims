@@ -45,6 +45,7 @@ class AppliedChange:
     target_id: Optional[UUID]
     # True when the object is already exactly as proposed: nothing was written.
     noop: bool = False
+    detail: Optional[str] = None
 
 
 class AtomicSession:
@@ -306,6 +307,27 @@ def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> 
         return _transition(db, user, body)
     if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors"):
         return _reagent_catalog(db, user, path, body)
+    if path == "/v1/instruments" or path.startswith("/v1/instruments/"):
+        return _instrument_catalog(db, user, method, path, body)
+    if path == "/v1/instrument-types" or path.startswith("/v1/instrument-types/"):
+        return _instrument_types(db, user, method, path, body)
+    if path == "/v1/instrument-maintenance-schedules" or path.startswith(
+        "/v1/instrument-maintenance-schedules/"
+    ):
+        raise CannotExpress(
+            "Lab admins or managers set schedules and the first due date in the admin UI"
+        )
+    if "substitute-instrument-type" in path:
+        raise CannotExpress(
+            "The configuring agent cannot substitute a run's instrument type."
+        )
+    if path.startswith("/v1/lims-runs"):
+        raise CannotExpress("Run analysis and dose-response are not configuration.")
+    if path == "/v1/instrument-uses" or path.startswith("/v1/instrument-uses/"):
+        raise CannotExpress(
+            "Instrument maintenance events, downtime and instrument use are recorded at the bench, "
+            "not by this configuration run."
+        )
     if path.startswith("/users/"):
         return _user_role(db, user, path, body)
     if re.match(r"^/containers/[^/]+/contents/[^/]+$", path):
@@ -452,6 +474,46 @@ def _reagent_catalog(db, user, path: str, body: dict) -> list[AppliedChange]:
         return [AppliedChange("vendor", created.name, created.id)]
     created = create_reagent(ReagentCreate.model_validate(body), user, db)
     return [AppliedChange("reagent", created.name, created.id)]
+
+
+def _instrument_catalog(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+    from app.routers.instrument_catalog import create_instrument, update_instrument
+    from app.schemas.instrument_catalog import InstrumentCreate, InstrumentUpdate
+
+    blocked = {"status", "active", "next_due", "last_done"} & set(body or {})
+    if blocked:
+        raise CannotExpress(
+            "Instrument status and active are not set by this configuration run. "
+            "Schedules and due dates are set by a lab admin or manager. "
+            "Send name, type, and vendor only."
+        )
+    if "maintenance_tracked" in (body or {}):
+        raise CannotExpress(
+            "The configuring agent does not set maintenance tracking. "
+            "An Administrator can turn it on for the instrument."
+        )
+    if method == "POST" and path == "/v1/instruments":
+        created = create_instrument(InstrumentCreate.model_validate(body), user, db)
+        return [AppliedChange("instrument", created.name, created.id)]
+    instrument_id = _uuid_from_path(path)
+    updated = update_instrument(instrument_id, InstrumentUpdate.model_validate(body), user, db)
+    return [AppliedChange("instrument", updated.name, updated.id)]
+
+
+def _instrument_types(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+    from app.routers.instrument_catalog import create_instrument_type, update_instrument_type
+    from app.schemas.instrument_catalog import InstrumentTypeCreate, InstrumentTypeUpdate
+
+    if "maintenance_tracked" in (body or {}):
+        raise CannotExpress(
+            "Instrument types are a plain list. Maintenance tracking is set per instrument."
+        )
+    if method == "POST" and path == "/v1/instrument-types":
+        created = create_instrument_type(InstrumentTypeCreate.model_validate(body), user, db)
+        return [AppliedChange("instrument_type", created.name, created.id)]
+    type_id = _uuid_from_path(path)
+    updated = update_instrument_type(type_id, InstrumentTypeUpdate.model_validate(body), user, db)
+    return [AppliedChange("instrument_type", updated.name, updated.id)]
 
 
 def _transition(db, user, body: dict) -> list[AppliedChange]:

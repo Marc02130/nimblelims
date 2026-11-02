@@ -44,6 +44,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { apiService } from '../../services/apiService';
 import AliquotPlanEditor from './AliquotPlanEditor';
 import ReagentUsePanel from '../reagents/ReagentUsePanel';
+import InstrumentUsePanel from '../instruments/InstrumentUsePanel';
 import {
   ALIQUOT_PLAN_ENTRY,
   ALIQUOT_PLAN_KEY,
@@ -102,6 +103,15 @@ interface Entry {
     sample_columns?: string[];
     allowed_reagent_ids?: string[];
     removed_reagent_ids?: string[];
+    allowed_instrument_ids?: string[];
+    removed_instrument_ids?: string[];
+    slots?: Array<{
+      key: string;
+      label?: string;
+      instrument_type_id?: string | null;
+      required?: boolean;
+      run_import?: boolean;
+    }>;
   } | null;
   field_definition_links: FieldLink[];
   values: EntryValue[];
@@ -120,6 +130,7 @@ const typeLabel = (entryType: string): string => {
   if (entryType === 'sample_data') return 'experiment_sample_data';
   if (entryType === 'experiment_detail') return 'experiment_data';
   if (entryType === 'reagent') return 'Reagent';
+  if (entryType === 'instrument') return 'Instruments';
   return entryType;
 };
 
@@ -162,6 +173,7 @@ const TYPE_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'info' |
   experiment_detail: 'info',
   predefined_action: 'warning',
   reagent: 'secondary',
+  instrument: 'info',
   display_table: 'default',
 };
 
@@ -704,6 +716,11 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
             defaultReagentIds={[]}
             onReagentsChanged={load}
           />
+          <InstrumentUsePanel
+            experimentId={experimentId}
+            defaultInstrumentIds={[]}
+            onInstrumentsChanged={load}
+          />
         </>
       ) : (
         entries.map((entry) => {
@@ -717,8 +734,13 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
           const dataRows = rowKeysByEntry[entry.id] || [];
           const isReagentEntry =
             entry.entry_type === 'reagent' || entry.predefined_entry_key === 'reagents';
+          const isInstrumentEntry =
+            entry.entry_type === 'instrument' || entry.predefined_entry_key === 'instruments';
           const defaultReagentIds = Array.isArray(entry.config?.allowed_reagent_ids)
             ? entry.config.allowed_reagent_ids
+            : [];
+          const defaultInstrumentIds = Array.isArray(entry.config?.allowed_instrument_ids)
+            ? entry.config.allowed_instrument_ids
             : [];
 
           return (
@@ -780,6 +802,14 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
                     experimentId={experimentId}
                     defaultReagentIds={defaultReagentIds}
                     onReagentsChanged={load}
+                  />
+                ) : isInstrumentEntry ? (
+                  <InstrumentUsePanel
+                    experimentId={experimentId}
+                    entryId={entry.id}
+                    slots={Array.isArray(entry.config?.slots) ? entry.config.slots : []}
+                    defaultInstrumentIds={defaultInstrumentIds}
+                    onInstrumentsChanged={load}
                   />
                 ) : isSampleScoped(entry.entry_type) ? (
                   sampleIds.length === 0 ? (
@@ -988,6 +1018,16 @@ const EntryCapturePanel: React.FC<EntryCapturePanelProps> = ({
             experimentId={experimentId}
             defaultReagentIds={[]}
             onReagentsChanged={load}
+          />
+        )}
+      {entries.length > 0 &&
+        !entries.some(
+          (entry) => entry.entry_type === 'instrument' || entry.predefined_entry_key === 'instruments',
+        ) && (
+          <InstrumentUsePanel
+            experimentId={experimentId}
+            defaultInstrumentIds={[]}
+            onInstrumentsChanged={load}
           />
         )}
     </Box>

@@ -17,6 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.rbac import require_experiment_manage
+from app.core.required_reason import require_reason
 from app.database import get_db
 from app.schemas.dose_response import (
     BatchReviewRequest,
@@ -119,13 +120,18 @@ def reset_fit_in_progress(
             status_code=status.HTTP_409_CONFLICT,
             detail="fit_in_progress is already False — nothing to reset.",
         )
+    reason = require_reason(
+        body.reason,
+        code="reset_fit_reason_required",
+        message="A reason is required to reset fit_in_progress.",
+    )
     _logger.warning(
         "fit_in_progress reset by user",
-        extra={"run_id": str(run_id), "user_id": str(current_user.id), "reason": body.reason},
+        extra={"run_id": str(run_id), "user_id": str(current_user.id), "reason": reason},
     )
     run.fit_in_progress = False
     db.commit()
-    return {"status": "ok", "run_id": str(run_id), "reason": body.reason}
+    return {"status": "ok", "run_id": str(run_id), "reason": reason}
 
 
 # ── Results ───────────────────────────────────────────────────────────────────

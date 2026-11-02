@@ -18,6 +18,7 @@ from models.project import Project, ProjectUser
 from models.test import Test
 from models.user import User
 from models.work_order import RoutingMap, StepAcceptedSampleType, WorkOrder
+from tests.test_flexible_experiment import PLATE_READER_TYPE_ID
 
 
 def _auth(token: str) -> dict:
@@ -30,6 +31,14 @@ def _asked_for_body(sample_ids, analysis_id, tat_days=5, params=None):
         "analysis_id": str(analysis_id),
         "tat_days": tat_days,
         "params": params if params is not None else {},
+    }
+
+
+def _start_run_body(sample_ids):
+    """Ad hoc LIMS start must send instrument_type_id (Marc Oct 26 3:05)."""
+    return {
+        "sample_ids": [str(s) for s in sample_ids],
+        "instrument_type_id": PLATE_READER_TYPE_ID,
     }
 
 
@@ -754,7 +763,7 @@ class TestWorkOrderP2:
         run_id = run.json()["id"]
         started = client.patch(
             f"/v1/lims-runs/{run_id}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text
@@ -848,7 +857,7 @@ class TestWorkOrderP2:
         run_id = run.json()["id"]
         started = client.patch(
             f"/v1/lims-runs/{run_id}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text
@@ -877,7 +886,7 @@ class TestWorkOrderP2:
         )
         started2 = client.patch(
             f"/v1/lims-runs/{run2.json()['id']}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started2.status_code == 200, started2.text
@@ -905,7 +914,7 @@ class TestWorkOrderP2:
         )
         started3 = client.patch(
             f"/v1/lims-runs/{run3.json()['id']}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started3.status_code == 200, started3.text
@@ -990,7 +999,7 @@ class TestWorkOrderP2:
         )
         started = client.patch(
             f"/v1/lims-runs/{run.json()['id']}/start",
-            json={"sample_ids": [str(dna.id)]},
+            json=_start_run_body([dna.id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text
@@ -1100,7 +1109,7 @@ class TestWorkOrderP2:
         db_session.commit()
         started = client.patch(
             f"/v1/lims-runs/{run_id}/start",
-            json={"sample_ids": [str(dna.id)]},
+            json=_start_run_body([dna.id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text
@@ -1184,7 +1193,7 @@ class TestWorkOrderP2:
         )
         started = client.patch(
             f"/v1/lims-runs/{run.json()['id']}/start",
-            json={"sample_ids": [str(dna.id)]},
+            json=_start_run_body([dna.id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text
@@ -1281,7 +1290,7 @@ class TestWorkOrderP2:
         )
         started = client.patch(
             f"/v1/lims-runs/{run.json()['id']}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text
@@ -1306,7 +1315,7 @@ class TestWorkOrderP2:
         )
         started2 = client.patch(
             f"/v1/lims-runs/{run2.json()['id']}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started2.status_code == 200, started2.text
@@ -1386,7 +1395,7 @@ class TestWorkOrderP2:
         )
         started = client.patch(
             f"/v1/lims-runs/{run.json()['id']}/start",
-            json={"sample_ids": [sample_id]},
+            json=_start_run_body([sample_id]),
             headers=_auth(admin_token),
         )
         assert started.status_code == 200, started.text

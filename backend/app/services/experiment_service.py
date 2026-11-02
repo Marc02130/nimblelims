@@ -79,6 +79,7 @@ def _reject_template_accepted_sample_types(
 
 
 REAGENT_ENTRY_INVALID = "reagent_entry_invalid"
+INSTRUMENT_ENTRY_INVALID = "instrument_entry_invalid"
 
 
 def _stamp_reagent_entries(entries: Any) -> Any:
@@ -94,6 +95,9 @@ def _stamp_reagent_entries(entries: Any) -> Any:
         if stamped.get("entry_type") == "reagent" or stamped.get("predefined_entry_key") == "reagents":
             stamped["entry_type"] = "reagent"
             stamped["predefined_entry_key"] = "reagents"
+        if stamped.get("entry_type") == "instrument" or stamped.get("predefined_entry_key") == "instruments":
+            stamped["entry_type"] = "instrument"
+            stamped["predefined_entry_key"] = "instruments"
         out.append(stamped)
     return out
 
@@ -149,6 +153,22 @@ def _reject_invalid_reagent_entries(
                 raise _reagent_entry_invalid(
                     "A Reagent entry lists a reagent that is not an active catalog reagent."
                 )
+
+
+def _instrument_entry_invalid(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"code": INSTRUMENT_ENTRY_INVALID, "message": message},
+    )
+
+
+def _reject_invalid_instrument_entries(
+    db: Session, template_definition: Optional[Dict[str, Any]]
+) -> None:
+    """An Instruments entry lists slots; the run_import slot must be typed."""
+    from app.services.instrument_slots import reject_invalid_instrument_slots
+
+    reject_invalid_instrument_slots(db, template_definition)
 
 
 def _with_aliquot_pair(template_definition: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -411,10 +431,19 @@ class ExperimentService:
     def list_templates(
         self,
         active: Optional[bool] = None,
+        include_inactive: bool = False,
         page: int = 1,
         size: int = 10,
     ) -> Tuple[List[ExperimentTemplate], int]:
-        return self.repo.list_templates(active=active, page=page, size=size)
+        role = getattr(getattr(self.current_user, "role", None), "name", None)
+        can_see_inactive = role in ("Administrator", "Lab Manager")
+        if not can_see_inactive:
+            return self.repo.list_templates(active=True, page=page, size=size)
+        if active is not None:
+            return self.repo.list_templates(active=active, page=page, size=size)
+        if include_inactive:
+            return self.repo.list_templates(active=None, page=page, size=size)
+        return self.repo.list_templates(active=True, page=page, size=size)
 
     def create_template(self, data: ExperimentTemplateCreate) -> ExperimentTemplate:
         if self.repo.get_template_by_name(data.name):
@@ -424,6 +453,7 @@ class ExperimentService:
             )
         definition = _with_aliquot_pair(data.template_definition)
         _reject_invalid_reagent_entries(self.db, definition)
+        _reject_invalid_instrument_entries(self.db, definition)
         t = self.repo.create_template(
             name=data.name,
             description=data.description,
@@ -455,6 +485,12 @@ class ExperimentService:
         if data.template_definition is not None:
             definition = _with_aliquot_pair(data.template_definition)
             _reject_invalid_reagent_entries(self.db, definition)
+            _reject_invalid_instrument_entries(self.db, definition)
+            from app.services.instrument_slots import reject_run_import_type_lock
+
+            reject_run_import_type_lock(
+                self.db, template_id, t.template_definition, definition
+            )
             update_kwargs["template_definition"] = definition
         if data.custom_attributes is not None:
             update_kwargs["custom_attributes"] = data.custom_attributes

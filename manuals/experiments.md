@@ -15,7 +15,7 @@ Experiments **can** capture certain instrument-based QC data (e.g. Tapestation, 
 
 It is **not** the primary home for large-scale result data analysis or dose-response curve fitting (see LIMS Runs).
 
-**Not the same as:** an ELN **Process** (ordered SOP; sidebar **Processes**), a **LimsRun** (sidebar **Runs** — every run has an analysis), or a LimsRun **checklist** (`/v1/processes`). Extract on the common path is an **experiment** (equipment / aliquot-pool execute), not the asked-for LimsRun. Operator SoT: [HOWTO.md](HOWTO.md) § Later execution.
+**Not the same as:** an ELN **Process** (ordered SOP; sidebar **Processes**), a **LimsRun** (sidebar **Runs** — every run has an analysis), or a LimsRun **checklist** (`/v1/processes`). Extract on the common path is an **experiment** (instrument / aliquot-pool execute), not the asked-for LimsRun. Operator SoT: [HOWTO.md](HOWTO.md) § Later execution.
 
 ## Core Entities
 
@@ -132,6 +132,12 @@ Destination quantitative cells are not an inventory ledger. Per-row mass/count p
 Normalization offers an eligible prior Result only: same analysis/designated concentration analyte, approved/reviewed first or otherwise latest by entry date. No match or unit mismatch refuses. Publishing the Result writes its value/unit to the bound 1×1 `Container.concentration` in the same transaction.
 
 Non-mint wrappers (Header, instrument-used, reagent-used, review) use a kind plus FieldDefinitions only; they do not use `METHOD_CATALOG`. Instrument primary files and Results remain on the LIMS Run.
+
+**Instruments used on an experiment:** the catalog is lab-wide under **Admin → Instruments** (`/admin/instruments`). Types are the configurable list `instrument_types` (seeded Plate reader, qPCR, LC-MS, Liquid handler, Balance, Centrifuge). Vendor, model, serial, asset tag, optional location, status (`in_service` / `out_of_service` / `retired`), and optional **Track maintenance** live on each instrument. Nothing is deleted: retire with `active` or status.
+
+On an experiment template, add an **Instruments** entry (**Tables & forms → Type → Instruments**, or **+ Instruments**) and define slots (`config.slots`: key, label, instrument_type_id, required, run_import). A LIMS run template needs one typed `run_import` slot. Creating the experiment copies the slots onto the experiment entry. On the experiment, **Add instrument** saves any eligible catalog instrument (`POST /v1/experiments/{id}/instruments`). **Record use** posts `/v1/instrument-uses` with `experiment_id` and `slot_key` when slots exist. A use with neither a LIMS run nor an experiment is **422** `use_target_required`.
+
+A new import or a new instrument use is refused (**422**) when the instrument is inactive, retired, out of service, or down (an open downtime row). Overdue maintenance and a missing schedule block only when **Track maintenance** is on. `GET /v1/instruments/{id}/eligibility` returns the same stop and the flag. LIMS runs do **not** have an `instrument_id` column; the instrument is recorded on the import and on `instrument_uses`. An import on a run with an instrument writes that use row automatically. See [HOWTO.md](HOWTO.md) for the lab path (setup, maintenance, downtime, the run block, and recording use).
 
 Storage browse/move remains outside Experiments. An entry may request an explicit one-shot put-away write-through; it is not a storage entry.
 

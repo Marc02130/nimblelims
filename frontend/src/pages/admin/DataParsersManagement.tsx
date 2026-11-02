@@ -41,8 +41,10 @@ interface DataParser {
   description?: string;
   instrument_id?: string;
   cro_source_id?: string;
+  instrument_type_id?: string;
   instrument_name?: string;
   cro_source_name?: string;
+  instrument_type_name?: string;
   version_group_id: string;
   version: number;
   active: boolean;
@@ -72,9 +74,10 @@ type DialogMode = 'create' | 'edit-version' | null;
 const emptyForm = {
   name: '',
   description: '',
-  sourceType: 'instrument' as 'instrument' | 'cro',
+  sourceType: 'instrument' as 'instrument' | 'cro' | 'instrument_type',
   instrument_id: '',
   cro_source_id: '',
+  instrument_type_id: '',
   analysis_ids: [] as string[],
   parser_config_json: JSON.stringify(defaultConfig, null, 2),
   activate: true,
@@ -89,6 +92,7 @@ const DataParsersManagement: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [instruments, setInstruments] = useState<any[]>([]);
   const [croSources, setCroSources] = useState<any[]>([]);
+  const [instrumentTypes, setInstrumentTypes] = useState<any[]>([]);
   const [analyses, setAnalyses] = useState<any[]>([]);
 
   const [viewParser, setViewParser] = useState<DataParser | null>(null);
@@ -109,15 +113,17 @@ const DataParsersManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [parsers, inst, cro, an] = await Promise.all([
+      const [parsers, inst, cro, types, an] = await Promise.all([
         apiService.getDataParsers({ active_only: false }),
         apiService.getInstruments(),
         apiService.getCroSources(),
+        apiService.getInstrumentTypes(),
         apiService.getAnalyses(),
       ]);
       setRows(parsers || []);
       setInstruments(inst || []);
       setCroSources(cro || []);
+      setInstrumentTypes(types || []);
       const list = Array.isArray(an) ? an : an?.analyses || [];
       setAnalyses(list);
     } catch (e: any) {
@@ -203,9 +209,14 @@ const DataParsersManagement: React.FC = () => {
       setForm({
         name: full.name,
         description: full.description || '',
-        sourceType: full.instrument_id ? 'instrument' : 'cro',
+        sourceType: full.instrument_id
+          ? 'instrument'
+          : full.instrument_type_id
+            ? 'instrument_type'
+            : 'cro',
         instrument_id: full.instrument_id || '',
         cro_source_id: full.cro_source_id || '',
+        instrument_type_id: full.instrument_type_id || '',
         analysis_ids: full.analysis_ids || [],
         parser_config_json: JSON.stringify(full.parser_config || defaultConfig, null, 2),
         activate: true,
@@ -297,11 +308,15 @@ const DataParsersManagement: React.FC = () => {
         if (form.sourceType === 'cro' && !form.cro_source_id) {
           throw new Error('Select a CRO source');
         }
+        if (form.sourceType === 'instrument_type' && !form.instrument_type_id) {
+          throw new Error('Select an instrument type');
+        }
         await apiService.createDataParser({
           name: form.name.trim(),
           description: form.description || undefined,
           instrument_id: form.sourceType === 'instrument' ? form.instrument_id : undefined,
           cro_source_id: form.sourceType === 'cro' ? form.cro_source_id : undefined,
+          instrument_type_id: form.sourceType === 'instrument_type' ? form.instrument_type_id : undefined,
           parser_config: cfg,
           analyses: analysesPayload,
           activate,
@@ -682,6 +697,12 @@ const DataParsersManagement: React.FC = () => {
                 >
                   CRO source
                 </Button>
+                <Button
+                  variant={form.sourceType === 'instrument_type' ? 'contained' : 'outlined'}
+                  onClick={() => setForm({ ...form, sourceType: 'instrument_type' })}
+                >
+                  Instrument type
+                </Button>
               </Box>
               {form.sourceType === 'instrument' ? (
                 <Autocomplete
@@ -690,6 +711,14 @@ const DataParsersManagement: React.FC = () => {
                   value={instruments.find((i) => i.id === form.instrument_id) || null}
                   onChange={(_, v) => setForm({ ...form, instrument_id: v?.id || '' })}
                   renderInput={(p) => <TextField {...p} label="Instrument" required />}
+                />
+              ) : form.sourceType === 'instrument_type' ? (
+                <Autocomplete
+                  options={instrumentTypes}
+                  getOptionLabel={(o) => o.name}
+                  value={instrumentTypes.find((i) => i.id === form.instrument_type_id) || null}
+                  onChange={(_, v) => setForm({ ...form, instrument_type_id: v?.id || '' })}
+                  renderInput={(p) => <TextField {...p} label="Instrument type" required />}
                 />
               ) : (
                 <Autocomplete
