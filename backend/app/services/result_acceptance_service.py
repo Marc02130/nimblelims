@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.lab_time import current_lab_day
+from app.core.required_reason import require_reason
 from app.schemas.flexible_experiment import (
     AcceptValueRequest,
     ValueChoiceOption,
@@ -96,12 +97,11 @@ class ResultAcceptanceService:
             (opt for opt in match.options if opt.lims_run_id != body.accepted_lims_run_id),
             None,
         )
-        reason = body.reason.strip()
-        if not reason:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A reason is required",
-            )
+        reason = require_reason(
+            body.reason,
+            code="acceptance_reason_required",
+            message="A reason is required to accept a value.",
+        )
         chosen_run = run if body.accepted_lims_run_id == run.id else other
         if counts_as_failed(self.db, chosen_run) and not body.override_failed:
             raise HTTPException(

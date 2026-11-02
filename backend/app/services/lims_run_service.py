@@ -449,7 +449,7 @@ class LimsRunService:
         run_id: uuid.UUID,
         *,
         instrument_type_id: uuid.UUID,
-        reason: str,
+        reason: Optional[str],
     ) -> LimsRun:
         """Person running the experiment may substitute the type on this run.
 
@@ -893,18 +893,19 @@ class LimsRunService:
             )
         return self._transition(run, LimsRunStatus.canceled)
 
-    def fail_run(self, run_id: uuid.UUID, reason: str) -> LimsRun:
+    def fail_run(self, run_id: uuid.UUID, reason: Optional[str]) -> LimsRun:
         """Mark the run failed and keep every imported row.
 
         SOP §13: one failed acceptance criterion fails the whole plate.
         Every cohort sample is rerun on a new plate. Nothing is deleted.
         """
-        text = (reason or "").strip()
-        if not text:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A reason is required to fail the run",
-            )
+        from app.core.required_reason import require_reason
+
+        text = require_reason(
+            reason,
+            code="fail_reason_required",
+            message="A reason is required to fail the run.",
+        )
         run = self._get_run_for_update(run_id)
         self._assert_can_transition(run, LimsRunStatus.failed)
         from datetime import datetime, timezone

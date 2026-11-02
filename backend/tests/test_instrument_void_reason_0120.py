@@ -125,7 +125,7 @@ def test_0120_revision_id_and_single_head():
     cfg = Config(str(BACKEND / "alembic.ini"))
     cfg.set_main_option("script_location", str(BACKEND / "db/migrations"))
     heads = ScriptDirectory.from_config(cfg).get_heads()
-    assert heads == ["0120_void_reason_4000"], heads
+    assert heads == ["0121_shared_reason_rules"], heads
 
 
 def test_void_reason_api_accepts_4000_and_rejects_4001(
@@ -234,7 +234,7 @@ def test_0120_downgrade_refuses_when_void_reason_longer_than_1000(migrated_engin
             command.downgrade(cfg, "0119_instrument_reasons")
         with migrated_engine.connect() as conn:
             head = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert head == "0120_void_reason_4000"
+            assert head == "0121_shared_reason_rules"
             stored = conn.execute(
                 text(
                     "SELECT char_length(void_reason) "
@@ -304,7 +304,7 @@ def test_0120_downgrade_and_upgrade_when_reasons_fit_1000(migrated_engine):
             version = conn.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar()
-        assert version == "0120_void_reason_4000"
+        assert version == "0121_shared_reason_rules"
         assert "4000" in defn
         assert "4000" in subst
         _run_as_lims_app(
@@ -394,7 +394,7 @@ def test_0120_downgrade_refuses_when_substitute_reason_longer_than_1000(
             head = conn.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar()
-            assert head == "0120_void_reason_4000"
+            assert head == "0121_shared_reason_rules"
             stored = conn.execute(
                 text(
                     "SELECT char_length(reason) "
