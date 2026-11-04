@@ -129,7 +129,7 @@ The IL-6 serum ELISA pack (synthetic Gen5 fixture, duplicates, 8 standards, low/
   - Outputs: bottom (`OD`), top (`OD`), slope (unit `1`), inflection point (same unit as the calibrator concentration), goodness-of-fit statistic (unit `1`), points used and excluded (count).
   - Missing-data rule: a calibrator replicate with no numeric response is excluded from the fit and counted as excluded. It is never treated as zero.
   - Stop rule: fewer than four calibrator levels with a numeric response, or a fit that does not converge, ends the stage with "curve not fitted". No back-calculation runs on that plate.
-  - AC: a KAT with a published or independently computed 4PL set reproduces the four parameters within the declared tolerance. A plate with three usable levels stops with "curve not fitted" and produces no sample concentrations.
+  - AC: a KAT with a published or independently computed 4PL set reproduces the four parameters within the declared tolerance. A plate with three usable levels stops with `curve_not_fitted` and produces no sample concentrations.
 - **CALC-REQ-9 [Not built]** `elisa_4pl_back_calc` v1 inverts the fitted curve for each sample response, then multiplies by the dilution factor. Split (CALC-REQ-37):
   - The backend decides in-range or out-of-range in decimal from the raw response strings.
   - R inverts in-range responses only.
@@ -210,7 +210,7 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
     - `above_range` (past the high-concentration end): U ≥ EL fails, because the true value is above U. U < EL gives no pass/fail and is flagged `limit_below_el`, with a dilute-and-rerun prompt.
     - `not_detected` and `below_range` use the same rule but stay distinct stored kinds.
   - Stop rule: an invalid dilution (CALC-REQ-16, CALC-REQ-18) or a failed run (CALC-REQ-13, CALC-REQ-16) gives no pass/fail.
-  - **Precedence of no-verdict causes.** Stage stops and refusals before any attempt take precedence over the per-sample list. A stage stop is `non_positive_log_input`, `r_timeout`, `backend_timeout`, `r_non_finite`, or `curve_not_fitted`. It is recorded on the attempt (CALC-REQ-25) and stores no per-sample flag for what that stage would have produced. For `lal_back_calc` that stage is one sample dilution (default, Marc to confirm; OQ-CALC-18), so one NaN or timeout fails only that dilution. A refusal before any attempt is a lock mismatch, a missing or bad built digest (CALC-REQ-4), or a sandbox failure (CALC-REQ-4a), and it writes nothing. The per-sample order is `run_failed` > `dilution_invalid` > `el_missing` > `missing_input` > `limit_above_el` or `limit_below_el`. When more than one of those applies, every applicable flag is stored, in this order, and the UI shows the first:
+  - **Precedence of no-verdict causes.** Stage stops and refusals before any attempt take precedence over the per-sample list. A stage stop is `non_positive_log_input`, `r_timeout`, `backend_timeout`, `r_non_finite`, or `curve_not_fitted`. It is recorded on the attempt (CALC-REQ-25) and stores no per-sample flag for what that stage would have produced. For `lal_back_calc` that stage is one sample dilution (default, Marc to confirm; OQ-CALC-18), so one NaN or timeout stops only that dilution. A refusal before any attempt is a lock mismatch, a missing or bad built digest (CALC-REQ-4), or a sandbox failure (CALC-REQ-4a), and it writes nothing. The per-sample order is `run_failed` > `dilution_invalid` > `el_missing` > `missing_input` > `limit_above_el` or `limit_below_el`. When more than one of those applies, every applicable flag is stored, in this order, and the UI shows the first:
     1. `run_failed` (CALC-REQ-13, CALC-REQ-16, CALC-REQ-21).
     2. `dilution_invalid` (CALC-REQ-11 above MVD, CALC-REQ-16 sample or spike %CV, CALC-REQ-18 recovery).
     3. `el_missing` (no EL).
@@ -229,9 +229,9 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
     - A `not_detected` result on a failed run with no EL stores `run_failed` and then `el_missing`, shows `run_failed`, and stores no limit flag.
 - **CALC-REQ-20 [Not built]** Not detected. No onset by the cutoff (7200 s by default, STE-1.2 §7.4) is reported as `<` (not detected): a below-limit result with a qualifier, **not missing data**. STE-1.2 §7.4 notes that some lysate lots need a longer time (for example 9600 s); the cutoff is a configuration input in s, not a constant (OQ-CALC-10). The limit reported after `<` is L in CALC-REQ-19.
   - AC: a tube with no onset at 7200 s produces a `<` result, is counted as a result, and is never shown or counted as missing.
-- **CALC-REQ-21 [Not built]** Run-level QC summary. A LAL run records pass or fail. The run-failure code is `run_failed`. The summary names which condition produced it: |r| below 0.980 (CALC-REQ-13), fewer than three calibrators (CALC-REQ-13), a calibrator %CV above 25% (CALC-REQ-16), or a QC %CV above 25% (CALC-REQ-16). A failed run produces no sample pass/fail. QC accuracy against nominal and a numeric negative-control limit are lab-set and are not in v1 (OQ-CALC-1, OQ-CALC-2). When `non_positive_log_input` stops the LAL curve, the run summary records a stage stop naming `non_positive_log_input`. It is not `run_failed`. The repeat policy is left to OQ-CALC-11.
+- **CALC-REQ-21 [Not built]** Run-level QC summary. A LAL run records pass, fail, or stopped (naming the stage-stop code). The run-failure code is `run_failed`. The summary names which condition produced it: |r| below 0.980 (CALC-REQ-13), fewer than three calibrators (CALC-REQ-13), a calibrator %CV above 25% (CALC-REQ-16), or a QC %CV above 25% (CALC-REQ-16). A failed run produces no sample pass/fail. QC accuracy against nominal and a numeric negative-control limit are lab-set and are not in v1 (OQ-CALC-1, OQ-CALC-2). When `non_positive_log_input` stops the LAL curve, the run summary records a stage stop naming `non_positive_log_input`. It is not `run_failed`. The repeat policy is left to OQ-CALC-19.
   - **Precedence.** Stage stops (`non_positive_log_input`, `r_timeout`, `backend_timeout`, `r_non_finite`, `curve_not_fitted`) and refusals before any attempt (lock mismatch, missing or bad built digest, sandbox failure; CALC-REQ-4, CALC-REQ-4a) take precedence over the per-sample list in CALC-REQ-19 (`run_failed` > `dilution_invalid` > `el_missing` > `missing_input` > `limit_above_el` or `limit_below_el`). A stage stop is recorded on the attempt and stores no per-sample flag for that stage. A refusal writes nothing.
-  - AC: each of those four conditions stores `run_failed` and names the condition. A run that fails any of them shows `run_failed` and no sample pass/fail. A `non_positive_log_input`, `r_timeout`, `backend_timeout`, or `r_non_finite` is recorded as that stage stop and is not stored as `run_failed`. A lock, digest, or sandbox refusal writes no run summary.
+  - AC: each of those four conditions stores `run_failed` and names the condition. A run that fails any of them shows `run_failed` and no sample pass/fail. A `r_timeout`, `backend_timeout`, or `r_non_finite` is recorded as that stage stop and is not stored as `run_failed`. A LAL curve stopped with `non_positive_log_input` shows a run summary naming `non_positive_log_input`, not `run_failed`, and records no sample pass/fail. A lock, digest, or sandbox refusal writes no run summary.
 
 ### 3.6 Closed catalog and no-code builder
 
@@ -325,6 +325,7 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-16 | Timeout lengths. **Default, Marc to confirm:** R stops a request at 50 s. The backend stops waiting at 60 s, matching the shipped `FIT_TIMEOUT_SECONDS`. | CALC-REQ-4a | Product. Tobias N2. |
 | OQ-CALC-17 | Is password re-entry required on top of the confirm token? **Default, Marc to confirm:** no. The confirm token alone suffices. | CALC-REQ-34 | Product. Tobias N4. |
 | OQ-CALC-18 | Is `lal_back_calc` one stage per sample dilution? **Default, Marc to confirm:** yes. One NaN or timeout (`r_non_finite`, `r_timeout`, `backend_timeout`) on that stage stops only that dilution, not every sample. | CALC-REQ-17, 19 | Product. Tobias M1. |
+| OQ-CALC-19 | **Open.** What repeat policy applies after `non_positive_log_input` stops the LAL curve? STE-1.2 §8.5 does not state it. | CALC-REQ-12, 21 | Lab-set. Tobias B2. |
 
 ---
 
@@ -348,7 +349,7 @@ Rolf and Marc are still pending. No stamp is given until the named person gives 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
 | 1 | Security review | Günter | Accept at 4cad42a, CI green required, not posted on GitHub | 2026-11-04 | 4cad42a |
-| 2 | Fail bars written | Tobias | Request changes at 5990366 (B1), re-check pending, not posted | 2026-11-04 | 5990366 |
+| 2 | Fail bars written | Tobias | Request changes at dda07f6 (B2), re-check pending, not posted | 2026-11-04 | dda07f6 |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
 | 5 | Spec review | Wilhelmina | Accept at this push's head, CI green required | 2026-11-04 | this push's head |
