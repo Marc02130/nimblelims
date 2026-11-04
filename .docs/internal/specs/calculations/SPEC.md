@@ -259,7 +259,7 @@ Günter has requested changes. That row is not Accept. Tobias, Rolf, and Marc ar
 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
-| 1 | Security review | Günter | Changes requested (H1, H2), folded at FOLD_SHA, awaiting his re-review. Not Accept. | 2026-11-04 | |
+| 1 | Security review | Günter | Changes requested (H1, H2), folded at 7b9fa1c, awaiting his re-review. Not Accept. | 2026-11-04 | |
 | 2 | Fail bars written | Tobias | Pending | | |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
