@@ -52,8 +52,15 @@ Anything else is not in this Spec.
 ## 2. Definitions
 
 - **Function:** a named calculation in the catalog, for example `lal_endotoxin_limit`. Identified by `name` plus an integer `version`.
-- **Lock:** the pair (R service image digest `sha256:…`, SHA-256 of the committed `renv.lock` file bytes).
-- **Lock hash:** SHA-256 of the UTF-8 string `<image digest>\n<renv.lock sha256>`. One lock hash names one runnable R environment.
+- **Lock hash:** one value for one runnable R environment. It is SHA-256 of a UTF-8 preimage with three fields, separated by a single LF (U+000A), with no spaces and no trailing LF:
+
+  `<base>\n<renv>\n<tree>`
+
+  - `<base>` is 64 lowercase hex digits: the digest in the Dockerfile `FROM <image>@sha256:<base>`. It is the pinned base image, not the built service image.
+  - `<renv>` is 64 lowercase hex digits: SHA-256 of the raw bytes of the committed `renv.lock`.
+  - `<tree>` is the lowercase hex git tree id of `services/r-calculator` (`git rev-parse <commit>:services/r-calculator`). That tree is the function source. The catalog function version is not an input. It is stored on the result beside the lock hash (CALC-REQ-30).
+
+  The lock hash is reported as 64 lowercase hex digits. Two builds of the same commit produce the same preimage and the same lock hash. The built image digest is recorded alongside the lock hash and is not an input to it, because a rebuild changes that digest. `/health` gets `<base>` and `<tree>` from build args baked into the image, and computes `<renv>` from the `renv.lock` copied into the image. The backend's expected lock hash is recomputed from the commit the same way, with no image build.
 - **Release:** a calculation-scoped bundle of new function versions, their KATs, and the lock hash they were proven on.
 - **Calculation configuration:** a no-code composition of catalog functions with input bindings, constants, and units, for one analysis.
 - **Stage:** one function call inside a configuration. Each stage has a stop rule.
@@ -70,14 +77,14 @@ Anything else is not in this Spec.
 
 ### 3.2 (a) Pin the R service
 
-- **CALC-REQ-2 [Not built]** The R service base image is referenced by digest (`FROM <image>@sha256:<digest>`), not by tag. The deployed service image is identified by its own digest.
-  - AC: the Dockerfile has no `FROM` line without `@sha256:`. Two builds from the same commit report the same lock hash on `/health`.
+- **CALC-REQ-2 [Not built]** The R service base image is referenced by digest (`FROM <image>@sha256:<digest>`), not by tag. The lock hash uses that base digest (§2). The built image has its own digest, recorded alongside the lock hash, and that built digest is not part of the lock hash.
+  - AC: the Dockerfile has no `FROM` line without `@sha256:`. Two builds from the same commit report the same lock hash on `/health`. Their built image digests may differ, and each is recorded. Recomputing §2 from the commit, without building, yields that same lock hash.
 - **CALC-REQ-3 [Not built]** R packages come only from a committed `renv.lock` (`renv::restore()`). The image build does no unversioned `install.packages`. A restore that cannot match the lock fails the build.
   - AC: the Dockerfile restores from `renv.lock` and contains no `install.packages(` call. Changing one package version in `renv.lock` changes the lock hash.
-- **CALC-REQ-4 [Not built]** `GET /health` reports the image digest, the `renv.lock` SHA-256, and the lock hash. The backend holds the expected lock hash. **Stop rule:** if the reported lock hash differs from the expected one, or `/health` does not report one, the backend refuses every calculation call and writes nothing.
-  - AC: with a mismatched expected hash, a calculation request returns an error that names the mismatch, and no result row exists afterwards. Shipped `/health` reports only `drc_version` and `r_version`.
-- **CALC-REQ-4a [Not built]** R sandbox and secrets (Günter H1). The R container runs as non-root, with a read-only root filesystem and tmpfs scratch, no network egress, and no host port. It has CPU, memory, and PID limits, and a per-request timeout enforced in both R and the backend. No database URL, credentials, or secrets are in the container. On `main` at `8e327c2`, `docker-compose.yml` already omits a host `ports:` block for `r-calculator` and sets no environment on that service. The Dockerfile has no `USER`. There is no read-only root, tmpfs, egress deny, or resource limit, and Plumber enforces no per-request timeout. The backend fit client times out at 60 s (`FIT_TIMEOUT_SECONDS` in `backend/app/services/r_calculator_client.py`); that client timeout is not this rule.
-  - AC: from inside the running container, an outbound connection attempt fails. A write outside the tmpfs scratch fails. The process uid is not 0. The container environment has no `DATABASE_URL`, no variable whose name ends in `_KEY`, and no variable whose name ends in `_SECRET`.
+- **CALC-REQ-4 [Not built]** `GET /health` reports `<base>`, `<renv>`, `<tree>`, and the lock hash from §2, and the built image digest when the runtime supplies it. The backend holds the expected lock hash, recomputed from the commit. **Stop rule:** if the reported lock hash differs from the expected one, or `/health` does not report one, the backend refuses every calculation call and writes nothing.
+  - AC: with a mismatched expected hash, a calculation request returns an error that names the mismatch, and no result row exists afterwards. The reported lock hash equals SHA-256 of the §2 preimage recomputed from the commit. Shipped `/health` reports only `drc_version` and `r_version`.
+- **CALC-REQ-4a [Not built]** R sandbox and secrets (Günter H1, fail closed in his re-review B3). The R container runs as non-root, with a read-only root filesystem and tmpfs scratch, no network egress, and no host port. It has CPU, memory, and PID limits, and a per-request timeout enforced in both R and the backend. No database URL, credentials, or secrets are in the container, in image layers, or in build args. On `main` at `8e327c2`, `docker-compose.yml` already omits a host `ports:` block for `r-calculator` and sets no environment on that service. The Dockerfile has no `USER`. There is no read-only root, tmpfs, egress deny, or resource limit, and Plumber enforces no per-request timeout. The backend fit client times out at 60 s (`FIT_TIMEOUT_SECONDS` in `backend/app/services/r_calculator_client.py`); that client timeout is not this rule. **Fail closed:** if the running container does not meet this rule, the backend refuses every calculation call and writes nothing. It checks at startup and again alongside the lock check on every calculation call. A timeout in R or in the backend stops that stage with a system code, `r_timeout` or `backend_timeout`, and stores nothing. Those codes are not a user-entered reason (CALC-REQ-36).
+  - AC: from inside the running container, an outbound connection attempt fails. A write outside the tmpfs scratch fails. The process uid is not 0. The container environment, the image history, and the build args have no `DATABASE_URL`, no variable whose name ends in `_KEY`, and no variable whose name ends in `_SECRET`. `docker inspect` shows a read-only root filesystem and CPU, memory, and PID limits. When the startup check or the lock-check companion fails, a calculation call writes nothing. An R timeout stores no result. A backend timeout stores no result.
 
 ### 3.3 (b) Known-answer tests
 
@@ -102,8 +109,8 @@ The IL-6 serum ELISA pack (synthetic Gen5 fixture, duplicates, 8 standards, low/
   - Inputs: curve parameters from CALC-REQ-8, sample response (`OD`), dilution factor (unit `1`).
   - Output: concentration in the calibrator concentration unit.
   - Missing-data rule: no numeric response, or no dilution factor, gives no concentration and a "missing input" flag. A response at or beyond an asymptote has no inverse and is flagged, not assigned a number.
-  - Stop rule: the function never extrapolates. A response outside the fitted calibrator range is returned as out-of-range with no numeric concentration. How out-of-range is reported (LLOQ/ULOQ wording, `<`/`>`) is lab-set (OQ-CALC-11).
-  - AC: a KAT sample inside the range back-calculates within tolerance; a response above the top calibrator response returns out-of-range with no number.
+  - Stop rule: the function never extrapolates. The range is the observed arithmetic-mean response of the lowest-concentration used calibrator and of the highest-concentration used calibrator. A response outside that span has no numeric concentration. Past the high-concentration calibrator's mean, the qualifier is `>`, the result is flagged, and the UI prompts dilute and rerun. Past the low-concentration calibrator's mean, the qualifier is `<` and the result is flagged. The text after `<` or `>` is lab-set (OQ-CALC-11). Gates that read this result use CALC-REQ-37.
+  - AC: a KAT sample inside the range back-calculates within tolerance. On `backend/tests/fixtures/elisa/IL6-PLT-0001_Gen5.csv`, IL6-SER-0007 has corrected OD 2.608 and 2.536 (mean 2.572) and STD-S1 has corrected OD 2.058 and 2.089 (mean 2.0735). IL6-SER-0007 is `>` with no numeric concentration. It is not a back-calculated number, including not about 499.6 pg/mL.
 
 ### 3.5 (c) Stress case: kinetic turbidity LAL endotoxin (STE-1.2)
 
@@ -120,17 +127,18 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - Output: MVD, unit `1` (dimensionless).
   - Missing-data rule: when the dose is unknown (no EL), MVD = 500, and the output records that the dose-unknown rule was used (STE-1.2 §6 also sets the highest final test concentration to 1 mg/mL in that case).
   - Stop rule: a tested dilution above the MVD is refused for that dilution; its result is not reportable.
-  - AC: EL 0.5 EU/mg, 10 mg/mL, λ 0.001 EU/mL gives MVD 5000 (STE-1.2 §6 example). No EL gives 500 with the dose-unknown marker. A dilution of 10000 against MVD 5000 is refused.
+  - AC: EL 0.5 EU/mg, 10 mg/mL, λ 0.001 EU/mL gives MVD 5000 (STE-1.2 §6 example). No EL gives 500 with the dose-unknown marker. A dilution equal to the MVD is allowed (CALC-REQ-37). A dilution of 10000 against MVD 5000 is refused.
 - **CALC-REQ-12 [Not built]** `lal_kinetic_standard_curve` v1: linear regression of log10(onset time) on log10(calibrator concentration).
   - Inputs: calibrator nominal concentration in EU/mL, onset time in s, replicate identity.
-  - Outputs: slope (unit `1`, expected negative), intercept (log10 s), correlation coefficient r (unit `1`), calibrators used and dropped (count and identity).
+  - Outputs: slope (unit `1`, expected negative), intercept (unit `1`, label `log10(s)`), correlation coefficient r (unit `1`), calibrators used and dropped (count and identity).
+  - Points: each used calibrator level enters the regression once. The y value is log10 of the arithmetic mean of that level's replicate onset times, in s. The x value is log10 of the nominal concentration, in EU/mL. Individual tubes are not separate points. The negative control, 0 EU/mL, is never a point.
   - Basis: STE-1.2 §8.1 says only that linear regression builds the curve. Log-log is **USP practice**, not SOP text. Confirming log-log is OQ-CALC-3.
   - Missing-data rule: a calibrator tube with no onset time is excluded and counted; a calibrator level with no tubes left is dropped.
-  - Stop rule: see CALC-REQ-13.
-  - AC: a KAT with four calibrators and known onset times reproduces slope, intercept, and r within tolerance, and the slope is negative.
+  - Stop rule: a calibrator concentration ≤ 0, or a replicate onset ≤ 0 that would enter the mean, stops the curve. Nothing is passed to log10. The system code is `non_positive_log_input`. It is not a user-entered reason (CALC-REQ-36). Curve acceptance is CALC-REQ-13.
+  - AC: a KAT with four calibrators and known onset times reproduces slope, intercept, and r within tolerance, and the slope is negative. The fit matches the arithmetic level means, not one point per tube. A 0 EU/mL negative control does not change the fit. A concentration or onset of 0 stops the curve with `non_positive_log_input` and stores no slope.
 - **CALC-REQ-13 [Not built]** Curve acceptance (STE-1.2 §8.2, §8.3, §8.5). The engine tests **|r| ≥ 0.980**, because r is negative for this curve. At least three calibrators must remain. **Stop rule:** |r| < 0.980, or fewer than three calibrators, fails the curve, and the run is to be repeated (§8.5). No sample result is computed on a failed curve.
   - Dropping calibrators: STE-1.2 §8.2 states the minimum of three. It does not itself spell out a dropping procedure. This Spec allows a calibrator to be dropped while at least three remain, as the brief directs; confirming that reading is OQ-CALC-4. A drop is a recorded exclusion (CALC-REQ-27), never silent.
-  - AC: r = −0.985 with four calibrators passes. r = −0.975 fails with "repeat run". Dropping one of four calibrators leaves three and the curve is evaluated; dropping two is refused.
+  - AC: r = −0.985 with four calibrators passes. r = −0.975 fails with "repeat run". r = −0.97995 fails: |r| is compared unrounded to 0.980 (CALC-REQ-37), so rounding to three decimal places first, which would show 0.980, does not pass. Dropping one of four calibrators leaves three and the curve is evaluated; dropping two is refused.
 - **CALC-REQ-14 [Not built]** `percent_cv` v1: %CV = SD / mean × 100.
   - Inputs: two or more replicate values in one shared unit.
   - Output: %CV in `%`.
@@ -145,16 +153,16 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - Stop rule: a sample or spiked-control %CV above 25% marks that sample dilution as failing §8.6 or §8.7; it is not passed to sample pass/fail. Whether another valid dilution may then be reported is OQ-CALC-9.
   - AC: QC duplicates at 30% CV fail the run with "repeat run". A sample dilution at 30% CV is marked and is not used for pass/fail.
 - **CALC-REQ-17 [Not built]** `lal_back_calc` v1: back-calculate concentration from the curve, multiply by the dilution factor, divide by sample concentration (STE-1.2 §6 states the goal is endotoxin per mg).
-  - Inputs: curve (CALC-REQ-12), mean onset time in s, dilution factor (unit `1`), sample concentration in mg/mL.
+  - Inputs: curve (CALC-REQ-12), arithmetic mean of the replicate onset times in s, dilution factor (unit `1`), sample concentration in mg/mL.
   - Outputs: measured concentration in EU/mL, concentration corrected for dilution in EU/mL, result in EU/mg.
   - Missing-data rule: no onset by the cutoff is **not missing** (CALC-REQ-20). No dilution factor or no sample concentration gives no EU/mg value and a "missing input" flag.
-  - Stop rule: an onset time outside the calibrator range is not extrapolated (same rule as CALC-REQ-9).
-  - AC: a KAT onset time between two calibrators back-calculates within tolerance, and the EU/mg value equals EU/mL × dilution ÷ mg/mL.
-- **CALC-REQ-18 [Not built]** `lal_spike_recovery` v1: recovery % = (spiked − unspiked) / 0.05 × 100, with both values in EU/mL at the same dilution and 0.05 EU/mL the nominal spike (STE-1.2 §5.3). The formula is **USP practice, not in the SOP**; STE-1.2 §8.8 gives the acceptance range only. Confirming the formula is OQ-CALC-6.
+  - Stop rule: an onset outside the range in CALC-REQ-9 is not extrapolated. Shorter than the mean onset of the highest-concentration used calibrator is `>` (above the top), flagged, with a dilute-and-rerun prompt, and no numeric concentration. Longer than the mean onset of the lowest-concentration used calibrator, while still before the cutoff, is `<` (below the bottom), flagged, and no numeric concentration. That `<` is not "not detected". Not detected remains no onset by the cutoff (CALC-REQ-20). The text after the qualifier is OQ-CALC-7.
+  - AC: a KAT onset time between the endpoint calibrator means back-calculates within tolerance, and the EU/mg value equals EU/mL × dilution ÷ mg/mL. An onset past either end stores no number. An onset past the slow end but before the cutoff is `<`, and it is counted as a result, not as missing.
+- **CALC-REQ-18 [Not built]** `lal_spike_recovery` v1: recovery % = (spiked − unspiked) / 0.05 × 100. Both values are the measured in-tube concentration in EU/mL at that dilution, not the dilution-corrected concentration. 0.05 EU/mL is the nominal in-tube spike (STE-1.2 §5.3). The formula is **USP practice, not in the SOP**; STE-1.2 §8.8 gives the acceptance range only. Confirming the formula is OQ-CALC-6.
   - Output: recovery in `%`.
-  - Acceptance (STE-1.2 §8.8, §8.9): 50–200% passes. Below 50% means inhibition; above 200% means enhancement or contamination. **Stop rule:** outside 50–200%, that sample's result at that dilution is invalid and is not passed to pass/fail.
+  - Acceptance (STE-1.2 §8.8, §8.9): 50–200% inclusive passes (CALC-REQ-37). Below 50% means inhibition; above 200% means enhancement or contamination. **Stop rule:** outside 50–200%, that sample's result at that dilution is invalid and is not passed to pass/fail.
   - Missing-data rule: no spiked value gives no recovery and the dilution is not reportable. An unspiked value that is not detected is handled per OQ-CALC-7.
-  - AC: spiked 0.06 EU/mL, unspiked 0.01 EU/mL gives 100%. A difference of 0.02 EU/mL (40%) marks the dilution invalid for inhibition; a difference of 0.12 EU/mL (240%) marks it invalid for enhancement or contamination.
+  - AC: spiked 0.06 EU/mL and unspiked 0.01 EU/mL, in-tube, give the unrounded decimal 100. Spiked 0.026 and unspiked 0.001 give exactly 50 and pass. Spiked 0.171 and unspiked 0.071 give exactly 200 and pass. A binary value of 49.99999999999999 where the decimal is 50 does not fail. A difference of 0.02 EU/mL (40%) marks the dilution invalid for inhibition; a difference of 0.12 EU/mL (240%) marks it invalid for enhancement or contamination. A dilution-corrected pair is not the input.
 - **CALC-REQ-19 [Not built]** `lal_sample_pass_fail` v1: a sample passes if its EU/mg result is at or below EL (STE-1.2 §9.1).
   - Inputs: result in EU/mg, EL in EU/mg.
   - Output: pass or fail.
@@ -172,8 +180,8 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - AC: the catalog lists exactly these nine entries, each with every declared field filled. An attempt to add or enable an entry through the API, the UI, a database write by the application role, runtime config, or an agent run is refused, and the catalog is unchanged. A new entry appears only after a reviewed pull request that changes the catalog in code is merged.
 - **CALC-REQ-23 [Not built]** Calculations are configured only in a no-code builder: pick catalog functions, bind each input to a run column, an upstream stage output, or a constant, each with its unit. There is no expression language and no free-text formula.
   - AC: the builder offers only catalog functions; there is no text field that accepts a formula or code.
-- **CALC-REQ-24 [Not built]** **Prohibited:** user code, scripts, plugins, a webhook runtime, and any generic "run R" (or run-any-code) endpoint. The R service exposes only `/health` and one route per catalog function. A request naming an unknown function or unknown model is refused; it never falls back to a default.
-  - AC: a call to a non-catalog function name, or a body carrying code, is refused. Shipped `fit_compound` silently substitutes `LL.4` for an unknown model name, which this rule forbids.
+- **CALC-REQ-24 [Not built]** **Prohibited:** user code, scripts, plugins, a webhook runtime, and any generic "run R" (or run-any-code) endpoint. The R service exposes `/health`, one route per catalog function, and the pre-existing dose-response routes `POST /fit` and `POST /svg/full`. Those two stay, because dose-response on `main` calls them (`backend/app/services/r_calculator_client.py`). They stay until `fit_compound` is brought under these rules. No other route. A new route that runs caller-supplied code, or that accepts an unknown function or model name, is refused and does not fall back to a default.
+  - AC: `POST /fit` and `POST /svg/full` still answer a dose-response call. A call to any other non-catalog path, or a body carrying code, is refused. A new route that is given an unknown model name is refused and does not run `LL.4`. Shipped `fit_compound` still silently substitutes `LL.4` for an unknown model name; that stays a defect of the existing route, and this rule forbids it on every route added for the catalog.
 
 ### 3.7 Stop rules, missing data, units
 
@@ -183,15 +191,15 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - AC: for each catalog function, a KAT case with a missing input shows the declared outcome.
 - **CALC-REQ-27 [Partly shipped]** An excluded point (knockout or calibrator drop) is a recorded exclusion with who and when, and is reversible by recording a new calculation result. Shipped: `lims_run_data_exclusions` records `excluded_by`, `excluded_at`, and an optional reason for dose-response points. Not built: the same for ELISA and LAL calibrators and replicates.
   - AC: after a calibrator drop, the calculation result lists the dropped calibrator, the user, and the time.
-- **CALC-REQ-28 [Not built]** Units are explicit on every input and every output, using the existing `units` table. Dimensionless values are declared as unit `1`; percentages as `%`. A binding whose unit does not match the function's declared unit (after a defined conversion within the same unit type) is refused at configuration time.
-  - AC: binding a mg/kg value to an input declared in EU/mL is refused. Every stored output carries its unit. Shipped: `concentration_unit` is sent to R and unused, and `dose_response_results` has no unit column.
+- **CALC-REQ-28 [Not built]** Units are explicit on every input and every output, using the `units` table. Percentages use the existing `%`. The table gains an additive seed for `OD` (type `absorbance`), `s` (type `time`), `EU/kg` (type `endotoxin_per_body_mass`), `EU/mg` (type `endotoxin_per_mass`), `mg/kg` (type `dose`), and `1` (type `dimensionless`). Each of those six is multiplier 1 in its own type. None shares a type with `EU/mL` (type `activity`, migration `0092_concentration_unit_scales`) or with `mg/mL` (type `concentration`), so none converts onto those. The log-log intercept is unit `1` with label `log10(s)`, not a unit named log10 s. A binding whose unit does not match the function's declared unit (after a defined conversion within the same unit type) is refused at configuration time.
+  - AC: the six names exist, each in the type named above. Binding a mg/kg value to an input declared in EU/mL is refused. `EU/kg` does not convert to `EU/mg` or to `EU/mL`. Every stored output carries its unit. Shipped: `concentration_unit` is sent to R and unused, and `dose_response_results` has no unit column. The six names are not in the seeded units at `8e327c2`.
 
 ### 3.8 Immutability, pinning, recompute
 
 - **CALC-REQ-29 [Not built]** A released function version is immutable. Any change to a formula, default, tolerance, unit, stop rule, or missing-data rule is a new version. A released version is never edited or deleted.
   - AC: an edit to a released version is refused; the same change saved as a new version succeeds and the old version is unchanged.
-- **CALC-REQ-30 [Not built]** Every calculation result records the function name and version of every stage, and the lock hash it ran on.
-  - AC: a stored result shows each stage's function version and the lock hash, and that lock hash matches `/health` at the time it ran.
+- **CALC-REQ-30 [Not built]** Every calculation result records the function name and version of every stage, the lock hash it ran on, and the built image digest recorded alongside that hash (§2). The function version and the built digest are not inputs to the lock hash.
+  - AC: a stored result shows each stage's function version, the lock hash, and the built image digest. The lock hash matches `/health` at the time it ran. The built digest may differ from the base digest inside the lock hash.
 - **CALC-REQ-31 [Partly shipped]** No silent recompute. A recompute is an explicit, recorded new result that links to the result it replaces and records who triggered it, when, and why it ran (knockout, new version, new lock). The old result is kept. Shipped: a dose-response refit writes a new row with `fit_version + 1` and `superseded_by`. Not built: lock hash and function version on that row; the same rule for ELISA and LAL; and the PDF SVG path, which re-fits on all points without the stored constraints instead of drawing the stored result.
   - AC: after a recompute, both results exist and the new one links to the old one. Opening, exporting, or reporting a result never runs a calculation.
 - **CALC-REQ-32 [Not built]** A new lock hash never rewrites results made on an earlier one. Recomputing on the new lock is an explicit recompute (CALC-REQ-31).
@@ -204,21 +212,26 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
 
 ### 3.10 Agent proposes, a named person activates
 
-- **CALC-REQ-34 [Not built]** The configuring AI agent may propose a calculation configuration (functions, bindings, constants, units) through the builder. It cannot activate one, and it cannot change the catalog (CALC-REQ-22). Shipped: the agent's allow-list refuses `/v1/lims-runs` ("Run analysis and dose-response are not configuration"); this Spec does not change that for running fits. Activation is refused server-side for every agent run context, including bulk, apply, and import (Günter H2). The refusal is both the allow-list and a check on the activation route. Activation needs a separate interactive request. An agent proposal does not carry an activation.
-  - AC: an agent run can create a proposed configuration. The same run, and its bulk, apply, and import paths, cannot activate it: the call is refused and no activation row is written. A separate interactive request is what activation accepts. Which role may send that request is OQ-CALC-14. Whether the proposer or the session owner may send it for their own proposal is OQ-CALC-15.
-- **CALC-REQ-35 [Not built]** Activation is a separate interactive request from a named, signed-in person (CALC-REQ-34). The role that may activate is Lab Manager or Admin, and is not chosen here (OQ-CALC-14). Whether the proposer or the session owner may activate their own proposal is not chosen here (OQ-CALC-15). Activation records the person, time, the function versions, the lock hash, and a validation-state value. The validation state is recorded, **not a required gate**: once the caller is allowed, activation succeeds whatever the state. The list of state values is OQ-CALC-12. Activation adds no reason field. The activation row is append-only. `created_by` equals `current_user_id()`, and the database enforces that. A forged actor, a `created_by` other than `current_user_id()`, gets SQLSTATE 42501 and no row. UPDATE and DELETE of an activation row are refused the same way. `current_user_id()` already exists (`backend/db/migrations/versions/0003_rls_policies.py`). The activation table does not.
-  - AC: a caller who is not the role decided in OQ-CALC-14 is refused server-side and no row is written. Until OQ-CALC-14 is decided, that bar is not scorable. A proposer or session owner self-activating is allowed only if OQ-CALC-15 says so; until then that bar is not scorable. An interactive activation by an allowed caller, with any validation-state value, succeeds and the row shows that person, the time, the versions, the lock hash, and the state. Inserting a row whose `created_by` is not `current_user_id()` fails with SQLSTATE 42501 and stores nothing. UPDATE and DELETE of a stored activation row fail and leave the row unchanged.
+- **CALC-REQ-34 [Not built]** The configuring AI agent may propose a calculation configuration (functions, bindings, constants, units) through the builder. It cannot activate one, and it cannot change the catalog (CALC-REQ-22). Shipped: the agent's allow-list refuses `/v1/lims-runs` ("Run analysis and dose-response are not configuration"); this Spec does not change that for running fits. Activation is refused server-side for every agent run context, including bulk, apply, and import (Günter H2). The refusal is both the allow-list and a check on the activation route. An agent proposal does not carry an activation. A separate interactive request (Günter re-review B1) means all of the following. The activate route requires a single-use confirm token. The activate dialog issues that token, or the server issues it when the same person re-enters their password. The re-entered password is not stored, not logged, and not a reason field. The token is valid for 5 minutes from issue and then expires. The route refuses any request that carries a configuring-agent run context, even when the request uses that same person's access token and a fresh confirm token. Who may send the interactive request is CALC-REQ-35.
+  - AC: an agent run can create a proposed configuration. Replaying that person's access token from an agent run is refused, including when the replay carries a fresh confirm token, and no activation row is written. A request with no confirm token is refused and writes no row. A reused confirm token is refused and writes no row. A token older than 5 minutes is refused and writes no row. Bulk, apply, and import paths of an agent run write no activation row.
+- **CALC-REQ-35 [Not built]** Only an Admin may activate a calculation, enforced server-side (OQ-CALC-14, Decided, Marc, 2026-11-03). Self-activation is allowed (OQ-CALC-15, Decided, Marc, 2026-11-03): an Admin who proposed the configuration, or who owns the session, may activate that proposal. The activation row records that Admin as the named person (`created_by = current_user_id()`). The configuring agent is never allowed to activate (CALC-REQ-34). Activation is the interactive confirm path in CALC-REQ-34. It records the person, time, the function versions, the lock hash, and a validation-state value. The validation state is recorded, **not a required gate**: an Admin's activation succeeds whatever the state. The list of state values is OQ-CALC-12. Activation adds no reason field. The activation row is append-only. The database enforces `created_by = current_user_id()`. A forged actor, a `created_by` other than `current_user_id()`, gets SQLSTATE 42501 and no row. UPDATE and DELETE of an activation row are refused the same way. `current_user_id()` already exists (`backend/db/migrations/versions/0003_rls_policies.py`). The activation table does not.
+  - AC: (a) a Lab Manager is refused and no row is written. (b) Any other non-Admin role is refused and no row is written. (c) An Admin who completes the interactive confirm path succeeds, for any validation-state value, and the row shows that Admin, the time, the versions, the lock hash, and the state. (d) An Admin who proposed the configuration, or who owns the session, can activate that proposal, and the row records them as the named person. (e) An agent run context is always refused and no row is written. Inserting a row whose `created_by` is not `current_user_id()` fails with SQLSTATE 42501 and stores nothing. UPDATE and DELETE of a stored activation row fail and leave the row unchanged.
 
 ### 3.11 Reasons
 
-- **CALC-REQ-36 [Shipped]** This Spec adds **no** required reason field. The only existing required reason it touches is the dose-response reset-fit reason (`reset_fit_reason_required`): 1–4000 characters, refused when missing, blank, or whitespace-only, including NBSP and U+2007 (`backend/app/core/required_reason.py`). The data-point exclusion reason stays optional, shares the 4000 maximum, and a whitespace-only value (including NBSP and U+2007) is not stored as a reason.
-  - AC: no route added for this Spec requires a reason.
+- **CALC-REQ-36 [Shipped]** This Spec adds **no** required reason field. The only existing required reason it touches is the dose-response reset-fit reason (`reset_fit_reason_required`): 1–4000 characters, refused when missing, blank, or whitespace-only, including NBSP and U+2007 (`backend/app/core/required_reason.py`). The data-point exclusion reason stays optional, shares the 4000 maximum, and a whitespace-only value (including NBSP and U+2007) is not stored as a reason. System codes on a stopped stage (`non_positive_log_input`, `r_timeout`, `backend_timeout`) are not user-entered reasons and have no text field.
+  - AC: no route added for this Spec requires a reason. None of those system codes accepts or requires a reason string.
+
+### 3.12 Precision of gates
+
+- **CALC-REQ-37 [Not built]** Gates compare unrounded decimal values. The gate quantities are computed in decimal arithmetic, not binary floating point, so a result that is exact in decimal stays exact: (0.026 − 0.001) / 0.05 × 100 is 50, and (0.171 − 0.071) / 0.05 × 100 is 200. Bounds are inclusive: |r| ≥ 0.980, %CV ≤ 25%, 50% ≤ spike recovery ≤ 200%, dilution ≤ MVD, and sample result ≤ EL. Rounding is for display only. Each numeric output stores the unrounded decimal and the display precision declared for that output on the catalog entry. Display rounds half away from zero to that precision, and the result records the precision. No gate reads the displayed value. This Spec does not pick a global number of decimal places.
+  - AC: |r| = 0.97995 fails the 0.980 gate. Rounding it to three decimal places before the compare, which would show 0.980, is a failure of this rule. Recovery whose decimal value is 50 or 200 passes, including the pairs 0.026 with 0.001 and 0.171 with 0.071. A stored gate result that followed a binary value of 49.99999999999999 where the decimal is 50 fails this rule. The stored row has the unrounded value and the recorded display precision, and the displayed rounding is not what the gate compared.
 
 ---
 
 ## 4. Open questions
 
-Status labels follow [`.docs/review/open-questions/README.md`](../../../review/open-questions/README.md). All are **Open**. None of these values are invented here.
+Status labels follow [`.docs/review/open-questions/README.md`](../../../review/open-questions/README.md). OQ-CALC-14 and OQ-CALC-15 are **Decided**. The rest are **Open**. No open question is given a number here.
 
 | ID | Question | Blocks | Source |
 |----|----------|--------|--------|
@@ -228,15 +241,15 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-4 | Confirm calibrators may be dropped while at least three remain. STE-1.2 §8.2 states the minimum; who may drop, and on what basis, is not stated. | CALC-REQ-13 | STE-1.2 §8.2 |
 | OQ-CALC-5 | %CV: SD with n−1 or n; computed on onset time or on back-calculated concentration. | CALC-REQ-14, 16 | Not stated in STE-1.2 §8 |
 | OQ-CALC-6 | Confirm the spike-recovery formula. It is USP practice; STE-1.2 §8.8 gives only the 50–200% range. | CALC-REQ-18 | STE-1.2 §8.8, USP <85> |
-| OQ-CALC-7 | The number reported after `<` (for example λ × dilution ÷ mg/mL), and how a not-detected unspiked value enters spike recovery. | CALC-REQ-18, 19, 20 | Lab-set |
+| OQ-CALC-7 | The number reported after `<` or `>` (for example λ × dilution ÷ mg/mL), and how a not-detected unspiked value enters spike recovery. The qualifier direction is decided (CALC-REQ-9, CALC-REQ-17). | CALC-REQ-17, 18, 19, 20 | Lab-set |
 | OQ-CALC-8 | Handling a missing single tube, or a split duplicate (one tube with onset, one not detected). | CALC-REQ-14, 16 | Lab-set; not in STE-1.2 |
 | OQ-CALC-9 | Which of several valid dilutions is reported. | CALC-REQ-16, 17, 19 | Lab-set; not in STE-1.2 |
 | OQ-CALC-10 | Onset-time cutoff: fixed 7200 s, or set per lysate lot (STE-1.2 §7.4 allows longer). | CALC-REQ-20 | STE-1.2 §7.4 |
-| OQ-CALC-11 | ELISA: blank handling, 4PL weighting, curve acceptance, duplicate %CV limit, kit QC ranges, LLOQ/ULOQ wording, and the concentration unit of the IL-6 pack (the synthetic fixture's `Conc/Dil` column has none). | CALC-REQ-8, 9 | Lab-set; IL-6 pack |
+| OQ-CALC-11 | ELISA: blank handling, 4PL weighting, curve acceptance, duplicate %CV limit, kit QC ranges, the number shown after `<` or `>` (the qualifier direction is decided in CALC-REQ-9), and the concentration unit of the IL-6 pack (the synthetic fixture's `Conc/Dil` column has none). | CALC-REQ-8, 9 | Lab-set; IL-6 pack |
 | OQ-CALC-12 | The closed list of validation-state values recorded at activation. | CALC-REQ-35 | Product |
 | OQ-CALC-13 | Who supplies independent expected values for the IL-6 and LAL KATs. | CALC-REQ-6 | Product / QA |
-| OQ-CALC-14 | Which named role activates a calculation configuration: Lab Manager, or Admin? | CALC-REQ-34, 35 | Günter H2. Not decided here. |
-| OQ-CALC-15 | May the proposer, or the session owner, activate their own proposal? | CALC-REQ-34, 35 | Günter H2. Not decided here. |
+| OQ-CALC-14 | **Decided (Marc, 2026-11-03).** Only an Admin may activate a calculation, enforced server-side. | CALC-REQ-35 | Marc. Günter's re-review B2 is closed by this answer. |
+| OQ-CALC-15 | **Decided (Marc, 2026-11-03).** Self-activation is allowed, because a startup cannot be assumed to have a second person. The proposer or the session owner may activate their own proposal. The row records that named person (`created_by = current_user_id()`). The configuring agent can never activate. The person must still be an Admin (OQ-CALC-14). | CALC-REQ-35 | Marc. Günter's re-review B2 is closed by this answer. |
 
 ---
 
@@ -255,11 +268,11 @@ Stated explicitly, and not built by this Spec:
 
 ## 6. Review
 
-Günter has requested changes. That row is not Accept. Tobias, Rolf, and Marc are still pending. No stamp is given until the named person gives it.
+Günter and Tobias have requested changes. Those rows are not Accept, and Tobias's row is not Pass. Rolf and Marc are still pending. No stamp is given until the named person gives it.
 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
-| 1 | Security review | Günter | Changes requested (H1, H2), folded at 7b9fa1c, awaiting his re-review. Not Accept. | 2026-11-04 | |
-| 2 | Fail bars written | Tobias | Pending | | |
+| 1 | Security review | Günter | Re-review at f4b9749 found B1–B3. B1 and B3 folded at FOLD_SHA. B2 folded at FOLD_SHA via Marc's answers to OQ-CALC-14 and OQ-CALC-15 (both Decided 2026-11-03: Admin only; self-activation allowed). Awaiting his re-review. Not Accept. | 2026-11-04 | |
+| 2 | Fail bars written | Tobias | Request changes (B1–B7), folded at FOLD_SHA. Fail bars are his to finalize. Awaiting re-review. Not Pass. Not Accept. | 2026-11-04 | |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
