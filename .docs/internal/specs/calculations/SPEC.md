@@ -272,7 +272,7 @@ Günter and Tobias have requested changes. Those rows are not Accept, and Tobias
 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
-| 1 | Security review | Günter | B2 and B3 closed at 8e2cbae. The rest of B1 is folded at FOLD_SHA. Awaiting his re-review. Not Accept. | 2026-11-04 | |
+| 1 | Security review | Günter | B2 and B3 closed at 8e2cbae. The rest of B1 is folded at 3bf6269. Awaiting his re-review. Not Accept. | 2026-11-04 | |
 | 2 | Fail bars written | Tobias | Request changes (B1–B7), folded at 6f02dc7. Fail bars are his to finalize. Awaiting re-review. Not Pass. Not Accept. | 2026-11-04 | |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
