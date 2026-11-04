@@ -70,7 +70,9 @@ Anything else is not in this Spec.
   - `below_range`, shown `<`. A detected response or onset past the low-concentration end of the used calibrators (CALC-REQ-9, CALC-REQ-17).
   - `above_range`, shown `>`. A response or onset past the high-concentration end (CALC-REQ-9, CALC-REQ-17).
 
-  `not_detected` and `below_range` display the same symbol and are stored as different kinds. The number shown after the symbol is the result's limit, and its value is lab-set (OQ-CALC-7 for LAL, OQ-CALC-11 for ELISA).
+  `not_detected` and `below_range` display the same symbol and are stored as different kinds. The number after the symbol is the result's limit.
+  - For LAL, the limit is computed by the backend (CALC-REQ-19). For `<`, L is the lowest used calibrator × DF ÷ mg/mL. For `>`, U is the highest used calibrator × DF ÷ mg/mL.
+  - For ELISA, the limit is OQ-CALC-11.
 
 ---
 
@@ -106,8 +108,11 @@ Anything else is not in this Spec.
 
 ### 3.3 (b) Known-answer tests
 
-- **CALC-REQ-5 [Not built]** Every released function version has KATs: fixed inputs (with units), expected outputs (with units), and a declared tolerance per output (absolute or relative, with units). KATs run against the built, pinned image over HTTP, not against host R.
-  - AC: the KAT run log names the image digest and lock hash it ran on, and lists each case as pass or fail with the observed value, expected value, and tolerance. Shipped `test_fit.R` runs on the host, is not in CI, and uses a 10% band on one synthetic set; it does not meet this rule.
+- **CALC-REQ-5 [Not built]** Every released function version has KATs: fixed inputs (with units), expected outputs (with units), and a declared tolerance per output (absolute or relative, with units). KATs follow the split in CALC-REQ-37.
+  - **R-side steps** (the fits and the curve inversions): KATs run against the built, pinned image over HTTP, not against host R.
+  - **Backend steps** (EL, MVD, %CV, spike recovery, the dilution step, the range check, and every gate): KATs run against the backend's decimal code. They make no R call.
+  - A backend KAT whose expected value is exact in decimal (for example recovery 50, MVD 5000, |r| 0.98) uses tolerance 0.
+  - AC: the KAT run log names the image digest and lock hash it ran on, and lists each case as pass or fail with the observed value, expected value, and tolerance. It also names, for each case, whether it ran against R or the backend. A backend-step KAT that calls R fails this rule. Shipped `test_fit.R` runs on the host, is not in CI, and uses a 10% band on one synthetic set; it does not meet this rule.
 - **CALC-REQ-6 [Not built]** KAT expected values come from a cited source independent of the function under test (a published worked example, or a computation outside the R service that is recorded with the case). Synthetic or public data only. No SOP body text, no SOP PDF, and no client data in fixtures.
   - AC: each KAT case has a source citation. The STE-1.2 §6 worked example (EL 0.5 EU/mg, MVD 5000 at 10 mg/mL and HED 10 mg/kg) is a valid citation for `lal_endotoxin_limit` and `lal_mvd`, cited by section, not copied.
 - **CALC-REQ-7 [Not built]** **Stop rule (engineering, not lab validation):** a function version cannot be part of a release unless its KATs pass on the release's lock hash. A new lock hash re-runs every KAT of every released version it will serve.
@@ -123,7 +128,10 @@ The IL-6 serum ELISA pack (synthetic Gen5 fixture, duplicates, 8 standards, low/
   - Missing-data rule: a calibrator replicate with no numeric response is excluded from the fit and counted as excluded. It is never treated as zero.
   - Stop rule: fewer than four calibrator levels with a numeric response, or a fit that does not converge, ends the stage with "curve not fitted". No back-calculation runs on that plate.
   - AC: a KAT with a published or independently computed 4PL set reproduces the four parameters within the declared tolerance. A plate with three usable levels stops with "curve not fitted" and produces no sample concentrations.
-- **CALC-REQ-9 [Not built]** `elisa_4pl_back_calc` v1 inverts the fitted curve for each sample response, then multiplies by the dilution factor.
+- **CALC-REQ-9 [Not built]** `elisa_4pl_back_calc` v1 inverts the fitted curve for each sample response, then multiplies by the dilution factor. Split (CALC-REQ-37):
+  - The backend decides in-range or out-of-range in decimal from the raw response strings.
+  - R inverts in-range responses only.
+  - The backend multiplies by the dilution factor in decimal.
   - Inputs: curve parameters from CALC-REQ-8, sample response (`OD`), dilution factor (unit `1`).
   - Output: concentration in the calibrator concentration unit.
   - Missing-data rule: no numeric response, or no dilution factor, gives no concentration and a "missing input" flag. A response at or beyond an asymptote has no inverse and is flagged, not assigned a number.
@@ -134,19 +142,19 @@ The IL-6 serum ELISA pack (synthetic Gen5 fixture, duplicates, 8 standards, low/
 
 Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over four log decades (calibrators 1.0, 0.1, 0.01, 0.001 EU/mL, STE-1.2 §5.1); an inverse response (more endotoxin gives a shorter onset time, so the slope is negative); duplicates on every item; several dilutions per sample, each with its own spiked control; a run-repeat rule; and a below-limit "not detected" outcome.
 
-- **CALC-REQ-10 [Not built]** `lal_endotoxin_limit` v1: EL = K / M (STE-1.2 §6).
+- **CALC-REQ-10 [Not built]** `lal_endotoxin_limit` v1: EL = K / M (STE-1.2 §6). Runs in the backend, in decimal (CALC-REQ-37). No R call.
   - Inputs: K in EU/kg, from a closed choice of 5 EU/kg (all routes except intrathecal) or 0.2 EU/kg (intrathecal); M, the maximum dose per kg per hour, in mg/kg.
   - Output: EL in EU/mg.
   - Missing-data rule: no M gives no EL. EL is never defaulted.
   - Stop rule: M ≤ 0, or a K outside the closed choice, is refused.
   - AC: K 5 EU/kg, M 10 mg/kg gives 0.5 EU/mg (STE-1.2 §6 worked example). M 0 is refused.
-- **CALC-REQ-11 [Not built]** `lal_mvd` v1: MVD = EL × sample concentration / λ (STE-1.2 §6), with λ = 0.001 EU/mL (the lowest calibrator, §5.1).
+- **CALC-REQ-11 [Not built]** `lal_mvd` v1: MVD = EL × sample concentration / λ (STE-1.2 §6), with λ = 0.001 EU/mL (the lowest calibrator, §5.1). Runs in the backend, in decimal, as K × sample concentration ÷ (M × λ) from the raw inputs (CALC-REQ-37). It does not take EL from R. No R call.
   - Inputs: EL in EU/mg (CALC-REQ-10), sample concentration in mg/mL, λ in EU/mL.
   - Output: MVD, unit `1` (dimensionless).
   - Missing-data rule: when the dose is unknown (no EL), MVD = 500, and the output records that the dose-unknown rule was used (STE-1.2 §6 also sets the highest final test concentration to 1 mg/mL in that case).
   - Stop rule: a tested dilution above the MVD is refused for that dilution; its result is not reportable.
   - AC: EL 0.5 EU/mg, 10 mg/mL, λ 0.001 EU/mL gives MVD 5000 (STE-1.2 §6 example). No EL gives 500 with the dose-unknown marker. A dilution equal to the MVD is allowed (CALC-REQ-37). A dilution of 10000 against MVD 5000 is refused.
-- **CALC-REQ-12 [Not built]** `lal_kinetic_standard_curve` v1: linear regression of log10(onset time) on log10(calibrator concentration).
+- **CALC-REQ-12 [Not built]** `lal_kinetic_standard_curve` v1: linear regression of log10(onset time) on log10(calibrator concentration). The regression is a fit and runs in R (CALC-REQ-37). The non-positive input check below runs in the backend before the R call.
   - Inputs: calibrator nominal concentration in EU/mL, onset time in s, replicate identity.
   - Outputs: slope (unit `1`, expected negative), intercept (unit `1`, label `log10(s)`), correlation coefficient r (unit `1`), calibrators used and dropped (count and identity).
   - Points: each used calibrator level enters the regression once. The y value is log10 of the arithmetic mean of that level's replicate onset times, in s. The x value is log10 of the nominal concentration, in EU/mL. Individual tubes are not separate points. The negative control, 0 EU/mL, is never a point.
@@ -155,9 +163,10 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - Stop rule: a calibrator concentration ≤ 0, or a replicate onset ≤ 0 that would enter the mean, stops the curve. Nothing is passed to log10. The system code is `non_positive_log_input`. It is not a user-entered reason (CALC-REQ-36). Curve acceptance is CALC-REQ-13.
   - AC: a KAT with four calibrators and known onset times reproduces slope, intercept, and r within tolerance, and the slope is negative. The fit matches the arithmetic level means, not one point per tube. A 0 EU/mL negative control does not change the fit. A concentration or onset of 0 stops the curve with `non_positive_log_input` and stores no slope.
 - **CALC-REQ-13 [Not built]** Curve acceptance (STE-1.2 §8.2, §8.3, §8.5). The engine tests **|r| ≥ 0.980**, because r is negative for this curve. At least three calibrators must remain. **Stop rule:** |r| < 0.980, or fewer than three calibrators, fails the curve, and the run is to be repeated (§8.5). No sample result is computed on a failed curve.
+  - Where it runs: both gates run in the backend, in decimal. The |r| gate uses R's r as its shortest round-trip string (CALC-REQ-37). The backend does not recompute the regression or r.
   - Dropping calibrators: STE-1.2 §8.2 states the minimum of three. It does not itself spell out a dropping procedure. This Spec allows a calibrator to be dropped while at least three remain, as the brief directs; confirming that reading is OQ-CALC-4. A drop is a recorded exclusion (CALC-REQ-27), never silent.
-  - AC: r = −0.985 with four calibrators passes. r = −0.975 fails with "repeat run". r = −0.97995 fails: |r| is compared unrounded to 0.980 (CALC-REQ-37), so rounding to three decimal places first, which would show 0.980, does not pass. Dropping one of four calibrators leaves three and the curve is evaluated; dropping two is refused.
-- **CALC-REQ-14 [Not built]** `percent_cv` v1: %CV = SD / mean × 100.
+  - AC: r = −0.985 with four calibrators passes. r = −0.98 passes: R returns the double nearest −0.98 as the string `-0.98`, and |−0.98| ≥ 0.980 holds in decimal. A value carried as `-0.97999999999999998` fails this rule. r = −0.975 fails with "repeat run". r = −0.97995 fails: |r| is compared unrounded to 0.980 (CALC-REQ-37), so rounding to three decimal places first, which would show 0.980, does not pass. Dropping one of four calibrators leaves three and the curve is evaluated; dropping two is refused.
+- **CALC-REQ-14 [Not built]** `percent_cv` v1: %CV = SD / mean × 100. Runs in the backend, in decimal, with `sqrt` in the CALC-REQ-37 context. No R call.
   - Inputs: two or more replicate values in one shared unit.
   - Output: %CV in `%`.
   - Missing-data rule: fewer than two numeric replicates gives no %CV and a "replicate missing" flag (handling a missing single tube or split duplicate is OQ-CALC-8).
@@ -166,39 +175,56 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - AC: replicates 100 and 110 give the %CV defined by the chosen SD form, within tolerance; one replicate gives no %CV and the flag.
 - **CALC-REQ-15 [Not built]** Replicate design (STE-1.2 §5.3, §6, §7.3). Every item (negative control, calibrators, QC, spiked control, sample) is run in duplicate tubes. Each sample is tested at several dilutions not exceeding the MVD. Each dilution has its own spiked control (inhibition/enhancement control) at 0.05 EU/mL.
   - AC: a configuration that binds a sample dilution with no paired spiked control at that dilution cannot be activated as a complete LAL configuration; the builder shows the missing pairing.
-- **CALC-REQ-16 [Not built]** Outlier rule. %CV ≤ 25% for each calibrator and QC (STE-1.2 §8.1), for each sample (§8.6), and for each spiked control (§8.7). **No Grubbs, Dixon, or other statistical outlier test** is in the catalog for this case.
+- **CALC-REQ-16 [Not built]** Outlier rule. %CV ≤ 25% for each calibrator and QC (STE-1.2 §8.1), for each sample (§8.6), and for each spiked control (§8.7). **No Grubbs, Dixon, or other statistical outlier test** is in the catalog for this case. The 25% gate runs in the backend, in decimal (CALC-REQ-37).
   - Stop rule: a calibrator or QC %CV above 25% fails the run, which is to be repeated (§8.4, §8.5).
   - Stop rule: a sample or spiked-control %CV above 25% marks that sample dilution as failing §8.6 or §8.7; it is not passed to sample pass/fail. Whether another valid dilution may then be reported is OQ-CALC-9.
   - AC: QC duplicates at 30% CV fail the run with "repeat run". A sample dilution at 30% CV is marked and is not used for pass/fail.
-- **CALC-REQ-17 [Not built]** `lal_back_calc` v1: back-calculate concentration from the curve, multiply by the dilution factor, divide by sample concentration (STE-1.2 §6 states the goal is endotoxin per mg).
+- **CALC-REQ-17 [Not built]** `lal_back_calc` v1: back-calculate concentration from the curve, multiply by the dilution factor, divide by sample concentration (STE-1.2 §6 states the goal is endotoxin per mg). Split (CALC-REQ-37):
+  - The backend decides in-range or qualified, in decimal, from the raw onset strings and the calibrator mean onsets.
+  - R inverts in-range onsets only, and returns in-tube EU/mL as the shortest round-trip string.
+  - The backend multiplies by the dilution factor and divides by sample concentration, in decimal.
   - Inputs: curve (CALC-REQ-12), arithmetic mean of the replicate onset times in s, dilution factor (unit `1`), sample concentration in mg/mL.
   - Outputs: measured concentration in EU/mL, concentration corrected for dilution in EU/mL, result in EU/mg.
   - Missing-data rule: no onset by the cutoff is **not missing** (CALC-REQ-20). No dilution factor or no sample concentration gives no EU/mg value and a "missing input" flag.
-  - Stop rule: an onset outside the range in CALC-REQ-9 is not extrapolated. Shorter than the mean onset of the highest-concentration used calibrator is `>` (above the top), flagged, with a dilute-and-rerun prompt, and no numeric concentration. Longer than the mean onset of the lowest-concentration used calibrator, while still before the cutoff, is `<` (below the bottom), flagged, and no numeric concentration. That `<` is not "not detected". Not detected remains no onset by the cutoff (CALC-REQ-20). The text after the qualifier is OQ-CALC-7.
+  - Stop rule: an onset outside the range in CALC-REQ-9 is not extrapolated. Shorter than the mean onset of the highest-concentration used calibrator is `>` (above the top), flagged, with a dilute-and-rerun prompt, and no numeric concentration. Longer than the mean onset of the lowest-concentration used calibrator, while still before the cutoff, is `<` (below the bottom), flagged, and no numeric concentration. That `<` is not "not detected". Not detected remains no onset by the cutoff (CALC-REQ-20). The limit after the qualifier is defined in CALC-REQ-19.
   - AC: a KAT onset time between the endpoint calibrator means back-calculates within tolerance, and the EU/mg value equals EU/mL × dilution ÷ mg/mL. An onset past either end stores no number. An onset past the slow end but before the cutoff is `<`, and it is counted as a result, not as missing.
-- **CALC-REQ-18 [Not built]** `lal_spike_recovery` v1: recovery % = (spiked − unspiked) / 0.05 × 100. Both values are the measured in-tube concentration in EU/mL at that dilution, not the dilution-corrected concentration. 0.05 EU/mL is the nominal in-tube spike (STE-1.2 §5.3). The formula is **USP practice, not in the SOP**; STE-1.2 §8.8 gives the acceptance range only. Confirming the formula is OQ-CALC-6.
+- **CALC-REQ-18 [Not built]** `lal_spike_recovery` v1: recovery % = (spiked − unspiked) / 0.05 × 100. Both values are the measured in-tube concentration in EU/mL at that dilution, not the dilution-corrected concentration. 0.05 EU/mL is the nominal in-tube spike (STE-1.2 §5.3). The formula is **USP practice, not in the SOP**; STE-1.2 §8.8 gives the acceptance range only. Confirming the formula is OQ-CALC-6. Runs in the backend, in decimal, as (spiked − unspiked) × 100 ÷ 0.05 (CALC-REQ-37). The in-tube inputs come from R's inversion as shortest round-trip strings.
   - Output: recovery in `%`.
   - Acceptance (STE-1.2 §8.8, §8.9): 50–200% inclusive passes (CALC-REQ-37). Below 50% means inhibition; above 200% means enhancement or contamination. **Stop rule:** outside 50–200%, that sample's result at that dilution is invalid and is not passed to pass/fail.
   - Missing-data rule: no spiked value gives no recovery and the dilution is not reportable. An unspiked value that is not detected is handled per OQ-CALC-7.
-  - AC: spiked 0.06 EU/mL and unspiked 0.01 EU/mL, in-tube, give the unrounded decimal 100. Spiked 0.026 and unspiked 0.001 give exactly 50 and pass. Spiked 0.171 and unspiked 0.071 give exactly 200 and pass. A binary value of 49.99999999999999 where the decimal is 50 does not fail. A difference of 0.02 EU/mL (40%) marks the dilution invalid for inhibition; a difference of 0.12 EU/mL (240%) marks it invalid for enhancement or contamination. A dilution-corrected pair is not the input.
-- **CALC-REQ-19 [Not built]** `lal_sample_pass_fail` v1: a sample passes if its EU/mg result is at or below EL (STE-1.2 §9.1).
+  - AC: spiked 0.06 EU/mL and unspiked 0.01 EU/mL, in-tube, give the unrounded decimal 100. Spiked 0.026 and unspiked 0.001 give exactly 50 and pass. A spiked in-tube value of 0.026 returned by R arrives as `0.026` with the 0.05 EU/mL spike, and still gives exactly 50% and passes. A value carried as `0.025999999999999999` fails this rule. Spiked 0.171 and unspiked 0.071 give exactly 200 and pass. A binary value of 49.99999999999999 where the decimal is 50 does not fail. A difference of 0.02 EU/mL (40%) marks the dilution invalid for inhibition; a difference of 0.12 EU/mL (240%) marks it invalid for enhancement or contamination. A dilution-corrected pair is not the input.
+- **CALC-REQ-19 [Not built]** `lal_sample_pass_fail` v1: a sample passes if its EU/mg result is at or below EL (STE-1.2 §9.1). Runs in the backend, in decimal (CALC-REQ-37). No R call.
   - Inputs: result in EU/mg, EL in EU/mg.
   - Output: pass or fail.
   - Missing-data rule: no EL gives no pass/fail (the MVD default in CALC-REQ-11 does not supply an EL).
-  - Qualified results (§2): each is compared using its stored limit L in EU/mg, with the bounds in CALC-REQ-37.
-    - `not_detected` (no onset by the cutoff) and `below_range` (detected, below the low-concentration end): L ≤ EL passes. L > EL gives no pass/fail, flagged `limit_above_el`, because the true value can lie either side of EL.
-    - `above_range` (past the high-concentration end): L ≥ EL fails, because the true value is above L. L < EL gives no pass/fail, flagged `limit_below_el`, with a dilute-and-rerun prompt.
-    - L itself is lab-set (OQ-CALC-7). Until OQ-CALC-7 is decided, a qualified result has no L and gives no pass/fail, flagged `limit_undecided`.
+  - **Limits for qualified results (§2).** The backend computes each limit in decimal for that sample dilution and stores it in EU/mg. "Used" means the calibrator levels that entered the accepted curve, after any recorded drop (CALC-REQ-13, CALC-REQ-27).
+    - `not_detected` and `below_range` use L = lowest used calibrator nominal (EU/mL) × DF ÷ sample concentration (mg/mL).
+    - `above_range` uses U = highest used calibrator nominal (EU/mL) × DF ÷ sample concentration (mg/mL).
+    - A limit is never taken from the fixed λ (CALC-REQ-11) or from a calibrator that was dropped. If 0.001 EU/mL was dropped, L uses the lowest calibrator that remains, for example 0.01 EU/mL.
+    - No DF or no sample concentration gives no limit and the `missing_input` flag (CALC-REQ-17).
+  - **Verdicts for qualified results**, with the bounds in CALC-REQ-37:
+    - `not_detected` (no onset by the cutoff) and `below_range` (detected, below the low-concentration end): L ≤ EL passes. L > EL gives no pass/fail and is flagged `limit_above_el`, because the true value can lie either side of EL.
+    - `above_range` (past the high-concentration end): U ≥ EL fails, because the true value is above U. U < EL gives no pass/fail and is flagged `limit_below_el`, with a dilute-and-rerun prompt.
     - `not_detected` and `below_range` use the same rule but stay distinct stored kinds.
   - Stop rule: an invalid dilution (CALC-REQ-16, CALC-REQ-18) or a failed run (CALC-REQ-13, CALC-REQ-16) gives no pass/fail.
-  - AC: 0.3 EU/mg against EL 0.5 EU/mg passes; 0.5 passes; 0.6 fails; a failed run gives no pass/fail. With an L supplied as a test input:
+  - **Precedence of no-verdict causes.** When more than one cause applies, every applicable flag is stored, in this order, and the UI shows the first:
+    1. `run_failed` (CALC-REQ-13, CALC-REQ-16, CALC-REQ-21).
+    2. `dilution_invalid` (CALC-REQ-11 above MVD, CALC-REQ-16 sample or spike %CV, CALC-REQ-18 recovery).
+    3. `el_missing` (no EL).
+    4. `missing_input` (no DF or no sample concentration, so no result and no limit).
+    5. `limit_above_el` or `limit_below_el`. At most one of these can apply, because each one belongs to a different qualifier.
+
+    A limit flag is computed and stored only when no earlier cause applies. These flags are system codes, not user-entered reasons (CALC-REQ-36).
+  - AC: 0.3 EU/mg against EL 0.5 EU/mg passes; 0.5 passes; 0.6 fails; a failed run gives no pass/fail.
+    - DF 100, 10 mg/mL, all four calibrators used: L = 0.001 × 100 ÷ 10 = 0.01 EU/mg, and U = 1.0 × 100 ÷ 10 = 10 EU/mg.
+    - Same inputs with 0.001 EU/mL dropped: L = 0.01 × 100 ÷ 10 = 0.1 EU/mg, not 0.01.
     - `not_detected` with L 0.4 against EL 0.5 passes.
     - `below_range` with L 0.4 against EL 0.5 passes and stays stored as `below_range`, not `not_detected`.
     - `not_detected` with L 0.6 against EL 0.5 gives no pass/fail and `limit_above_el`.
-    - `above_range` with L 0.5 against EL 0.5 fails.
-    - `above_range` with L 0.4 against EL 0.5 gives no pass/fail and `limit_below_el`.
-    - With no L, every qualified result gives no pass/fail and `limit_undecided`.
-- **CALC-REQ-20 [Not built]** Not detected. No onset by the cutoff (7200 s by default, STE-1.2 §7.4) is reported as `<` (not detected): a below-limit result with a qualifier, **not missing data**. STE-1.2 §7.4 notes that some lysate lots need a longer time (for example 9600 s); the cutoff is a configuration input in s, not a constant (OQ-CALC-10). The number reported after `<` is lab-set (OQ-CALC-7).
+    - `above_range` with U 0.5 against EL 0.5 fails.
+    - `above_range` with U 0.4 against EL 0.5 gives no pass/fail and `limit_below_el`.
+    - A `not_detected` result on a failed run with no EL stores `run_failed` and then `el_missing`, shows `run_failed`, and stores no limit flag.
+- **CALC-REQ-20 [Not built]** Not detected. No onset by the cutoff (7200 s by default, STE-1.2 §7.4) is reported as `<` (not detected): a below-limit result with a qualifier, **not missing data**. STE-1.2 §7.4 notes that some lysate lots need a longer time (for example 9600 s); the cutoff is a configuration input in s, not a constant (OQ-CALC-10). The limit reported after `<` is L in CALC-REQ-19.
   - AC: a tube with no onset at 7200 s produces a `<` result, is counted as a result, and is never shown or counted as missing.
 - **CALC-REQ-21 [Not built]** Run-level QC summary. A LAL run records pass or fail with the failing reason code: curve |r|, fewer than three calibrators, calibrator %CV, QC %CV. A failed run produces no sample pass/fail. QC accuracy against nominal and a numeric negative-control limit are lab-set and are not in v1 (OQ-CALC-1, OQ-CALC-2).
   - AC: each failing condition produces its own reason code on the run summary; a run that fails any of them shows "repeat run" and no sample pass/fail.
@@ -209,8 +235,8 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
   - AC: the catalog lists exactly these nine entries, each with every declared field filled. An attempt to add or enable an entry through the API, the UI, a database write by the application role, runtime config, or an agent run is refused, and the catalog is unchanged. A new entry appears only after a reviewed pull request that changes the catalog in code is merged.
 - **CALC-REQ-23 [Not built]** Calculations are configured only in a no-code builder: pick catalog functions, bind each input to a run column, an upstream stage output, or a constant, each with its unit. There is no expression language and no free-text formula.
   - AC: the builder offers only catalog functions; there is no text field that accepts a formula or code.
-- **CALC-REQ-24 [Not built]** **Prohibited:** user code, scripts, plugins, a webhook runtime, and any generic "run R" (or run-any-code) endpoint. The R service exposes `/health`, one route per catalog function, and the pre-existing dose-response routes `POST /fit` and `POST /svg/full`. Those two stay, because dose-response on `main` calls them (`backend/app/services/r_calculator_client.py`). They stay until `fit_compound` is brought under these rules. No other route. A new route that runs caller-supplied code, or that accepts an unknown function or model name, is refused and does not fall back to a default.
-  - AC: `POST /fit` and `POST /svg/full` still answer a dose-response call. A call to any other non-catalog path, or a body carrying code, is refused. A new route that is given an unknown model name is refused and does not run `LL.4`. Shipped `fit_compound` still silently substitutes `LL.4` for an unknown model name; that stays a defect of the existing route, and this rule forbids it on every route added for the catalog.
+- **CALC-REQ-24 [Not built]** **Prohibited:** user code, scripts, plugins, a webhook runtime, and any generic "run R" (or run-any-code) endpoint. The R service exposes `/health`, one route per R-side step in CALC-REQ-37, and the pre-existing dose-response routes `POST /fit` and `POST /svg/full`. The R-side steps are the fits and inversions in `elisa_4pl_standard_curve`, `elisa_4pl_back_calc`, `lal_kinetic_standard_curve`, and `lal_back_calc`. `lal_endotoxin_limit`, `lal_mvd`, `percent_cv`, `lal_spike_recovery`, and `lal_sample_pass_fail` have no R route. Those two stay, because dose-response on `main` calls them (`backend/app/services/r_calculator_client.py`). They stay until `fit_compound` is brought under these rules. No other route. A new route that runs caller-supplied code, or that accepts an unknown function or model name, is refused and does not fall back to a default.
+  - AC: `POST /fit` and `POST /svg/full` still answer a dose-response call. The R service has no route for EL, MVD, %CV, spike recovery, the dilution step, or pass/fail. A call to any other non-catalog path, or a body carrying code, is refused. A new route that is given an unknown model name is refused and does not run `LL.4`. Shipped `fit_compound` still silently substitutes `LL.4` for an unknown model name; that stays a defect of the existing route, and this rule forbids it on every route added for the catalog.
 
 ### 3.7 Stop rules, missing data, units
 
@@ -251,18 +277,23 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
 
 ### 3.11 Reasons
 
-- **CALC-REQ-36 [Shipped]** This Spec adds **no** required reason field. The only existing required reason it touches is the dose-response reset-fit reason (`reset_fit_reason_required`): 1–4000 characters, refused when missing, blank, or whitespace-only, including NBSP and U+2007 (`backend/app/core/required_reason.py`). The data-point exclusion reason stays optional, shares the 4000 maximum, and a whitespace-only value (including NBSP and U+2007) is not stored as a reason. System codes on a stopped stage (`non_positive_log_input`, `r_timeout`, `backend_timeout`) are not user-entered reasons and have no text field.
+- **CALC-REQ-36 [Shipped]** This Spec adds **no** required reason field. The only existing required reason it touches is the dose-response reset-fit reason (`reset_fit_reason_required`): 1–4000 characters, refused when missing, blank, or whitespace-only, including NBSP and U+2007 (`backend/app/core/required_reason.py`). The data-point exclusion reason stays optional, shares the 4000 maximum, and a whitespace-only value (including NBSP and U+2007) is not stored as a reason. System codes on a stopped stage (`non_positive_log_input`, `r_timeout`, `backend_timeout`, `r_non_finite`) and the no-verdict flags in CALC-REQ-19 are not user-entered reasons and have no text field.
   - AC: no route added for this Spec requires a reason. None of those system codes accepts or requires a reason string.
 
 ### 3.12 Precision of gates
 
 - **CALC-REQ-37 [Not built]** Gates run in the backend, not in R.
+  - **Split between R and the backend.**
+    - R does only the fits and the curve inversions. That means the 4PL fit (`elisa_4pl_standard_curve`), the 4PL inversion (`elisa_4pl_back_calc`), the log-log regression with slope, intercept and r (`lal_kinetic_standard_curve`), and the inversion of onset time to in-tube EU/mL (`lal_back_calc`).
+    - The backend does all of the following, in Python `decimal`: EL, MVD, %CV, spike recovery, the dilution step (× DF, and ÷ mg/mL for LAL), the in-range check before an inversion, the qualified-result limits (CALC-REQ-19), and every pass/fail gate.
+    - The backend does not recompute the regression or r from the points. It gates on R's r as received (next bullet).
   - **Inputs stay decimal strings.** Every gate input and every gate threshold is carried as a decimal string end to end: from the run data, binding, or constant, through the backend, and in every JSON body. It is never a JSON number and never an R double.
-  - **Values that come from R.** R and drc fit outputs (for example slope, intercept, r, 4PL parameters) are binary doubles. R serialises each one as a decimal string with 17 significant digits. The backend parses that string with Python `decimal`. That parsed value is the "unrounded decimal" for a fit output, and it is what is stored and gated.
+  - **Values that come from R.** R and drc fit outputs (for example slope, intercept, r, 4PL parameters) are binary doubles. R serialises each one as the **shortest round-trip** decimal string: the shortest string that parses back to the identical double (R tries 15, then 16, then 17 significant digits and takes the first that round-trips). It is not a fixed 17-digit string. So the double nearest 0.026 arrives as `0.026` and the double nearest −0.98 arrives as `-0.98`. The backend parses that string with Python `decimal`. That parsed value is the "unrounded decimal" for an R output, and it is what is stored and gated.
+  - **Non-finite values stop.** NaN, Inf, −Inf, or NA in any R output stops that stage with the system code `r_non_finite` (CALC-REQ-25, CALC-REQ-36). The attempt is recorded and no result is stored. The backend never maps a non-finite value to a number, to a qualifier, or to a pass/fail.
   - **Arithmetic.** The backend evaluates every gate quantity with Python `decimal`, using a context of precision 50 and rounding `ROUND_HALF_EVEN`. Division, `log10`, and `sqrt` use that context. Within a formula, products are formed first and a single division is done last. MVD is K × sample concentration ÷ (M × λ). Recovery is (spiked − unspiked) × 100 ÷ 0.05. So a quotient that is exact in decimal is exact here.
   - **Bounds are inclusive:** |r| ≥ 0.980, %CV ≤ 25%, 50% ≤ spike recovery ≤ 200%, dilution ≤ MVD, and sample result ≤ EL.
   - **Display.** Rounding is for display only. Each numeric output stores the unrounded decimal and the display precision declared for that output on the catalog entry. Display rounds half away from zero to that precision, and the result records the precision. No gate reads the displayed value. This Spec does not pick a global number of display decimal places.
-  - AC: K 5 EU/kg, M 3 mg/kg, sample concentration 3 mg/mL, and λ 0.001 EU/mL give MVD exactly 5000. A dilution of 5000 is allowed. A value of 4999.999…998 from dividing EL first under `ROUND_DOWN`, which would refuse that dilution, fails this rule. |r| = 0.97995 fails the 0.980 gate. Rounding it to three decimal places before the compare, which would show 0.980, is a failure of this rule. Recovery whose decimal value is 50 or 200 passes, including the pairs 0.026 with 0.001 and 0.171 with 0.071. A stored gate result that followed a binary value of 49.99999999999999 where the decimal is 50 fails this rule. Gate inputs in request and response bodies are JSON strings, not JSON numbers; a JSON number in a gate input is refused. A fit output from R arrives as a 17-significant-digit string and is stored as that decimal. The stored row has the unrounded value and the recorded display precision, and the displayed rounding is not what the gate compared.
+  - AC: K 5 EU/kg, M 3 mg/kg, sample concentration 3 mg/mL, and λ 0.001 EU/mL give MVD exactly 5000. A dilution of 5000 is allowed. A value of 4999.999…998 from dividing EL first under `ROUND_DOWN`, which would refuse that dilution, fails this rule. |r| = 0.97995 fails the 0.980 gate. Rounding it to three decimal places before the compare, which would show 0.980, is a failure of this rule. Recovery whose decimal value is 50 or 200 passes, including the pairs 0.026 with 0.001 and 0.171 with 0.071. A stored gate result that followed a binary value of 49.99999999999999 where the decimal is 50 fails this rule. Gate inputs in request and response bodies are JSON strings, not JSON numbers; a JSON number in a gate input is refused. A fit output from R arrives as its shortest round-trip string and is stored as that decimal. An R inversion returning in-tube 0.026 EU/mL for a spiked control, with unspiked 0.001 EU/mL and the 0.05 EU/mL spike, gives exactly 50% and passes. R's r of −0.98 passes the |r| ≥ 0.980 gate. An R output of NaN or Inf stops the stage with `r_non_finite` and stores no result. The R service has no route that computes EL, MVD, %CV, recovery, the dilution step, or a gate. The stored row has the unrounded value and the recorded display precision, and the displayed rounding is not what the gate compared.
 
 ---
 
@@ -278,7 +309,7 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-4 | Confirm calibrators may be dropped while at least three remain. STE-1.2 §8.2 states the minimum; who may drop, and on what basis, is not stated. | CALC-REQ-13 | STE-1.2 §8.2 |
 | OQ-CALC-5 | %CV: SD with n−1 or n; computed on onset time or on back-calculated concentration. | CALC-REQ-14, 16 | Not stated in STE-1.2 §8 |
 | OQ-CALC-6 | Confirm the spike-recovery formula. It is USP practice; STE-1.2 §8.8 gives only the 50–200% range. | CALC-REQ-18 | STE-1.2 §8.8, USP <85> |
-| OQ-CALC-7 | The number reported after `<` or `>` (for example λ × dilution ÷ mg/mL), and how a not-detected unspiked value enters spike recovery. The qualifier direction is decided (CALC-REQ-9, CALC-REQ-17). | CALC-REQ-17, 18, 19, 20 | Lab-set |
+| OQ-CALC-7 | **Open, narrowed.** Still open: how a not-detected unspiked value enters spike recovery. The limit after `<` or `>` is no longer part of this question. CALC-REQ-19 defines it from the used calibrators: L = lowest used calibrator × DF ÷ mg/mL, and U = highest used calibrator × DF ÷ mg/mL. It is never taken from λ. The qualifier direction is decided (CALC-REQ-9, CALC-REQ-17). | CALC-REQ-18 | Lab-set. Limit rule from Tobias N8. |
 | OQ-CALC-8 | Handling a missing single tube, or a split duplicate (one tube with onset, one not detected). | CALC-REQ-14, 16 | Lab-set; not in STE-1.2 |
 | OQ-CALC-9 | Which of several valid dilutions is reported. | CALC-REQ-16, 17, 19 | Lab-set; not in STE-1.2 |
 | OQ-CALC-10 | Onset-time cutoff: fixed 7200 s, or set per lysate lot (STE-1.2 §7.4 allows longer). | CALC-REQ-20 | STE-1.2 §7.4 |
@@ -311,7 +342,7 @@ Rolf and Marc are still pending. No stamp is given until the named person gives 
 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
-| 1 | Security review | Günter | Accept at 6f7288a, CI green required | 2026-11-04 | 6f7288a |
+| 1 | Security review | Günter | Accept at a727316, CI green required | 2026-11-04 | a727316 |
 | 2 | Fail bars written | Tobias | Request changes at 6f7288a (draft, not posted on GitHub) | 2026-11-04 | 6f7288a |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
