@@ -272,7 +272,7 @@ Günter and Tobias have requested changes. Those rows are not Accept, and Tobias
 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
-| 1 | Security review | Günter | Re-review at f4b9749 found B1–B3. B1 and B3 folded at FOLD_SHA. B2 folded at FOLD_SHA via Marc's answers to OQ-CALC-14 and OQ-CALC-15 (both Decided 2026-11-03: Admin only; self-activation allowed). Awaiting his re-review. Not Accept. | 2026-11-04 | |
-| 2 | Fail bars written | Tobias | Request changes (B1–B7), folded at FOLD_SHA. Fail bars are his to finalize. Awaiting re-review. Not Pass. Not Accept. | 2026-11-04 | |
+| 1 | Security review | Günter | Re-review at f4b9749 found B1–B3. B1 and B3 folded at 6f02dc7. B2 folded at 6f02dc7 via Marc's answers to OQ-CALC-14 and OQ-CALC-15 (both Decided 2026-11-03: Admin only; self-activation allowed). Awaiting his re-review. Not Accept. | 2026-11-04 | |
+| 2 | Fail bars written | Tobias | Request changes (B1–B7), folded at 6f02dc7. Fail bars are his to finalize. Awaiting re-review. Not Pass. Not Accept. | 2026-11-04 | |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
