@@ -76,6 +76,8 @@ Anything else is not in this Spec.
   - AC: the Dockerfile restores from `renv.lock` and contains no `install.packages(` call. Changing one package version in `renv.lock` changes the lock hash.
 - **CALC-REQ-4 [Not built]** `GET /health` reports the image digest, the `renv.lock` SHA-256, and the lock hash. The backend holds the expected lock hash. **Stop rule:** if the reported lock hash differs from the expected one, or `/health` does not report one, the backend refuses every calculation call and writes nothing.
   - AC: with a mismatched expected hash, a calculation request returns an error that names the mismatch, and no result row exists afterwards. Shipped `/health` reports only `drc_version` and `r_version`.
+- **CALC-REQ-4a [Not built]** R sandbox and secrets (Günter H1). The R container runs as non-root, with a read-only root filesystem and tmpfs scratch, no network egress, and no host port. It has CPU, memory, and PID limits, and a per-request timeout enforced in both R and the backend. No database URL, credentials, or secrets are in the container. On `main` at `8e327c2`, `docker-compose.yml` already omits a host `ports:` block for `r-calculator` and sets no environment on that service. The Dockerfile has no `USER`. There is no read-only root, tmpfs, egress deny, or resource limit, and Plumber enforces no per-request timeout. The backend fit client times out at 60 s (`FIT_TIMEOUT_SECONDS` in `backend/app/services/r_calculator_client.py`); that client timeout is not this rule.
+  - AC: from inside the running container, an outbound connection attempt fails. A write outside the tmpfs scratch fails. The process uid is not 0. The container environment has no `DATABASE_URL`, no variable whose name ends in `_KEY`, and no variable whose name ends in `_SECRET`.
 
 ### 3.3 (b) Known-answer tests
 
@@ -166,8 +168,8 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
 
 ### 3.6 Closed catalog and no-code builder
 
-- **CALC-REQ-22 [Not built]** The catalog is closed. Version 1 contains exactly: `elisa_4pl_standard_curve`, `elisa_4pl_back_calc`, `lal_endotoxin_limit`, `lal_mvd`, `lal_kinetic_standard_curve`, `lal_back_calc`, `percent_cv`, `lal_spike_recovery`, `lal_sample_pass_fail`. Each entry declares name, version, every input and output with its unit, its missing-data rule, its stop rule, and its KATs. Shipped dose-response `fit_compound` is not in the catalog until it is brought under these rules.
-  - AC: the catalog lists exactly these nine entries, each with every declared field filled.
+- **CALC-REQ-22 [Not built]** The catalog is closed. Version 1 contains exactly: `elisa_4pl_standard_curve`, `elisa_4pl_back_calc`, `lal_endotoxin_limit`, `lal_mvd`, `lal_kinetic_standard_curve`, `lal_back_calc`, `percent_cv`, `lal_spike_recovery`, `lal_sample_pass_fail`. Each entry declares name, version, every input and output with its unit, its missing-data rule, its stop rule, and its KATs. Shipped dose-response `fit_compound` is not in the catalog until it is brought under these rules. The catalog changes only through a PR-reviewed code change (Günter H2). It never changes through the API, the UI, a database row, runtime config, or the agent. None of those paths can add a function or enable a version.
+  - AC: the catalog lists exactly these nine entries, each with every declared field filled. An attempt to add or enable an entry through the API, the UI, a database write by the application role, runtime config, or an agent run is refused, and the catalog is unchanged. A new entry appears only after a reviewed pull request that changes the catalog in code is merged.
 - **CALC-REQ-23 [Not built]** Calculations are configured only in a no-code builder: pick catalog functions, bind each input to a run column, an upstream stage output, or a constant, each with its unit. There is no expression language and no free-text formula.
   - AC: the builder offers only catalog functions; there is no text field that accepts a formula or code.
 - **CALC-REQ-24 [Not built]** **Prohibited:** user code, scripts, plugins, a webhook runtime, and any generic "run R" (or run-any-code) endpoint. The R service exposes only `/health` and one route per catalog function. A request naming an unknown function or unknown model is refused; it never falls back to a default.
@@ -202,10 +204,10 @@ Why it stresses differently from the IL-6 ELISA: a linear fit (not 4PL) over fou
 
 ### 3.10 Agent proposes, a named person activates
 
-- **CALC-REQ-34 [Not built]** The configuring AI agent may propose a calculation configuration (functions, bindings, constants, units) through the builder. It cannot activate one. Shipped: the agent's allow-list refuses `/v1/lims-runs` ("Run analysis and dose-response are not configuration"); this Spec does not change that for running fits.
-  - AC: an agent run can create a proposed configuration; an attempt by the agent to activate it is refused.
-- **CALC-REQ-35 [Not built]** A named, signed-in person activates a configuration. Activation records the person, time, the function versions, the lock hash, and a validation-state value. The validation state is recorded, **not a required gate**: activation succeeds whatever the state. The list of state values is OQ-CALC-12. Activation adds no reason field.
-  - AC: activation with any validation-state value succeeds and the record shows the person, time, versions, lock hash, and state.
+- **CALC-REQ-34 [Not built]** The configuring AI agent may propose a calculation configuration (functions, bindings, constants, units) through the builder. It cannot activate one, and it cannot change the catalog (CALC-REQ-22). Shipped: the agent's allow-list refuses `/v1/lims-runs` ("Run analysis and dose-response are not configuration"); this Spec does not change that for running fits. Activation is refused server-side for every agent run context, including bulk, apply, and import (Günter H2). The refusal is both the allow-list and a check on the activation route. Activation needs a separate interactive request. An agent proposal does not carry an activation.
+  - AC: an agent run can create a proposed configuration. The same run, and its bulk, apply, and import paths, cannot activate it: the call is refused and no activation row is written. A separate interactive request is what activation accepts. Which role may send that request is OQ-CALC-14. Whether the proposer or the session owner may send it for their own proposal is OQ-CALC-15.
+- **CALC-REQ-35 [Not built]** Activation is a separate interactive request from a named, signed-in person (CALC-REQ-34). The role that may activate is Lab Manager or Admin, and is not chosen here (OQ-CALC-14). Whether the proposer or the session owner may activate their own proposal is not chosen here (OQ-CALC-15). Activation records the person, time, the function versions, the lock hash, and a validation-state value. The validation state is recorded, **not a required gate**: once the caller is allowed, activation succeeds whatever the state. The list of state values is OQ-CALC-12. Activation adds no reason field. The activation row is append-only. `created_by` equals `current_user_id()`, and the database enforces that. A forged actor, a `created_by` other than `current_user_id()`, gets SQLSTATE 42501 and no row. UPDATE and DELETE of an activation row are refused the same way. `current_user_id()` already exists (`backend/db/migrations/versions/0003_rls_policies.py`). The activation table does not.
+  - AC: a caller who is not the role decided in OQ-CALC-14 is refused server-side and no row is written. Until OQ-CALC-14 is decided, that bar is not scorable. A proposer or session owner self-activating is allowed only if OQ-CALC-15 says so; until then that bar is not scorable. An interactive activation by an allowed caller, with any validation-state value, succeeds and the row shows that person, the time, the versions, the lock hash, and the state. Inserting a row whose `created_by` is not `current_user_id()` fails with SQLSTATE 42501 and stores nothing. UPDATE and DELETE of a stored activation row fail and leave the row unchanged.
 
 ### 3.11 Reasons
 
@@ -233,6 +235,8 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-11 | ELISA: blank handling, 4PL weighting, curve acceptance, duplicate %CV limit, kit QC ranges, LLOQ/ULOQ wording, and the concentration unit of the IL-6 pack (the synthetic fixture's `Conc/Dil` column has none). | CALC-REQ-8, 9 | Lab-set; IL-6 pack |
 | OQ-CALC-12 | The closed list of validation-state values recorded at activation. | CALC-REQ-35 | Product |
 | OQ-CALC-13 | Who supplies independent expected values for the IL-6 and LAL KATs. | CALC-REQ-6 | Product / QA |
+| OQ-CALC-14 | Which named role activates a calculation configuration: Lab Manager, or Admin? | CALC-REQ-34, 35 | Günter H2. Not decided here. |
+| OQ-CALC-15 | May the proposer, or the session owner, activate their own proposal? | CALC-REQ-34, 35 | Günter H2. Not decided here. |
 
 ---
 
@@ -251,11 +255,11 @@ Stated explicitly, and not built by this Spec:
 
 ## 6. Review
 
-All pending. No stamp is given until the named person gives it.
+Günter has requested changes. That row is not Accept. Tobias, Rolf, and Marc are still pending. No stamp is given until the named person gives it.
 
 | Order | Review | Who | Status | Date | Commit |
 |-------|--------|-----|--------|------|--------|
-| 1 | Security review | Günter | Pending | | |
+| 1 | Security review | Günter | Changes requested (H1, H2), folded at FOLD_SHA, awaiting his re-review. Not Accept. | 2026-11-04 | |
 | 2 | Fail bars written | Tobias | Pending | | |
 | 3 | Confirm | Rolf | Pending | | |
 | 4 | Approve | Marc | Pending | | |
