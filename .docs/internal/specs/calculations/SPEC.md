@@ -377,7 +377,7 @@ Example (not a requirement, not a default): a kinetic-turbidity LAL configuratio
 
 - Example (not a requirement, not a default): what an input with no value produces is open (OQ-CALC-49). The LAL fixture's case for its configured reading is in CALC-REQ-43.
 
-- A value past a low cutoff is stored `<` with its limit. The record is written. Reported is not null. There is no blank-result path. A value past a high cutoff is stored `>` with its limit.
+- A value past a low cutoff is stored `<` with its limit. The record is written. Reported is not null. There is no blank-result path. That row is not a stopped compute, so it does not clear calculated or reported. A value past a high cutoff is stored `>` with its limit.
   - Example (not a requirement, not a default): a lab SOP may call a value past a low cutoff below detection limit (BDL) or non-detect.
   - AC: a value past a declared low cutoff stores `<` with its limit. The row is written, is counted as a result, and is never shown or counted as missing. Reported is not null. The row is not a stopped compute.
   - AC: a value past a declared high cutoff stores `>` with the stored limit.
