@@ -8,12 +8,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
+# Copy requirements and install Python dependencies.
+# Build context is the repository root so the R service files can be copied
+# for the lock-hash recompute (CALC-REQ-4). There is no Docker socket.
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY backend/ .
+COPY services/r-calculator /repo/services/r-calculator
+ENV NIMBLELIMS_REPO_ROOT=/repo
 
 # Make start script executable
 RUN chmod +x start.sh

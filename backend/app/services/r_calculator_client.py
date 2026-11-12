@@ -135,3 +135,93 @@ class RCalculatorClient:
                 detail=f"SVG generation failed: {exc}",
             )
         return resp.json()["svg"]
+
+    def fetch_health_body(self) -> Dict[str, Any]:
+        """GET /health and return the JSON body.
+
+        Connection and HTTP failures raise ``CalculationCallRefused`` and do
+        not write. Dose-response does not call this.
+        """
+        from app.services.calculation_runtime import CalculationCallRefused
+
+        try:
+            resp = httpx.get(f"{self._base_url}/health", timeout=5.0)
+            resp.raise_for_status()
+            body = resp.json()
+        except httpx.HTTPError as exc:
+            raise CalculationCallRefused(
+                "lock_hash",
+                f"/health did not report a lock hash ({exc})",
+            ) from exc
+        if not isinstance(body, dict):
+            raise CalculationCallRefused(
+                "lock_hash",
+                "/health did not report a lock hash",
+            )
+        return body
+
+    def execute_calculation_request(
+        self,
+        path: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Gate, then POST a future calculation route.
+
+        CALC-REQ-4 and CALC-REQ-4a run here, not on ``fit`` or ``full_svg``.
+        The backend stops waiting after 60 s (OQ-CALC-16). A timeout raises
+        ``backend_timeout``. An R response with code ``r_timeout`` raises that
+        code. Neither path writes an attempt or a result; S9 records those.
+        """
+        from app.services.calculation_runtime import (
+            CALCULATION_BACKEND_TIMEOUT_SECONDS,
+            CalculationCallRefused,
+            begin_calculation_call,
+        )
+
+        normalized = "/" + path.lstrip("/")
+        if normalized.rstrip("/") in ("/fit", "/svg/full"):
+            raise CalculationCallRefused(
+                "route",
+                "dose-response POST /fit and POST /svg/full are not calculation calls",
+            )
+        health = self.fetch_health_body()
+        begin_calculation_call(health)
+        url = f"{self._base_url.rstrip('/')}{normalized}"
+        try:
+            resp = httpx.post(
+                url,
+                json=payload,
+                timeout=CALCULATION_BACKEND_TIMEOUT_SECONDS,
+            )
+        except httpx.TimeoutException as exc:
+            raise CalculationCallRefused(
+                "backend_timeout",
+                "backend stopped waiting after 60 s",
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise CalculationCallRefused(
+                "r_service",
+                f"calculation call refused: R service error ({exc})",
+            ) from exc
+        if resp.status_code == 504:
+            try:
+                body = resp.json()
+            except ValueError:
+                body = {}
+            if isinstance(body, dict) and body.get("code") == "r_timeout":
+                detail = body.get("detail") or "R stopped the request after 50 s"
+                raise CalculationCallRefused("r_timeout", str(detail))
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise CalculationCallRefused(
+                "r_service",
+                f"calculation call refused: R service error ({exc.response.status_code})",
+            ) from exc
+        result = resp.json()
+        if not isinstance(result, dict):
+            raise CalculationCallRefused(
+                "r_service",
+                "calculation call refused: R service returned no object",
+            )
+        return result

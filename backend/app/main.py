@@ -14,6 +14,7 @@ from app.core.lab_time import (
     LabTimezoneUnset,
     require_lab_timezone_on_startup,
 )
+from app.services.calculation_runtime import note_calculation_runtime_on_startup
 from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, instrument_ops, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings
 import logging
 
@@ -42,6 +43,9 @@ async def _lifespan(_app: FastAPI):
     # start.sh migrates, then uvicorn loads this app. The check runs here,
     # not at import, so the table can be created first.
     require_lab_timezone_on_startup()
+    # CALC-REQ-4 / 4a. A mismatch is logged. The process stays up so
+    # dose-response POST /fit is unchanged. Calculation calls re-check.
+    note_calculation_runtime_on_startup()
     yield
 
 

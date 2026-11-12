@@ -81,3 +81,17 @@ jobs:
           CI: "true"
       - name: Type check
         run: npx tsc --noEmit
+
+  r-calculator-pin:
+    name: R service pin (S1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The lock hash recompute imports the backend module. It does not need
+      # the database or the rest of requirements.txt.
+      - name: Pin, two builds, sandbox inspect
+        run: bash services/r-calculator/scripts/ci-pin.sh
