@@ -1,6 +1,13 @@
-# rocker/r-ver tag 4.4, linux/amd64, resolved 2026-11-12.
+# rocker/r-ver tag 4.4 (R 4.4.3), multi-arch index, resolved 2026-11-12.
 # The tag is not the pin. CALC-REQ-2 requires the digest.
-FROM rocker/r-ver@sha256:aa952afb35853aaf5c67bd224aa969caf6ad49395d69cf19a586f1554ed3bd05
+# This digest is the manifest index, not one platform's image. BuildKit
+# selects linux/arm64 or linux/amd64 to match the build machine. Pinning the
+# platform manifest (what `docker inspect` shows after a pull) forces that
+# one architecture and makes Compose warn on the other.
+# Index children, same rocker revision c0ab9c6258fa:
+#   linux/amd64  sha256:aa952afb35853aaf5c67bd224aa969caf6ad49395d69cf19a586f1554ed3bd05
+#   linux/arm64  sha256:0792a280d2a8b0cf6e08b7bf5338ade551af71fa9af3f520c820df253aa42295
+FROM rocker/r-ver@sha256:3dae5d2eeddf74f10e0a81fb6b7ae350295e288000304f438b844b2c1e00fe2c
 
 # System libraries for R package native code.
 # - plumber: httpuv (zlib), sodium (libsodium), webutils (libcurl)
@@ -47,7 +54,7 @@ COPY . /app
 # <base> is the digest in the FROM line. <tree> is the git tree id of
 # services/r-calculator, supplied by deploy/CI (git rev-parse <commit>:services/r-calculator).
 # An empty tree fails closed: the backend's expected hash will not match.
-ARG R_BASE_DIGEST=aa952afb35853aaf5c67bd224aa969caf6ad49395d69cf19a586f1554ed3bd05
+ARG R_BASE_DIGEST=3dae5d2eeddf74f10e0a81fb6b7ae350295e288000304f438b844b2c1e00fe2c
 ARG R_TREE=
 ENV R_BASE_DIGEST=${R_BASE_DIGEST} \
     R_TREE=${R_TREE} \

@@ -44,6 +44,8 @@ This project uses a five-container Docker setup:
    docker compose up -d --build
    ```
 
+   Images build for the host architecture. Compose does not set `platform`. The R calculator base is the multi-arch index of `rocker/r-ver:4.4`, so an Apple Silicon Mac builds `linux/arm64` and CI on amd64 builds `linux/amd64`. See [manuals/r-calculator-pin.md](manuals/r-calculator-pin.md).
+
    `.env.example` uses `change-me` placeholders. The lab timezone is required. It is stored in `lab_settings.timezone` and set by an administrator at the required post-login step, or with `PATCH /v1/lab-settings`. There is no environment fallback. `current_lab_day()` raises until it is set. A fresh database also needs the five required Compose secrets: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `LIMS_MIGRATE_PASSWORD`, `LIMS_APP_PASSWORD`, and `SECRET_KEY`. Compose uses `${VAR:?}` for those five and will not start when any of them is unset. `POSTGRES_USER` is the bootstrap superuser (`lims_bootstrap`). The API connects as `lims_app`. Alembic connects as `lims_migrate`. Role details: [manuals/db-roles.md](manuals/db-roles.md).
    
    This will automatically:

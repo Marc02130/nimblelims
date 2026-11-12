@@ -81,7 +81,9 @@ def test_dockerfile_from_lines_are_digest_pinned() -> None:
         if line.strip().startswith("FROM ")
     ]
     assert from_lines
-    assert all("@sha256:" in line for line in from_lines)
+    assert all("@sha256:" in line and "--platform" not in line for line in from_lines)
+    base = parse_base_digest(text)
+    assert f"ARG R_BASE_DIGEST={base}" in text
     assert "install.packages(" not in text
     assert "renv::restore(" in (_service() / "restore.R").read_text(encoding="utf-8")
 
