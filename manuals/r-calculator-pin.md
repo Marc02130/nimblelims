@@ -49,4 +49,6 @@ docker compose build r-calculator
 export R_IMAGE_DIGEST="$(docker compose images -q r-calculator | head -n 1)"
 ```
 
+KATs, the serialiser test, and release records (S2) are on [calculation-kats.md](calculation-kats.md).
+
 `R_IMAGE_DIGEST` must be `sha256:` plus 64 lowercase hex digits. If it is unset or the lock hash does not match, calculation calls are refused. The rest of the API, including dose-response fit, still starts.
