@@ -317,11 +317,14 @@ def test_harness_fixtures_are_labelled_and_are_not_catalog_functions() -> None:
     not os.environ.get("KAT_R_CALCULATOR_URL"),
     reason="needs the running pinned R image (KAT_R_CALCULATOR_URL); CI job r-calculator-pin",
 )
-def test_r_side_harness_kats_on_the_pinned_image() -> None:
+def test_r_side_harness_kats_on_the_pinned_image(tmp_path: Path) -> None:
+    from app.services.calculation_release import ReleaseRefused, prepare_release
+
     client = RCalculatorClient(os.environ["KAT_R_CALCULATOR_URL"])
     health = client.fetch_health_body()
     fv = hf.r_round_trip(with_failing_case=True)
-    log = run_kats([fv, hf.backend_sum()], health=health, r_client=client)
+    passing = hf.r_round_trip(version=2)
+    log = run_kats([fv, passing, hf.backend_sum()], health=health, r_client=client)
     out_path = os.environ.get("KAT_RUN_LOG_PATH")
     if out_path:
         Path(out_path).write_text(log.to_json() + "\n", encoding="utf-8")
@@ -329,7 +332,7 @@ def test_r_side_harness_kats_on_the_pinned_image() -> None:
 
     assert log.lock_hash == expected_lock_from_commit(find_repo_root()).lock_hash
     assert re.fullmatch(r"sha256:[0-9a-f]{64}", log.image_digest)
-    by_id = {c.case_id: c for c in log.cases}
+    by_id = {c.case_id: c for c in log.cases if c.version == 1}
     for case_id, _value, expected in hf.R_ROUND_TRIP_PASSING:
         result = by_id[case_id]
         assert result.side == "r", case_id
@@ -340,3 +343,11 @@ def test_r_side_harness_kats_on_the_pinned_image() -> None:
     assert wrong.outputs[0].observed == "0.1"
     assert by_id["hf-sum-exact"].side == "backend" and by_id["hf-sum-exact"].passed
     assert Decimal(by_id["hf-r-sum-0.1-0.2"].outputs[0].observed) != Decimal("0.3")
+
+    # The release check on this run log and the commit's lock hash.
+    catalog = [fv, passing]
+    with pytest.raises(ReleaseRefused) as caught:
+        prepare_release("harness-r-v1", [fv.key], catalog=catalog, ledger=[], run_log=log)
+    assert caught.value.code == "kat_failed"
+    record = prepare_release("harness-r-v2", [passing.key], catalog=catalog, ledger=[], run_log=log)
+    assert record.lock_hash == log.lock_hash
