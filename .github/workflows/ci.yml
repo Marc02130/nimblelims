@@ -95,3 +95,8 @@ jobs:
       # the database or the rest of requirements.txt.
       - name: Pin, two builds, sandbox inspect
         run: bash services/r-calculator/scripts/ci-pin.sh
+      # The KAT harness runs from the backend against the pinned container.
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: KAT harness on the pinned image (S2)
+        run: bash services/r-calculator/scripts/ci-kat.sh lims-r-pin-a
