@@ -295,6 +295,8 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - `REQUIRE_QC_FOR_BATCH_TYPES`: Comma-separated list of batch type UUIDs that require QC samples. If a batch type is in this list, QC samples must be provided during batch creation.
 - `FAIL_QC_BLOCKS_BATCH`: Set to `true` to block batch completion if QC samples fail validation. Default: `false` (warnings only).
 - `R_CALCULATOR_URL`: URL for the R calculator microservice. Default: `http://r-calculator:8000`. Override for local R development or alternative endpoints.
+- `R_BASE_DIGEST` and `R_TREE`: build args for the R image. `R_BASE_DIGEST` is the 64-hex digest in `services/r-calculator/Dockerfile`. `R_TREE` is `git rev-parse HEAD:services/r-calculator`. `services/r-calculator/scripts/ci-pin.sh` exports both from the commit. An image built without them fails closed for calculation calls.
+- `R_IMAGE_DIGEST`: runtime env on the R container only, `sha256:` plus 64 lowercase hex digits, the id of the image that was built. It is not part of the lock hash. Unset, calculation calls are refused. Dose-response `POST /fit` does not read it.
 
 ## Health Checks
 

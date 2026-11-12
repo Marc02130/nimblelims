@@ -4,6 +4,8 @@ A proposed PR sequence for the merged calculations Spec ([PR #253](https://githu
 
 **Status (2026-11-11, 7:16 PM ET):** Marc authorized a go to build on **S1 only** (pin the R service). Later slices stay closed until he says go. S1 uses the Spec's OQ-CALC-16 default timeouts (R 50 s, backend 60 s). Existing dose-response `POST /fit` calls are left unchanged in S1; whether CALC-REQ-4 / 4a refusal also applies to them is not stated in the Spec and is still with Marc.
 
+**Status (2026-11-12):** S1 is implemented on `calculations`. S2–S14 stay closed. OQ-CALC-16 uses the Spec default (R 50 s, backend 60 s). `POST /fit` and `POST /svg/full` are not under the new refusal. The attempt-record half of the CALC-REQ-4a timeout acceptance criteria waits for S9, because S1 has no calculation-attempt store.
+
 Interactive copy: [NimbleLIMS calculations: implementation plan](https://cursor.com/canvas/store-66f86e31-b3c1-4f49-811e-d9b1eca5b78a/f3537fe2-0308-42da-addb-b8a509e16e59).
 
 ## Recommendation
