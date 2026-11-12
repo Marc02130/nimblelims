@@ -35,6 +35,7 @@
 13. The backend service in `docker-compose.yml` does not mount `/var/run/docker.sock`.
 14. `services/r-calculator/R/request_timeout.R` sets `REQUEST_TIMEOUT_SECONDS` to 50. `CALCULATION_BACKEND_TIMEOUT_SECONDS` is 60. The pytest maps an R 504 `r_timeout` and a backend wait timeout to those codes and does not write. It does not insert an attempt row; that store is S9.
 15. `RCalculatorClient.fit` and `full_svg` do not call `begin_calculation_call`. `R/fit.R` still bounds profiled confidence intervals at 5 seconds.
+16. `ci-pin.sh` runs `tests/test_pin.R` inside the image. That script routes a short overrun through plumber. The response is HTTP 504 and `code` is `r_timeout`, and the handler does not finish. A slow `POST /fit` and a slow `POST /svg/full` on that test router finish. The shipped router has the hook on `/health` at 50 seconds and no hook on `/fit` or `/svg/full`. `GET /health` still returns status `ok`.
 
 ## Not in this pass
 

@@ -18,7 +18,7 @@ The R service is pinned before any catalog function or known-answer test. Later 
 
 Compose runs `r-calculator` as uid 1000, with a read-only root, a tmpfs on `/tmp`, no host port, and no route off the `r-internal` network. CPU, memory, and PID limits are set. Deploy and CI check that with `services/r-calculator/scripts/inspect-sandbox.sh`. The API process does not run Docker.
 
-OQ-CALC-16 uses the Spec default: R stops a calculation request after 50 seconds, and the backend stops waiting after 60 seconds. Dose-response `POST /fit` and `POST /svg/full` are not under that 50 second limit and are not under the lock or sandbox refusal. Their existing client timeout is still 60 seconds. The 5 second bound inside curve profiling is unchanged.
+OQ-CALC-16 uses the Spec default: R stops a calculation request after 50 seconds, and the backend stops waiting after 60 seconds. The R limit is a plumber `aroundexec` hook. Plumber calls that hook with the endpoint function, so the limit is in force while the handler runs. `POST /fit` and `POST /svg/full` are not given the hook. They are not under the lock or sandbox refusal. Their existing client timeout is still 60 seconds. The 5 second bound inside curve profiling is unchanged. `tests/test_pin.R` sends a short overrun through plumber and expects HTTP 504 with `r_timeout`. The same short limit does not stop `/fit` or `/svg/full`. No attempt row is written for that timeout; the attempt store is S9.
 
 A calculation call that fails the lock or sandbox check is refused and writes nothing. S1 has no calculation-attempt table, so the acceptance lines that say the attempt records `r_timeout` or `backend_timeout` are proved when that store exists (S9). The timeouts themselves are in place.
 

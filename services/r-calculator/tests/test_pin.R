@@ -95,4 +95,185 @@ err <- tryCatch(
 stopifnot(inherits(err, "error"))
 stopifnot(isTRUE(is_r_timeout(err)))
 
+# The helper above calls the expression directly. The regression below goes
+# through plumber. Wrapping plumber::forward() does not: forward() only sets
+# a flag, setTimeLimit is cleared when the filter returns, and the handler
+# then runs to completion. This request would return finished=TRUE under that
+# bug. A short limit keeps the passing run fast. The product value stays 50.
+library(plumber)
+library(jsonlite)
+
+pin_make_req <- function(verb, path, body = "") {
+  req <- new.env(parent = emptyenv())
+  req$REQUEST_METHOD <- verb
+  req$PATH_INFO <- path
+  req$QUERY_STRING <- ""
+  if (is.character(body)) {
+    body <- charToRaw(body)
+  }
+  req$rook.input <- list(
+    read_lines = function() rawToChar(body),
+    read = function() body,
+    rewind = function() length(body)
+  )
+  req$bodyRaw <- body
+  req
+}
+
+pin_call <- function(pr, verb, path, body = "") {
+  pr$call(pin_make_req(verb, path, body))
+}
+
+response_text <- function(res) {
+  body <- res$body
+  if (is.null(body)) {
+    return("")
+  }
+  if (is.raw(body)) {
+    return(rawToChar(body))
+  }
+  paste(as.character(body), collapse = "\n")
+}
+
+busy_for <- function(seconds) {
+  start <- proc.time()[[3]]
+  repeat {
+    if (proc.time()[[3]] - start > seconds) {
+      break
+    }
+  }
+  list(finished = TRUE)
+}
+
+find_endpoint <- function(pr, path) {
+  found <- NULL
+  ends <- pr$endpoints
+  for (i in seq_along(ends)) {
+    group <- ends[[i]]
+    for (j in seq_along(group)) {
+      if (identical(group[[j]]$path, path)) {
+        found <- group[[j]]
+      }
+    }
+  }
+  found
+}
+
+around_hooks <- function(endpoint) {
+  recorded <- endpoint$.__enclos_env__$private$hooks[["aroundexec"]]
+  if (is.null(recorded)) {
+    return(list())
+  }
+  if (is.function(recorded)) {
+    return(list(recorded))
+  }
+  as.list(recorded)
+}
+
+# Test router only. These paths are not product routes.
+# /fit and /svg/full here exist so the skip can be observed.
+limit_s <- 1
+overrun_s <- 6
+legacy_s <- 2
+pr_test <- plumber::pr()
+pr_test$handle(
+  "GET",
+  "/slow",
+  function() busy_for(overrun_s),
+  serializer = plumber::serializer_unboxed_json()
+)
+pr_test$handle(
+  "GET",
+  "/who",
+  function(req) list(path = req$PATH_INFO),
+  serializer = plumber::serializer_unboxed_json()
+)
+pr_test$handle(
+  "GET",
+  "/boom",
+  function() stop("nope"),
+  serializer = plumber::serializer_unboxed_json()
+)
+pr_test$handle(
+  "POST",
+  "/fit",
+  function() busy_for(legacy_s),
+  serializer = plumber::serializer_unboxed_json()
+)
+pr_test$handle(
+  "POST",
+  "/svg/full",
+  function() busy_for(legacy_s),
+  serializer = plumber::serializer_unboxed_json()
+)
+install_calculation_timeout(pr_test, limit_s)
+
+slow_started <- proc.time()[[3]]
+slow <- pin_call(pr_test, "GET", "/slow")
+slow_elapsed <- proc.time()[[3]] - slow_started
+slow_body <- jsonlite::fromJSON(response_text(slow))
+if (!identical(as.integer(slow$status), 504L)) {
+  stop("slow route status ", slow$status, " body ", response_text(slow))
+}
+if (!identical(unname(slow_body$code), "r_timeout")) {
+  stop("slow route was not an R timeout: ", response_text(slow))
+}
+if (isTRUE(slow_body$finished)) {
+  stop("slow route ran to completion")
+}
+if (slow_elapsed >= overrun_s - 1) {
+  stop("slow route was not stopped early: ", slow_elapsed, " s")
+}
+if (!grepl("1 s", slow_body$detail, fixed = TRUE)) {
+  stop("timeout detail did not use the test limit: ", slow_body$detail)
+}
+
+who <- jsonlite::fromJSON(response_text(pin_call(pr_test, "GET", "/who")))
+stopifnot(identical(unname(who$path), "/who"))
+
+boom <- pin_call(pr_test, "GET", "/boom")
+stopifnot(identical(as.integer(boom$status), 500L))
+stopifnot(!grepl("r_timeout", response_text(boom), fixed = TRUE))
+
+expect_legacy_finishes <- function(verb, path) {
+  started <- proc.time()[[3]]
+  res <- pin_call(pr_test, verb, path)
+  elapsed <- proc.time()[[3]] - started
+  parsed <- jsonlite::fromJSON(response_text(res))
+  if (!identical(as.integer(res$status), 200L) || !isTRUE(parsed$finished)) {
+    stop(path, " did not finish: ", res$status, " ", response_text(res))
+  }
+  if (elapsed < legacy_s - 0.3) {
+    stop(path, " returned before its own work finished: ", elapsed, " s")
+  }
+  if (!is.null(parsed$code) && identical(unname(parsed$code), "r_timeout")) {
+    stop(path, " was stopped by the calculation timeout")
+  }
+}
+expect_legacy_finishes("POST", "/fit")
+expect_legacy_finishes("POST", "/svg/full")
+
+stopifnot(length(around_hooks(find_endpoint(pr_test, "/slow"))) == 1L)
+stopifnot(length(around_hooks(find_endpoint(pr_test, "/fit"))) == 0L)
+stopifnot(length(around_hooks(find_endpoint(pr_test, "/svg/full"))) == 0L)
+
+# The shipped router installs the same hook at the production limit.
+shipped <- plumber::plumb(file.path(root, "plumber.R"))
+health_ep <- find_endpoint(shipped, "/health")
+fit_ep <- find_endpoint(shipped, "/fit")
+svg_ep <- find_endpoint(shipped, "/svg/full")
+stopifnot(!is.null(health_ep), !is.null(fit_ep), !is.null(svg_ep))
+health_hooks <- around_hooks(health_ep)
+stopifnot(length(health_hooks) == 1L)
+stopifnot(identical(environment(health_hooks[[1L]])$limit, REQUEST_TIMEOUT_SECONDS))
+stopifnot(length(around_hooks(fit_ep)) == 0L)
+stopifnot(length(around_hooks(svg_ep)) == 0L)
+
+health <- pin_call(shipped, "GET", "/health")
+health_body <- jsonlite::fromJSON(response_text(health))
+if (!identical(as.integer(health$status), 200L)) {
+  stop("health status ", health$status, " body ", response_text(health))
+}
+stopifnot(identical(unname(health_body$status), "ok"))
+
 cat("test_pin.R ok\n")

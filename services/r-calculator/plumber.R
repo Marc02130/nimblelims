@@ -21,29 +21,6 @@ function(req) {
   plumber::forward()
 }
 
-#* Wall-clock limit for calculation requests (CALC-REQ-4a, OQ-CALC-16).
-#* POST /fit and POST /svg/full are the shipped dose-response routes.
-#* They keep their existing timing, including the 5 s profiled-CI bound.
-#* @filter calculation_timeout
-function(req, res) {
-  if (legacy_dose_response_path(req$PATH_INFO)) {
-    return(plumber::forward())
-  }
-  tryCatch(
-    run_with_wall_timeout(plumber::forward(), REQUEST_TIMEOUT_SECONDS),
-    error = function(e) {
-      if (is_r_timeout(e)) {
-        res$status <- 504L
-        return(list(
-          code = "r_timeout",
-          detail = paste0("R stopped the request after ", REQUEST_TIMEOUT_SECONDS, " s")
-        ))
-      }
-      stop(e)
-    }
-  )
-}
-
 #* Health check
 #* @get /health
 #* @serializer unboxedJSON
@@ -166,4 +143,11 @@ function(req) {
   )
 
   list(svg = svg)
+}
+
+# The 50 s limit wraps endpoint execution via aroundexec.
+# POST /fit and POST /svg/full are not given that hook.
+#* @plumber
+function(pr) {
+  install_calculation_timeout(pr, REQUEST_TIMEOUT_SECONDS)
 }

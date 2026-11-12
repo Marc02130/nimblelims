@@ -360,7 +360,13 @@ def test_compose_sandbox_and_no_backend_socket() -> None:
 
 def test_request_timeout_does_not_wrap_fit() -> None:
     plumber = (_service() / "plumber.R").read_text(encoding="utf-8")
-    assert "legacy_dose_response_path" in plumber
-    assert "REQUEST_TIMEOUT_SECONDS" in plumber
+    timeout_r = (_service() / "R" / "request_timeout.R").read_text(encoding="utf-8")
+    assert "install_calculation_timeout(pr, REQUEST_TIMEOUT_SECONDS)" in plumber
+    assert "run_with_wall_timeout(plumber::forward()" not in plumber
+    assert 'registerHook("aroundexec"' in timeout_r
+    assert "legacy_dose_response_path" in timeout_r
+    assert '"/fit"' in timeout_r
+    assert '"/svg/full"' in timeout_r
+    assert "REQUEST_TIMEOUT_SECONDS <- 50" in timeout_r
     fit = (_service() / "R" / "fit.R").read_text(encoding="utf-8")
     assert "withTimeout(confint(fit, level = 0.95), timeout = 5" in fit
