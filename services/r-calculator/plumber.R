@@ -3,6 +3,7 @@ library(jsonlite)
 
 source("R/request_timeout.R")
 source("R/pin.R")
+source("R/serialise.R")
 source("R/fit.R")
 source("R/category.R")
 source("R/svg_thumbnail.R")
@@ -143,6 +144,35 @@ function(req) {
   )
 
   list(svg = svg)
+}
+
+#* KAT harness fixture route (CALC-REQ-5 harness only). Not a catalog function.
+#*
+#* Parses one decimal string as an R double and returns that double's
+#* shortest round-trip string. It does no arithmetic. It lets the backend KAT
+#* runner prove the R-over-HTTP path on the pinned image before any catalog
+#* route exists.
+#*
+#* Expected body: {"value": "0.026"}
+#*
+#* @post /kat-harness/round-trip
+#* @serializer unboxedJSON
+function(req, res) {
+  body <- tryCatch(
+    jsonlite::fromJSON(req$postBody, simplifyVector = FALSE),
+    error = function(e) NULL
+  )
+  value <- if (is.list(body)) body$value else NULL
+  parsed <- if (is.character(value) && length(value) == 1L) {
+    suppressWarnings(as.numeric(value))
+  } else {
+    NA_real_
+  }
+  if (is.na(parsed) || !is.finite(parsed)) {
+    res$status <- 400L
+    return(list(code = "harness_input", detail = "value must be one finite decimal string"))
+  }
+  list(value = shortest_round_trip(parsed))
 }
 
 # The 50 s limit wraps endpoint execution via aroundexec.
