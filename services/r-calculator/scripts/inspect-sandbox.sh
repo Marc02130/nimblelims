@@ -24,10 +24,16 @@ if not host.get("NanoCpus") and not host.get("CpuQuota"):
 pids = host.get("PidsLimit")
 if pids is None or pids <= 0:
     errors.append("pid limit is unset")
+# EXPOSE records the container port with a null binding. That is not a host port.
+# A published port has a non-empty binding list.
 ports = (data.get("NetworkSettings") or {}).get("Ports") or {}
+for port, binding in ports.items():
+    if binding:
+        errors.append(f"host port is published for {port}")
 bindings = host.get("PortBindings") or {}
-if ports or bindings:
-    errors.append("host port is published")
+for port, binding in bindings.items():
+    if binding:
+        errors.append(f"host port is published for {port}")
 user = config.get("User") or ""
 if user in ("", "0", "root", "0:0"):
     errors.append(f"container user is root ({user!r})")

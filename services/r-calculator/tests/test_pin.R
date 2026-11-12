@@ -78,8 +78,18 @@ stopifnot(isTRUE(boxed$memory_limited))
 stopifnot(isTRUE(boxed$pids_limited))
 stopifnot(isTRUE(boxed$forbidden_env_absent))
 
+# setTimeLimit stops R evaluation. A pure C sleep is not the check.
 err <- tryCatch(
-  run_with_wall_timeout(Sys.sleep(5), 1),
+  run_with_wall_timeout(
+    {
+      start <- proc.time()[[3]]
+      repeat {
+        if (proc.time()[[3]] - start > 3) break
+      }
+      "not-stopped"
+    },
+    1
+  ),
   error = function(e) e
 )
 stopifnot(inherits(err, "error"))
