@@ -4,7 +4,7 @@ The R service is pinned before any catalog function or known-answer test. Later 
 
 ## What is pinned
 
-- The Dockerfile starts `FROM rocker/r-ver@sha256:<digest>`. There is no floating tag.
+- The Dockerfile starts `FROM rocker/r-ver@sha256:<digest>`. There is no floating tag. The digest is the multi-arch manifest index for tag `4.4` (R 4.4.3), not the linux/amd64 image manifest. BuildKit selects `linux/arm64` or `linux/amd64` to match the machine building the image, so Compose does not warn that the image requested linux/amd64. The lock hash uses that index digest, so an arm64 build and an amd64 build of the same commit share one `<base>`. Pin the index (`docker buildx imagetools inspect rocker/r-ver:4.4`). Pinning the digest from `docker inspect` after a pull records one platform only.
 - R packages are installed only by `renv::restore()` from the committed `services/r-calculator/renv.lock`. The image build does not call `install.packages`.
 - The lock hash is SHA-256 of `<base>\n<renv>\n<tree>` (no trailing line feed).
   - `<base>` is the 64-hex digest in that `FROM` line.
