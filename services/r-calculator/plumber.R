@@ -4,6 +4,7 @@ library(jsonlite)
 source("R/request_timeout.R")
 source("R/pin.R")
 source("R/serialise.R")
+source("R/catalog.R")
 source("R/fit.R")
 source("R/category.R")
 source("R/svg_thumbnail.R")
@@ -174,6 +175,33 @@ function(req, res) {
   }
   list(value = shortest_round_trip(parsed))
 }
+
+catalog_handler <- function(path) {
+  spec <- CATALOG_ROUTES[[path]]
+  function(req, res) {
+    catalog_route(req, res, spec$fields, spec$compute)
+  }
+}
+
+#* Catalog fit_4pl v1 (CALC-REQ-8). See R/catalog.R.
+#* @post /catalog/fit_4pl/v1
+#* @serializer unboxedJSON
+catalog_handler("/catalog/fit_4pl/v1")
+
+#* Catalog inverse_4pl v1 (CALC-REQ-9). In-range responses only.
+#* @post /catalog/inverse_4pl/v1
+#* @serializer unboxedJSON
+catalog_handler("/catalog/inverse_4pl/v1")
+
+#* Catalog fit_loglog_linear v1 (CALC-REQ-12).
+#* @post /catalog/fit_loglog_linear/v1
+#* @serializer unboxedJSON
+catalog_handler("/catalog/fit_loglog_linear/v1")
+
+#* Catalog inverse_loglog_linear v1 (CALC-REQ-17). In-range y only.
+#* @post /catalog/inverse_loglog_linear/v1
+#* @serializer unboxedJSON
+catalog_handler("/catalog/inverse_loglog_linear/v1")
 
 # The 50 s limit wraps endpoint execution via aroundexec.
 # POST /fit and POST /svg/full are not given that hook.
