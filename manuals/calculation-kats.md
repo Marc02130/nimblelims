@@ -74,7 +74,7 @@ This is a software-release check. It is not a lab validation gate, which is out 
 
 ## Not in S2
 
-- Catalog functions, real KAT cases, and their expected values. Expected values for real cases come from the SOP when the SOP has them (OQ-CALC-13).
+- Catalog functions, real KAT cases, and their expected values. Expected values for real cases come from the SOP when the SOP has them (OQ-CALC-13). The S3 R-side functions are on [calculation-catalog-r.md](calculation-catalog-r.md). They have no KAT cases yet and are not released.
 - ELISA and LAL reference-configuration KATs (S14).
 - A committed release ledger. The first catalog release (S3 onward) chooses where records are committed.
 - Configurations, attempts, and result writes.

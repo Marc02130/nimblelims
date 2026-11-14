@@ -299,7 +299,7 @@ Copy `backend/env.example` to `backend/.env` and configure:
 - `R_CALCULATOR_URL`: URL for the R calculator microservice. Default: `http://r-calculator:8000`. Override for local R development or alternative endpoints.
 - `R_BASE_DIGEST` and `R_TREE`: build args for the R image. `R_BASE_DIGEST` is the 64-hex digest in `services/r-calculator/Dockerfile`. `R_TREE` is `git rev-parse HEAD:services/r-calculator`. `services/r-calculator/scripts/ci-pin.sh` exports both from the commit. An image built without them fails closed for calculation calls.
 - `R_IMAGE_DIGEST`: runtime env on the R container only, `sha256:` plus 64 lowercase hex digits, the id of the image that was built. It is not part of the lock hash. Unset, calculation calls are refused. Dose-response `POST /fit` does not read it.
-- `KAT_R_CALCULATOR_URL` and `KAT_RUN_LOG_PATH`: test-only. `services/r-calculator/scripts/ci-kat.sh` sets them to run the KAT harness against the pinned R container and write the run log. See `manuals/calculation-kats.md`.
+- `KAT_R_CALCULATOR_URL` and `KAT_RUN_LOG_PATH`: test-only. `services/r-calculator/scripts/ci-kat.sh` sets them to run the KAT harness against the pinned R container and write the run log. See `manuals/calculation-kats.md`. `services/r-calculator/scripts/ci-catalog.sh` also sets `KAT_R_CALCULATOR_URL` to run the R-side catalog function tests on the pinned image. See `manuals/calculation-catalog-r.md`.
 
 ## Health Checks
 
