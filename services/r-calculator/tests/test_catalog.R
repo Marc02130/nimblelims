@@ -12,6 +12,18 @@ if (!file.exists(file.path(root, "plumber.R"))) {
   stop("run from services/r-calculator (the image WORKDIR)")
 }
 
+in_pinned_image <- function() {
+  base <- Sys.getenv("R_BASE_DIGEST", "")
+  tree <- Sys.getenv("R_TREE", "")
+  isTRUE(file.exists("/app/renv.lock")) &&
+    identical(normalizePath(root), "/app") &&
+    grepl("^[0-9a-f]{64}$", base) &&
+    grepl("^[0-9a-f]{40}$|^[0-9a-f]{64}$", tree)
+}
+if (!in_pinned_image()) {
+  stop("not inside the pinned image: a host-R run of the catalog route test does not count")
+}
+
 make_req <- function(verb, path, body = "") {
   req <- new.env(parent = emptyenv())
   req$REQUEST_METHOD <- verb
