@@ -488,7 +488,7 @@ def test_4pl_fit_and_inverse_on_the_pinned_image() -> None:
     assert fit.stop is None, fit.detail
     assert fit.outputs["points_used"] == "7" and fit.outputs["points_excluded"] == "1"
     for name, want in (("slope", b), ("bottom", c), ("top", d), ("inflection", e)):
-        assert _close(fit.outputs[name], want, 1e-6), (name, fit.outputs[name])
+        assert _close(fit.outputs[name], want, 1e-4), (name, fit.outputs[name])
     for name in cat.FOUR_PL_PARAMETERS + ("r_squared",):
         assert cat.is_decimal_string(fit.outputs[name])
 
@@ -502,7 +502,7 @@ def test_4pl_fit_and_inverse_on_the_pinned_image() -> None:
 
     low_mean, high_mean = repr(ll4(5.0)), repr(ll4(320.0))
     inv = cat.inverse_4pl(fit.outputs, repr(ll4(30.0)), low_mean, high_mean, client)
-    assert inv.stop is None and _close(inv.outputs["concentration"], 30.0, 1e-6)
+    assert inv.stop is None and _close(inv.outputs["concentration"], 30.0, 1e-4)
 
     # With slope > 0 drc's LL.4 decreases: the high-concentration end has the low response.
     calls_before = len(client.paths)

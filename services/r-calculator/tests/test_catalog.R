@@ -98,10 +98,11 @@ fit_body <- list(concentration = strs(conc), response = strs(ll4(conc)))
 
 fit <- post("/catalog/fit_4pl/v1", fit_body)
 expect_ok(fit, "fit_4pl")
-stopifnot(near(num(fit$body$slope), b0, 1e-6))
-stopifnot(near(num(fit$body$bottom), c0, 1e-6))
-stopifnot(near(num(fit$body$top), d0, 1e-6))
-stopifnot(near(num(fit$body$inflection), e0, 1e-6))
+# drc's default convergence tolerance leaves about 5e-6 relative error on exact data.
+stopifnot(near(num(fit$body$slope), b0, 1e-4))
+stopifnot(near(num(fit$body$bottom), c0, 1e-4))
+stopifnot(near(num(fit$body$top), d0, 1e-4))
+stopifnot(near(num(fit$body$inflection), e0, 1e-4))
 stopifnot(num(fit$body$r_squared) > 1 - 1e-9)
 stopifnot(setequal(names(fit$body), c("bottom", "top", "slope", "inflection", "r_squared")))
 
