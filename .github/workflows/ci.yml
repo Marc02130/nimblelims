@@ -100,3 +100,5 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: KAT harness on the pinned image (S2)
         run: bash services/r-calculator/scripts/ci-kat.sh lims-r-pin-a
+      - name: R-side catalog functions on the pinned image (S3)
+        run: bash services/r-calculator/scripts/ci-catalog.sh lims-r-pin-a

@@ -122,6 +122,8 @@ bash services/r-calculator/scripts/inspect-sandbox.sh lims-r-pin-a
 docker run --rm --entrypoint Rscript nimblelims-r-calculator:pin-a tests/test_pin.R
 # CALC-REQ-5 serialiser unit test, inside the pinned image only.
 docker run --rm --network none --entrypoint Rscript nimblelims-r-calculator:pin-a tests/test_serialise.R
+# S3 catalog routes, inside the pinned image (unit tests, not KATs).
+docker run --rm --network none --entrypoint Rscript nimblelims-r-calculator:pin-a tests/test_catalog.R
 
 # Image history and build args carry no database URL and no *_KEY / *_SECRET name.
 docker history --no-trunc --format '{{.CreatedBy}}' nimblelims-r-calculator:pin-a > /tmp/r-pin-history.txt
