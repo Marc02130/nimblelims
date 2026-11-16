@@ -646,13 +646,13 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 ---
 ### OQ-CALC-11 fit options: weighting, fixed and bounded parameters, outliers (draft, Marc decides)
 
-Status: draft options for Marc. Nothing in this subsection is decided. Nothing here changes CALC-REQ-8 until Marc decides.
+Status: draft options for Marc. Nothing in this subsection is decided, except that at most one parameter may be fixed (Option A item 2, Marc 2026-11-15). Nothing here changes CALC-REQ-8 until Marc decides.
 
 Today `fit_4pl` (CALC-REQ-8) uses drc defaults: ordinary least squares, no weights, and no parameter bounds. Marc asked that the options be modeled on IDBS XLfit, which offers weighting options, fixed and constrained parameters, automatic outlier detection, global fitting, and many models. XLfit is a reference for the options. It is not a requirement.
 
 **Option A. Proposed minimal set for this build.**
 1. Weighting is a configured choice in the calculation. The proposed choices are none (today's behavior), 1/y, and 1/y². The fit output records which weighting was used.
-2. Fixed parameters. The configuration may fix bottom, top, or both to a configured value. A fixed parameter is not fitted and is reported as fixed.
+2. Fixed parameters (Marc, 2026-11-15). The configuration may fix at most one of the four parameters to a configured value. Most labs allow one, not two. Fixing bottom is the usual case; it costs one degree of freedom. A fixed parameter is not fitted and is reported as fixed.
 3. Bounds. The configuration may set a lower bound, an upper bound, or both on any of the four parameters. A fit that ends on a bound is flagged.
 4. Outliers. No automatic outlier detection in this build. CALC-REQ-8's rule stands: a replicate with no numeric response is excluded and counted.
 5. Where it is configured. These choices belong to the calculation on the analysis-analyte pair (the calculation lives on analysis_analytes, Marc 2026-11-10). They are configurable values in the calculation (CALC-REQ-23), not hardcoded, and a change is a new version (CALC-REQ-40).
@@ -738,4 +738,5 @@ History, not stamps at this head:
 | Spec | Marc | Decision (6:25 PM ET): "calculated and reported are set together." | 2026-11-11 | ced25c1 |
 | Spec | Marc | Decision: OQ-CALC-13. KAT expected values come from the SOP when applicable. KAT test code is separate work, built like a unit test. Katinka may source a test, results, and SOP for one. | 2026-11-15 | c7fa5a3 |
 | Spec | Marc | Decisions on S3 choices the Spec was silent on (implementation is separate work): slope 0 is valid (inactive or nonreactive) and is not refused; the inverse of a flat curve returns no number, with an inactive flag; negative concentrations are refused; all points dropped gives missing_input; stops return 200 and refusals return 400; r_squared is kept as a QC metric, plus a residual-based fit statistic whose exact form is pending Marc. OQ-CALC-11 fit options drafted for Marc's decision. | 2026-11-15 | c7fa5a3 |
-| Spec | Marc | Decision (about 9:32 PM ET): CALC-REQ-6 allows the SOP, cited by section, as a KAT expected-value source. S3 decisions written into requirement text: slope 0 valid; flat curve or equal endpoint means gives no number with flag inactive; wrong-order endpoint means refused; negative concentrations refused; stops 200, refusals 400; r_squared plus sum_residuals, sum_abs_residuals, sum_sq_residuals (fitted minus observed; log10 for log-log), storable as results by lab configuration; all points dropped: fit_4pl curve_not_fitted, fit_loglog_linear missing_input. | 2026-11-15 | this revision |
+| Spec | Marc | Decision (about 9:32 PM ET): CALC-REQ-6 allows the SOP, cited by section, as a KAT expected-value source. S3 decisions written into requirement text: slope 0 valid; flat curve or equal endpoint means gives no number with flag inactive; wrong-order endpoint means refused; negative concentrations refused; stops 200, refusals 400; r_squared plus sum_residuals, sum_abs_residuals, sum_sq_residuals (fitted minus observed; log10 for log-log), storable as results by lab configuration; all points dropped: fit_4pl curve_not_fitted, fit_loglog_linear missing_input. | 2026-11-15 | 9664312 |
+| Spec | Marc | Decision (about 9:56 PM ET): keep the negative calibrator concentration refusal on fit_4pl inputs as an input check. OQ-CALC-11: at most one parameter may be fixed; fixing bottom is the usual case (one degree of freedom). Robust fitting not yet decided. | 2026-11-15 | this revision |
