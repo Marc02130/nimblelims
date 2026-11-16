@@ -44,12 +44,19 @@ def _replies(body: Any) -> StubR:
     return StubR(lambda _path, _payload: body)
 
 
+_RESIDUALS = {
+    "sum_residuals": "0",
+    "sum_abs_residuals": "0",
+    "sum_sq_residuals": "0",
+}
+
 FIT_OUT = {
     "bottom": "0.05",
     "top": "2.5",
     "slope": "1.5",
     "inflection": "40",
     "r_squared": "0.9999999999999999",
+    **_RESIDUALS,
 }
 
 
@@ -134,6 +141,21 @@ def test_fit_4pl_non_finite_r_output_stops_r_non_finite(value: Any) -> None:
     result = cat.fit_4pl(_points(["5", "10", "20", "40"]), _replies(body))
     assert result.stop == "r_non_finite"
     assert result.outputs == {} and result.qualifier is None and result.flags == ()
+
+
+def test_fit_4pl_slope_zero_is_a_normal_result() -> None:
+    body = {**FIT_OUT, "slope": "0"}
+    result = cat.fit_4pl(_points(["5", "10", "20", "40"]), _replies(body))
+    assert result.stop is None
+    assert result.outputs["slope"] == "0"
+    for name in cat.RESIDUAL_STATS:
+        assert result.outputs[name] == "0"
+
+
+def test_fit_4pl_non_finite_residual_stat_stops() -> None:
+    body = {**FIT_OUT, "sum_sq_residuals": "NaN"}
+    result = cat.fit_4pl(_points(["5", "10", "20", "40"]), _replies(body))
+    assert result.stop == "r_non_finite" and result.outputs == {}
 
 
 def test_fit_4pl_r_non_finite_stop_from_r() -> None:
@@ -236,12 +258,32 @@ def test_inverse_4pl_non_finite_r_output_stops() -> None:
     assert result.stop == "r_non_finite" and result.outputs == {}
 
 
+@pytest.mark.parametrize("slope", ["0", "0.0", "-0"])
+def test_inverse_4pl_slope_zero_is_inactive_without_r(slope: str) -> None:
+    stub = StubR()
+    result = cat.inverse_4pl({**CURVE, "slope": slope}, "1.0", "0.1", "2.4", stub)
+    assert result.flags == ("inactive",)
+    assert result.outputs == {} and result.stop is None and result.qualifier is None
+    assert not result.r_called and stub.calls == []
+
+
+def test_inverse_4pl_slope_zero_wins_over_a_missing_response() -> None:
+    stub = StubR()
+    result = cat.inverse_4pl({**CURVE, "slope": "0"}, None, "0.1", "2.4", stub)
+    assert result.flags == ("inactive",) and stub.calls == []
+
+
+def test_inverse_4pl_equal_endpoint_means_are_inactive_without_r() -> None:
+    stub = StubR()
+    result = cat.inverse_4pl(CURVE, "1.0", "1.10", "1.1", stub)
+    assert result.flags == ("inactive",)
+    assert result.outputs == {} and not result.r_called and stub.calls == []
+
+
 @pytest.mark.parametrize(
     "curve,low,high",
     [
-        ({**CURVE, "slope": "0"}, "0.1", "2.4"),
         ({**CURVE, "top": 2.5}, "0.1", "2.4"),
-        (CURVE, "0.1", "0.1"),
         (CURVE, 0.1, "2.4"),
     ],
 )
@@ -252,7 +294,7 @@ def test_inverse_4pl_refuses_bad_inputs(curve: dict, low: Any, high: Any) -> Non
 
 # ---- fit_loglog_linear -----------------------------------------------------
 
-LL_OUT = {"slope": "-0.8", "intercept": "0.5", "r": "-1"}
+LL_OUT = {"slope": "-0.8", "intercept": "0.5", "r": "-1", **_RESIDUALS}
 
 
 def _ll_points(xs: list[str], ys: list[Any], reps: Optional[list] = None) -> list[dict]:
@@ -312,6 +354,14 @@ def test_fit_loglog_linear_no_y_at_all_is_missing_input() -> None:
     result = cat.fit_loglog_linear(_ll_points(["1", "10"], [None, "N/A"]), stub)
     assert result.flags == ("missing_input",) and result.dropped == ("p0", "p1")
     assert stub.calls == []
+
+
+def test_fit_loglog_linear_slope_zero_is_a_normal_result() -> None:
+    body = {**LL_OUT, "slope": "0", "r": "0"}
+    result = cat.fit_loglog_linear(_ll_points(["1", "10", "100"], ["2", "2", "2"]), _replies(body))
+    assert result.stop is None
+    assert result.outputs["slope"] == "0"
+    assert result.outputs["r"] == "0"
 
 
 def test_fit_loglog_linear_non_finite_r_output_stops() -> None:
@@ -376,13 +426,28 @@ def test_inverse_loglog_linear_non_positive_endpoint_mean_stops() -> None:
     assert result.stop == "non_positive_log_input"
 
 
+@pytest.mark.parametrize("slope", ["0", "0.0", "-0"])
+def test_inverse_loglog_linear_slope_zero_is_inactive_without_r(slope: str) -> None:
+    stub = StubR()
+    result = cat.inverse_loglog_linear(
+        {"slope": slope, "intercept": "0.5"}, "100", "2200", "8.9", stub
+    )
+    assert result.flags == ("inactive",)
+    assert result.outputs == {} and result.stop is None and result.qualifier is None
+    assert not result.r_called and stub.calls == []
+
+
+def test_inverse_loglog_linear_equal_endpoint_means_are_inactive_without_r() -> None:
+    stub = StubR()
+    result = cat.inverse_loglog_linear(POS_FIT, "10", "8.90", "8.9", stub)
+    assert result.flags == ("inactive",) and stub.calls == []
+
+
 @pytest.mark.parametrize(
     "fit,low_x,high_x",
     [
-        ({"slope": "0", "intercept": "0.5"}, "2200", "8.9"),
         (NEG_FIT, "8.9", "2200"),
         (POS_FIT, "2200", "8.9"),
-        (POS_FIT, "8.9", "8.9"),
         ({"slope": -0.8, "intercept": "0.5"}, "2200", "8.9"),
     ],
 )
@@ -411,6 +476,11 @@ def test_the_four_r_side_versions_are_declared_with_every_field() -> None:
         assert fv.compute is None
         assert fv.r_sources == ("R/catalog.R", "R/serialise.R")
         version_fingerprint(fv, find_repo_root())
+    for name in cat.RESIDUAL_STATS:
+        assert name in cat.FIT_4PL_V1.outputs
+        assert name in cat.FIT_LOGLOG_LINEAR_V1.outputs
+    assert "r_squared" in cat.FIT_4PL_V1.outputs
+    assert "r" in cat.FIT_LOGLOG_LINEAR_V1.outputs
 
 
 def test_no_r_side_version_has_kat_cases_yet() -> None:
@@ -489,8 +559,9 @@ def test_4pl_fit_and_inverse_on_the_pinned_image() -> None:
     assert fit.outputs["points_used"] == "7" and fit.outputs["points_excluded"] == "1"
     for name, want in (("slope", b), ("bottom", c), ("top", d), ("inflection", e)):
         assert _close(fit.outputs[name], want, 1e-4), (name, fit.outputs[name])
-    for name in cat.FOUR_PL_PARAMETERS + ("r_squared",):
+    for name in cat.FOUR_PL_PARAMETERS + ("r_squared",) + cat.RESIDUAL_STATS:
         assert cat.is_decimal_string(fit.outputs[name])
+    assert Decimal(fit.outputs["sum_sq_residuals"]) < Decimal("1e-4")
 
     three = [
         {"concentration": repr(x), "response": repr(ll4(x)), "replicate": f"r{i}"}
@@ -512,6 +583,14 @@ def test_4pl_fit_and_inverse_on_the_pinned_image() -> None:
     assert (past_high_conc.qualifier, past_high_conc.end) == (">", "high")
     assert len(client.paths) == calls_before
 
+    calls_before = len(client.paths)
+    flat_curve = {**fit.outputs, "slope": "0"}
+    inactive = cat.inverse_4pl(flat_curve, repr(ll4(30.0)), low_mean, high_mean, client)
+    equal_ends = cat.inverse_4pl(fit.outputs, repr(ll4(30.0)), "1.5", "1.5", client)
+    assert inactive.flags == ("inactive",) and inactive.outputs == {}
+    assert equal_ends.flags == ("inactive",) and equal_ends.outputs == {}
+    assert len(client.paths) == calls_before
+
 
 @LIVE
 def test_loglog_fit_and_inverse_on_the_pinned_image() -> None:
@@ -526,6 +605,9 @@ def test_loglog_fit_and_inverse_on_the_pinned_image() -> None:
     assert _close(fit.outputs["slope"], -0.8, 1e-12)
     assert _close(fit.outputs["intercept"], 0.5, 1e-12)
     assert _close(fit.outputs["r"], -1.0, 1e-12)
+    for name in cat.RESIDUAL_STATS:
+        assert cat.is_decimal_string(fit.outputs[name])
+    assert Decimal(fit.outputs["sum_sq_residuals"]) < Decimal("1e-8")
 
     low_x_mean, high_x_mean = pts[0]["y"], pts[-1]["y"]
     y = repr(10 ** (0.5 - 0.8 * math.log10(0.2)))
@@ -541,3 +623,18 @@ def test_loglog_fit_and_inverse_on_the_pinned_image() -> None:
 
     one = cat.fit_loglog_linear(pts[:1], client)
     assert one.stop == "r_non_finite" and one.outputs == {}
+
+    flat_pts = [
+        {"x": x, "y": "2", "point_id": f"f{i}"} for i, x in enumerate(["1", "10", "100", "1000"])
+    ]
+    flat = cat.fit_loglog_linear(flat_pts, client)
+    assert flat.stop is None, flat.detail
+    assert Decimal(flat.outputs["slope"]) == 0
+    assert Decimal(flat.outputs["r"]) == 0
+    # lm's intercept is one ulp off log10(2), so the residual sums are rounding dust.
+    assert abs(Decimal(flat.outputs["sum_residuals"])) < Decimal("1e-12")
+    assert Decimal(flat.outputs["sum_sq_residuals"]) < Decimal("1e-12")
+    calls_before = len(client.paths)
+    inactive = cat.inverse_loglog_linear(flat.outputs, "2", "2", "2", client)
+    assert inactive.flags == ("inactive",) and inactive.outputs == {}
+    assert len(client.paths) == calls_before

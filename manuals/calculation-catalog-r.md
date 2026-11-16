@@ -53,8 +53,10 @@ All four are called from the backend as Python functions taking an `r_client` (a
 - Fewer than four concentration levels with a numeric response stops with `curve_not_fitted`, and R is not called.
 - A negative concentration is refused.
 - R fits drc `LL.4`: response = c + (d − c) / (1 + exp(b (ln x − ln e))). It uses ordinary least squares with no weights and no parameter bounds.
-- Outputs are `bottom` (c), `top` (d), `slope` (b), `inflection` (e), and `r_squared` = 1 − SS_res / SS_tot, plus `points_used` and `points_excluded`.
-- A fit that does not converge stops with `curve_not_fitted`.
+- Outputs are `bottom` (c), `top` (d), `slope` (b), `inflection` (e), and `r_squared` = 1 − SS_res / SS_tot, plus `points_used` and `points_excluded`. When both sums of squares are 0, `r_squared` is 1.
+- Three more outputs are the residual statistics. Residual = fitted response minus observed response: `sum_residuals` (plain sum), `sum_abs_residuals`, and `sum_sq_residuals`. A lab can choose later, by configuration, to store any of them as a result. S3 only returns them.
+- A fitted slope of 0 is a normal result. The fit does not refuse it and does not stop because of it.
+- A fit that does not converge stops with `curve_not_fitted`. A flat series that does not converge still stops that way; this slice does not invent 4PL parameters for it.
 
 R body: `{"concentration": [...], "response": [...]}`.
 
@@ -62,12 +64,14 @@ R body: `{"concentration": [...], "response": [...]}`.
 
 `inverse_4pl(curve, response, low_calibrator_mean_response, high_calibrator_mean_response, r_client)`.
 
-- No numeric response gives no concentration and the flag `missing_input`.
+- A slope of 0 returns no concentration and the flag `inactive`. R is not called. This is decided before the missing-response check, so a missing response on a slope of 0 is `inactive`.
+- Equal low and high calibrator mean responses get the same flag, also with no R call. Both of those used to be refusals.
+- No numeric response, on a curve that does have an inverse, gives no concentration and the flag `missing_input`.
 - The curve's direction comes from the two calibrator means. A response past the high-concentration calibrator's mean returns qualifier `>` with `end` `high`. A response past the low-concentration calibrator's mean returns qualifier `<` with `end` `low`. Neither stores a number or calls R, so the function never extrapolates.
 - A response equal to an end mean is in range.
 - A response that is in range but not strictly between `bottom` and `top` has no inverse. It is flagged `response_at_asymptote` and is not given a number.
 - Otherwise R computes x = e · ((d − c) / (y − c) − 1)^(1/b).
-- A slope of 0, or equal low and high means, is refused.
+- A direct call to the R route with a slope of 0 is not a refusal. It stops with `r_non_finite` (HTTP 200) and returns no concentration. The backend does not make that call.
 
 R body: `{"bottom", "top", "slope", "inflection", "response"}`.
 
@@ -79,7 +83,8 @@ R body: `{"bottom", "top", "slope", "inflection", "response"}`.
 - A point with no y is dropped, and its `point_id` is recorded in `dropped`.
 - If no point has a y, there is no fit and the flag is `missing_input`.
 - R fits `lm(log10(y) ~ log10(x))`. Outputs are `slope`, `intercept`, and `r`, the Pearson correlation of log10 x and log10 y. They come with `points_used` and `points_dropped`.
-- A single point gives an undefined slope and stops with `r_non_finite`.
+- Three more outputs are residual statistics on the log10(y) scale, not on y. Residual = fitted log10(y) minus observed log10(y): `sum_residuals`, `sum_abs_residuals`, and `sum_sq_residuals`.
+- A fitted slope of 0 is a normal result. When log10(y) has no variance, Pearson r is undefined; the function returns `r` as 0 so the flat fit stays a finite result. A single point gives an undefined slope and stops with `r_non_finite`.
 
 R body: `{"x": [...], "y": [...]}`.
 
@@ -87,13 +92,15 @@ R body: `{"x": [...], "y": [...]}`.
 
 `inverse_loglog_linear(fit, y, lowest_x_mean_y, highest_x_mean_y, r_client)`.
 
-- No y gives the flag `missing_input`.
+- A slope of 0 returns no x and the flag `inactive`. R is not called. This is decided before the missing-y check.
 - An endpoint mean ≤ 0 stops with `non_positive_log_input`.
+- Equal endpoint means, both positive, get the flag `inactive` and no R call. Endpoint means in the wrong order for the sign of a non-zero slope are still refused.
+- No y, on a fit that does have an inverse, gives the flag `missing_input`.
 - With a negative slope, a y below the highest-x mean returns `>` and a y above the lowest-x mean returns `<`.
 - With a positive slope, a y above the highest-x mean returns `>` and a y below the lowest-x mean returns `<`.
 - Neither qualified case calls R.
 - Otherwise R computes x = 10^((log10 y − intercept) / slope). An overflow stops with `r_non_finite`.
-- A slope of 0, or endpoint means whose order does not match the sign of the slope, is refused.
+- A direct call to the R route with a slope of 0 stops with `r_non_finite` (HTTP 200) and returns no x. It is not a refusal. The backend does not make that call.
 
 R body: `{"slope", "intercept", "y"}`.
 
@@ -122,4 +129,12 @@ Each version needs at least one cited KAT case before the release check accepts 
 - `fit_loglog_linear`: a worked log-log standard set with a known slope, intercept, and r. One example would be the STE-1.2 section 8 worked example; the STE-1.2 PDF is not in the repository.
 - `inverse_loglog_linear`: a worked inversion example on a stated log-log fit.
 
-The S2 harness passes scalar inputs only. A real fit KAT needs array inputs, so adding these cases will need a small harness change at that point.
+## Version
+
+All four stay at version 1, on the same `/v1` routes. They are not released. CALC-REQ-29 makes a released version immutable; a change to a released version's formula, outputs, units, stop rule, or missing-data rule is a new version, and the release check refuses an edit of a released fingerprint. No release record names these four, so the residual outputs and the `inactive` flag are part of v1. The first release of each version will fingerprint this definition.
+
+## Array inputs on the harness
+
+The S2 harness accepts an array of decimal strings, or nested arrays of them, as one input. A scalar input is still a single decimal string. A fit case can supply concentration and response vectors, x and y vectors, and replicates. The runner posts a JSON array and, for a backend case, passes a tuple of decimals. Every leaf is still a decimal string with the declared unit.
+
+The harness unit tests that exercise arrays use synthetic values generated from known parameters. They are not KAT cases: they cite no SOP, they are not labelled as KATs, and they do not release any version. The four catalog versions still have no KAT cases.

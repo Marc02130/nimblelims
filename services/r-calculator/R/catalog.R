@@ -54,6 +54,19 @@ parse_decimal_array <- function(values, name) {
   )
 }
 
+# residual = fitted - observed. NULL when any residual is not finite.
+# The three sums are plain, absolute, and squared.
+residual_sums <- function(residual) {
+  if (any(!is.finite(residual))) {
+    return(NULL)
+  }
+  list(
+    sum_residuals = sum(residual),
+    sum_abs_residuals = sum(abs(residual)),
+    sum_sq_residuals = sum(residual * residual)
+  )
+}
+
 # Shortest round-trip strings for named outputs, or the r_non_finite stop.
 catalog_outputs <- function(values) {
   for (name in names(values)) {
@@ -105,7 +118,9 @@ catalog_route <- function(req, res, fields, compute) {
 #   f(x) = c + (d - c) / (1 + exp(b * (log(x) - log(e))))
 # bottom = c, top = d, slope = b, inflection = e. No weights and no parameter
 # bounds are passed, so drm fits by ordinary least squares on the points
-# received. r_squared = 1 - SS_res / SS_tot over those points.
+# received. r_squared = 1 - SS_res / SS_tot over those points. When both
+# sums of squares are 0, r_squared is 1. Residual = fitted response minus
+# observed response. A fitted slope of 0 is a normal result.
 catalog_fit_4pl <- function(body) {
   conc <- parse_decimal_array(body$concentration, "concentration")
   resp <- parse_decimal_array(body$response, "response")
@@ -129,14 +144,27 @@ catalog_fit_4pl <- function(body) {
     return(catalog_stop("curve_not_fitted", paste0("the fit did not converge: ", conditionMessage(fit))))
   }
   params <- stats::coef(fit)
-  ss_res <- sum(stats::residuals(fit)^2)
+  b_ <- unname(params[["b:(Intercept)"]])
+  c_ <- unname(params[["c:(Intercept)"]])
+  d_ <- unname(params[["d:(Intercept)"]])
+  e_ <- unname(params[["e:(Intercept)"]])
+  fitted <- c_ + (d_ - c_) / (1 + exp(b_ * (log(conc) - log(e_))))
+  residual <- fitted - resp
+  sums <- residual_sums(residual)
+  if (is.null(sums)) {
+    return(catalog_stop("r_non_finite", "a fitted value is not finite"))
+  }
   ss_tot <- sum((resp - mean(resp))^2)
-  catalog_outputs(list(
-    bottom = unname(params[["c:(Intercept)"]]),
-    top = unname(params[["d:(Intercept)"]]),
-    slope = unname(params[["b:(Intercept)"]]),
-    inflection = unname(params[["e:(Intercept)"]]),
-    r_squared = 1 - ss_res / ss_tot
+  r_squared <- if (sums$sum_sq_residuals == 0 && ss_tot == 0) 1 else 1 - sums$sum_sq_residuals / ss_tot
+  catalog_outputs(c(
+    list(
+      bottom = c_,
+      top = d_,
+      slope = b_,
+      inflection = e_,
+      r_squared = r_squared
+    ),
+    sums
   ))
 }
 
@@ -147,15 +175,20 @@ catalog_inverse_4pl <- function(body) {
   b_ <- parse_decimal_string(body$slope, "slope")
   e_ <- parse_decimal_string(body$inflection, "inflection")
   y <- parse_decimal_string(body$response, "response")
+  # A slope of 0 has no finite inverse. This is a stop, not a refusal: the
+  # backend returns the inactive flag and does not call this route.
   if (b_ == 0) {
-    catalog_refuse("slope is 0; the curve has no inverse")
+    return(catalog_stop("r_non_finite", "slope is 0; the inverse is not a finite concentration"))
   }
   x <- e_ * ((d_ - c_) / (y - c_) - 1)^(1 / b_)
   catalog_outputs(list(concentration = x))
 }
 
 # fit_loglog_linear v1: lm(log10(y) ~ log10(x)); r is the Pearson correlation
-# of log10(x) and log10(y).
+# of log10(x) and log10(y). Residual sums are on the log10(y) scale:
+# residual = fitted log10(y) minus observed log10(y). A fitted slope of 0 is
+# a normal result. When log10(y) has no variance, Pearson r is undefined; r
+# is then 0 so the flat fit stays finite.
 catalog_fit_loglog_linear <- function(body) {
   x <- parse_decimal_array(body$x, "x")
   y <- parse_decimal_array(body$y, "y")
@@ -172,11 +205,30 @@ catalog_fit_loglog_linear <- function(body) {
   ly <- log10(y)
   fit <- stats::lm(ly ~ lx)
   params <- stats::coef(fit)
+  slope <- unname(params[["lx"]])
+  intercept <- unname(params[["(Intercept)"]])
+  if (length(slope) != 1L || !is.finite(slope) || !is.finite(intercept)) {
+    return(catalog_stop("r_non_finite", "the fit slope or intercept is not finite"))
+  }
+  # lm can return negative zero for a constant series. That is a slope of 0.
+  if (slope == 0) {
+    slope <- 0
+  }
   r <- suppressWarnings(stats::cor(lx, ly))
-  catalog_outputs(list(
-    slope = unname(params[["lx"]]),
-    intercept = unname(params[["(Intercept)"]]),
-    r = r
+  ly_sd <- stats::sd(ly)
+  # Pearson r is undefined when log10(y) has no variance. A flat fit still
+  # returns its slope; r is 0 so the outputs stay finite.
+  if (!is.finite(r) && is.finite(ly_sd) && ly_sd == 0) {
+    r <- 0
+  }
+  residual <- (intercept + slope * lx) - ly
+  sums <- residual_sums(residual)
+  if (is.null(sums)) {
+    return(catalog_stop("r_non_finite", "a fitted value is not finite"))
+  }
+  catalog_outputs(c(
+    list(slope = slope, intercept = intercept, r = r),
+    sums
   ))
 }
 
@@ -185,8 +237,10 @@ catalog_inverse_loglog_linear <- function(body) {
   slope <- parse_decimal_string(body$slope, "slope")
   intercept <- parse_decimal_string(body$intercept, "intercept")
   y <- parse_decimal_string(body$y, "y")
+  # A slope of 0 has no finite inverse. This is a stop, not a refusal: the
+  # backend returns the inactive flag and does not call this route.
   if (slope == 0) {
-    catalog_refuse("slope is 0; the fit has no inverse")
+    return(catalog_stop("r_non_finite", "slope is 0; the inverse is not a finite concentration"))
   }
   if (y <= 0) {
     return(catalog_stop("non_positive_log_input", "y is not greater than 0"))

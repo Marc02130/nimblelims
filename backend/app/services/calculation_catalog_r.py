@@ -49,6 +49,10 @@ R_TIMEOUT = "r_timeout"
 BACKEND_TIMEOUT = "backend_timeout"
 MISSING_INPUT = "missing_input"
 RESPONSE_AT_ASYMPTOTE = "response_at_asymptote"
+INACTIVE = "inactive"
+
+# residual = fitted value minus observed value, on the scale the fit uses.
+RESIDUAL_STATS = ("sum_residuals", "sum_abs_residuals", "sum_sq_residuals")
 
 _TIMEOUT_CODES = (R_TIMEOUT, BACKEND_TIMEOUT)
 FOUR_PL_PARAMETERS = ("bottom", "top", "slope", "inflection")
@@ -72,7 +76,7 @@ class StageResult:
     (CALC-REQ-25) and then ``outputs`` is empty. ``qualifier`` is ``<`` or
     ``>`` for a response past the low or high end, with ``end`` ``low`` or
     ``high``; the kind's name, label, and limit come from configuration.
-    ``flags`` holds ``missing_input`` or ``response_at_asymptote``.
+    ``flags`` holds ``missing_input``, ``response_at_asymptote``, or ``inactive``.
     """
 
     function: str
@@ -168,7 +172,11 @@ FIT_4PL_V1 = FunctionVersion(
         "Fits a four-parameter logistic curve to calibrator responses against nominal "
         "calibrator concentrations: response = bottom + (top - bottom) / "
         "(1 + exp(slope * (ln(concentration) - ln(inflection)))) (drc LL.4, ordinary "
-        "least squares, no weights, no parameter bounds). r_squared = 1 - SS_res / SS_tot."
+        "least squares, no weights, no parameter bounds). r_squared = 1 - SS_res / SS_tot "
+        "(1 when both sums of squares are 0). Residual = fitted response minus observed "
+        "response. sum_residuals, sum_abs_residuals, and sum_sq_residuals are that "
+        "residual's sum, sum of absolute values, and sum of squares. A fitted slope of 0 "
+        "is a normal result."
     ),
     inputs={
         "concentration": "calibrator concentration unit (declared on the binding)",
@@ -181,6 +189,9 @@ FIT_4PL_V1 = FunctionVersion(
         "slope": "1",
         "inflection": "calibrator concentration unit (declared on the binding)",
         "r_squared": "1",
+        "sum_residuals": "calibrator response unit (declared on the binding)",
+        "sum_abs_residuals": "calibrator response unit (declared on the binding)",
+        "sum_sq_residuals": "square of the calibrator response unit (declared on the binding)",
         "points_used": "count",
         "points_excluded": "count",
     },
@@ -205,7 +216,9 @@ INVERSE_4PL_V1 = FunctionVersion(
         "Back-calculates a concentration from a response on a fitted 4PL curve: "
         "concentration = inflection * ((top - bottom) / (response - bottom) - 1)^(1 / slope). "
         "The backend first decides in-range against the mean responses of the lowest- and "
-        "highest-concentration used calibrators; only in-range responses reach R."
+        "highest-concentration used calibrators; only in-range responses reach R. "
+        "A slope of 0, or equal low and high calibrator mean responses, has no inverse: "
+        "no concentration, no R call, and the flag inactive."
     ),
     inputs={
         "bottom": "calibrator response unit (declared on the binding)",
@@ -224,9 +237,10 @@ INVERSE_4PL_V1 = FunctionVersion(
         "with r_non_finite."
     ),
     missing_data_rule=(
-        "No numeric response gives no concentration and missing_input. A response at or "
-        "beyond an asymptote has no inverse and is flagged response_at_asymptote, not "
-        "assigned a number."
+        "No numeric response gives no concentration and missing_input. A slope of 0, or "
+        "equal low and high calibrator mean responses, gives no concentration and inactive, "
+        "and R is not called. A response at or beyond an asymptote has no inverse and is "
+        "flagged response_at_asymptote, not assigned a number."
     ),
     kats=(),
     route=INVERSE_4PL_ROUTE,
@@ -239,7 +253,11 @@ FIT_LOGLOG_LINEAR_V1 = FunctionVersion(
     side="r",
     description=(
         "Linear regression of log10(y) on log10(x): log10(y) = intercept + slope * log10(x). "
-        "r is the Pearson correlation of log10(x) and log10(y)."
+        "r is the Pearson correlation of log10(x) and log10(y). When log10(y) has no variance, "
+        "that correlation is undefined and r is 0, so a fitted slope of 0 stays a normal "
+        "finite result. Residual = fitted log10(y) minus observed log10(y). sum_residuals, "
+        "sum_abs_residuals, and sum_sq_residuals are that residual's sum, sum of absolute "
+        "values, and sum of squares, on the log10(y) scale and not on y."
     ),
     inputs={
         "x": "x unit (declared on the binding)",
@@ -251,6 +269,9 @@ FIT_LOGLOG_LINEAR_V1 = FunctionVersion(
         "slope": "1",
         "intercept": "1 (label log10(<y unit>))",
         "r": "1",
+        "sum_residuals": "1 (label log10(<y unit>))",
+        "sum_abs_residuals": "1 (label log10(<y unit>))",
+        "sum_sq_residuals": "1 (label (log10(<y unit>))^2)",
         "points_used": "count",
         "points_dropped": "count",
     },
@@ -276,7 +297,9 @@ INVERSE_LOGLOG_LINEAR_V1 = FunctionVersion(
         "Back-calculates x from y on a log-log linear fit: "
         "x = 10^((log10(y) - intercept) / slope). The backend first decides in-range "
         "against the y means of the lowest-x and highest-x used points; only in-range "
-        "values reach R."
+        "values reach R. A slope of 0, or equal endpoint means, has no inverse: no x, "
+        "no R call, and the flag inactive. Endpoint means in the wrong order for the "
+        "sign of a non-zero slope are refused."
     ),
     inputs={
         "slope": "1",
@@ -293,7 +316,10 @@ INVERSE_LOGLOG_LINEAR_V1 = FunctionVersion(
         "stores a number or calls R. An endpoint mean <= 0 stops with "
         "non_positive_log_input. A non-finite R output stops with r_non_finite."
     ),
-    missing_data_rule="No y value gives no x and missing_input.",
+    missing_data_rule=(
+        "No y value gives no x and missing_input. A slope of 0, or equal endpoint means, "
+        "gives no x and inactive, and R is not called."
+    ),
     kats=(),
     route=INVERSE_LOGLOG_LINEAR_ROUTE,
     r_sources=R_CATALOG_SOURCES,
@@ -343,7 +369,7 @@ def fit_4pl(points: Sequence[Mapping[str, Any]], r_client: RCalculationClient) -
         fv,
         r_client,
         {"concentration": [c for c, _r in used], "response": [r for _c, r in used]},
-        FOUR_PL_PARAMETERS + ("r_squared",),
+        FOUR_PL_PARAMETERS + ("r_squared",) + RESIDUAL_STATS,
         (CURVE_NOT_FITTED, R_NON_FINITE),
     )
     if result.stop is not None:
@@ -365,11 +391,11 @@ def inverse_4pl(
     fv = INVERSE_4PL_V1
     params = {name: _decimal(curve.get(name), name) for name in FOUR_PL_PARAMETERS}
     if params["slope"] == 0:
-        raise CatalogInputRefused("slope is 0; the curve has no inverse")
+        return _inactive(fv)
     low = _decimal(low_calibrator_mean_response, "low_calibrator_mean_response")
     high = _decimal(high_calibrator_mean_response, "high_calibrator_mean_response")
     if low == high:
-        raise CatalogInputRefused("the low and high calibrator mean responses are equal")
+        return _inactive(fv)
     y = _optional_decimal(response, "response")
     if y is None:
         return StageResult(fv.name, fv.version, {}, False, flags=(MISSING_INPUT,))
@@ -434,7 +460,7 @@ def fit_loglog_linear(
         fv,
         r_client,
         {"x": [x for x, _y in used], "y": [y for _x, y in used]},
-        ("slope", "intercept", "r"),
+        ("slope", "intercept", "r") + RESIDUAL_STATS,
         (NON_POSITIVE_LOG_INPUT, R_NON_FINITE),
     )
     if result.stop is not None:
@@ -457,6 +483,11 @@ def _non_positive(fv: FunctionVersion, detail: str) -> StageResult:
     return StageResult(fv.name, fv.version, {}, False, stop=NON_POSITIVE_LOG_INPUT, detail=detail)
 
 
+def _inactive(fv: FunctionVersion) -> StageResult:
+    """A flat fit has no inverse. No number and no R call."""
+    return StageResult(fv.name, fv.version, {}, False, flags=(INACTIVE,))
+
+
 # ---- inverse_loglog_linear -------------------------------------------------
 
 
@@ -472,14 +503,14 @@ def inverse_loglog_linear(
     slope = _decimal(fit.get("slope"), "slope")
     _decimal(fit.get("intercept"), "intercept")
     if slope == 0:
-        raise CatalogInputRefused("slope is 0; the fit has no inverse")
+        return _inactive(fv)
     low_x_mean = _decimal(lowest_x_mean_y, "lowest_x_mean_y")
     high_x_mean = _decimal(highest_x_mean_y, "highest_x_mean_y")
     if low_x_mean <= 0 or high_x_mean <= 0:
         return _non_positive(fv, "an endpoint mean is not greater than 0")
-    if (slope > 0 and not high_x_mean > low_x_mean) or (
-        slope < 0 and not high_x_mean < low_x_mean
-    ):
+    if low_x_mean == high_x_mean:
+        return _inactive(fv)
+    if (slope > 0 and high_x_mean < low_x_mean) or (slope < 0 and high_x_mean > low_x_mean):
         raise CatalogInputRefused("the endpoint means do not follow the sign of the slope")
     value = _optional_decimal(y, "y")
     if value is None:

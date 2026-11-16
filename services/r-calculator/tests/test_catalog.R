@@ -116,7 +116,30 @@ stopifnot(near(num(fit$body$bottom), c0, 1e-4))
 stopifnot(near(num(fit$body$top), d0, 1e-4))
 stopifnot(near(num(fit$body$inflection), e0, 1e-4))
 stopifnot(num(fit$body$r_squared) > 1 - 1e-9)
-stopifnot(setequal(names(fit$body), c("bottom", "top", "slope", "inflection", "r_squared")))
+stopifnot(num(fit$body$sum_sq_residuals) < 1e-4)
+stopifnot(setequal(
+  names(fit$body),
+  c("bottom", "top", "slope", "inflection", "r_squared",
+    "sum_residuals", "sum_abs_residuals", "sum_sq_residuals")
+))
+
+# One response moved off the exact curve, so the residual sums are not zero.
+# residual = fitted response minus observed response, from the returned parameters.
+bumped <- ll4(conc)
+bumped[4] <- bumped[4] + 0.05
+bumped_body <- list(concentration = strs(conc), response = strs(bumped))
+bumped_fit <- post("/catalog/fit_4pl/v1", bumped_body)
+expect_ok(bumped_fit, "fit_4pl residuals")
+bb <- num(bumped_fit$body$bottom)
+bt <- num(bumped_fit$body$top)
+bs <- num(bumped_fit$body$slope)
+be <- num(bumped_fit$body$inflection)
+fitted_b <- bb + (bt - bb) / (1 + exp(bs * (log(conc) - log(be))))
+resid_b <- fitted_b - bumped
+stopifnot(near(num(bumped_fit$body$sum_residuals), sum(resid_b), 1e-6))
+stopifnot(near(num(bumped_fit$body$sum_abs_residuals), sum(abs(resid_b)), 1e-6))
+stopifnot(near(num(bumped_fit$body$sum_sq_residuals), sum(resid_b^2), 1e-6))
+stopifnot(num(bumped_fit$body$sum_sq_residuals) > 0)
 
 # Three levels (two replicates each) stop with curve_not_fitted.
 three <- c(10, 10, 40, 40, 160, 160)
@@ -180,7 +203,37 @@ expect_ok(ll, "fit_loglog_linear")
 stopifnot(near(num(ll$body$slope), -0.8, 1e-12))
 stopifnot(near(num(ll$body$intercept), 0.5, 1e-12))
 stopifnot(near(num(ll$body$r), -1, 1e-12))
-stopifnot(setequal(names(ll$body), c("slope", "intercept", "r")))
+stopifnot(num(ll$body$sum_sq_residuals) < 1e-8)
+stopifnot(setequal(
+  names(ll$body),
+  c("slope", "intercept", "r", "sum_residuals", "sum_abs_residuals", "sum_sq_residuals")
+))
+
+# A point moved on the log10(y) scale. Residual sums use that scale.
+ly <- 0.5 - 0.8 * log10(x)
+ly[3] <- ly[3] + 0.1
+y_moved <- 10^ly
+moved <- post("/catalog/fit_loglog_linear/v1", list(x = strs(x), y = strs(y_moved)))
+expect_ok(moved, "fit_loglog_linear residuals")
+fitted_l <- num(moved$body$intercept) + num(moved$body$slope) * log10(x)
+resid_l <- fitted_l - log10(y_moved)
+stopifnot(near(num(moved$body$sum_residuals), sum(resid_l), 1e-6))
+stopifnot(near(num(moved$body$sum_abs_residuals), sum(abs(resid_l)), 1e-6))
+stopifnot(near(num(moved$body$sum_sq_residuals), sum(resid_l^2), 1e-6))
+stopifnot(num(moved$body$sum_sq_residuals) > 0)
+
+# A constant y is a flat fit: slope 0 is a normal result, and r is 0 because
+# Pearson's r is undefined when log10(y) has no variance.
+flat_x <- c(1, 10, 100, 1000)
+flat <- post("/catalog/fit_loglog_linear/v1", list(x = strs(flat_x), y = strs(rep(2, 4))))
+expect_ok(flat, "flat log-log")
+stopifnot(num(flat$body$slope) == 0)
+stopifnot(near(num(flat$body$intercept), log10(2), 1e-12))
+stopifnot(num(flat$body$r) == 0)
+# lm's intercept is one ulp off log10(2), so the residual sums are rounding dust.
+stopifnot(abs(num(flat$body$sum_residuals)) < 1e-12)
+stopifnot(num(flat$body$sum_abs_residuals) < 1e-12)
+stopifnot(num(flat$body$sum_sq_residuals) < 1e-12)
 
 up <- post("/catalog/fit_loglog_linear/v1", list(x = strs(x), y = strs(2 * x^1.25)))
 expect_ok(up, "fit_loglog_linear positive")
@@ -210,14 +263,19 @@ expect_stop(
   "non_positive_log_input",
   "inverse y = 0"
 )
-expect_refused(
-  post("/catalog/inverse_loglog_linear/v1", list(slope = "0", intercept = "0.5", y = "2")),
-  "slope is 0",
-  "inverse slope 0"
+zero_slope <- post(
+  "/catalog/inverse_loglog_linear/v1",
+  list(slope = "0", intercept = "0.5", y = "2")
 )
+expect_stop(zero_slope, "r_non_finite", "inverse slope 0")
+stopifnot(grepl("slope is 0", zero_slope$body$detail, fixed = TRUE))
+stopifnot(is.null(zero_slope$body$x))
 zero_b <- inv_body
 zero_b$slope <- "0"
-expect_refused(post("/catalog/inverse_4pl/v1", zero_b), "slope is 0", "inverse_4pl slope 0")
+zero_4pl <- post("/catalog/inverse_4pl/v1", zero_b)
+expect_stop(zero_4pl, "r_non_finite", "inverse_4pl slope 0")
+stopifnot(grepl("slope is 0", zero_4pl$body$detail, fixed = TRUE))
+stopifnot(is.null(zero_4pl$body$concentration))
 # A result too large for a double is not finite: r_non_finite, no number.
 expect_stop(
   post("/catalog/inverse_loglog_linear/v1", list(slope = "0.001", intercept = "0", y = "10")),
