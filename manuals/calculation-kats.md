@@ -20,16 +20,18 @@ S2 is the harness only. There are no catalog functions yet (S3 to S5), no real K
 
 A function version declares its name, integer version, R or backend side, a plain-language formula, every input and output with its unit, defaults, its stop rule, its missing-data rule, and its KATs. An R-side version names its R route. A backend version names its decimal code.
 
-A KAT case supplies every input itself, as a decimal string with a unit. It gives the expected value of every output with its unit, a tolerance for every output, and a source citation. A case reads nothing from a configuration.
+A KAT case supplies every input itself, with a unit. A scalar input is one decimal string. An array input is a tuple of decimal strings, or nested tuples of them: a concentration or response vector, an x or y vector, or replicates. Every leaf is a decimal string and uses the one declared unit. The case gives the expected value of every output with its unit, a tolerance for every output, and a source citation. A case reads nothing from a configuration. Outputs stay scalars.
 
 - An absolute tolerance is in the output's unit. A relative tolerance is a fraction of the expected value and has unit `1`.
-- A case with no citation, a unit that is not the declared unit, a missing tolerance, or a value that is not a decimal string fails before it runs.
+- A case with no citation, a unit that is not the declared unit, a missing tolerance, or a value that is not a decimal string fails before it runs. An array fails the same way when any element is not a decimal string.
+
+The runner posts an array as a JSON array of strings. A backend case receives a tuple of `Decimal` values, nested the same way. Scalar cases are unchanged: one decimal string in, one string on the wire.
 
 ## Running KATs
 
 `run_kats(versions, health=..., r_client=...)` first checks the R service's `/health` with the S1 gate (lock hash, built image digest, and sandbox). If that check refuses, no run log is produced. A host R process, or an image built without the pin's tree, cannot pass.
 
-- R-side cases are POSTed to the version's route on the pinned image through `RCalculatorClient.execute_calculation_request`. Every call passes the gate again. R returns outputs as JSON strings; a JSON number fails the case.
+- R-side cases are POSTed to the version's route on the pinned image through `RCalculatorClient.execute_calculation_request`. Every call passes the gate again. Array inputs go in the JSON body as arrays. R returns outputs as JSON strings; a JSON number fails the case.
 - Backend cases run the version's decimal code in Python `decimal` (precision 50, ROUND_HALF_EVEN). Any HTTP request made while a backend case runs fails that case.
 
 The run log is JSON. It names the lock hash and the built image digest it ran on and the time. For each case it lists the case id, function name and version, R or backend, the citation, pass or fail, any error, and for each output the observed value, expected value, unit, and tolerance.
@@ -71,6 +73,10 @@ A record holds the release id, the lock hash, the SHA-256 of the KAT run log, th
 The fingerprint covers the formula description, defaults, inputs and outputs with units, stop rule, missing-data rule, KAT cases (and so their tolerances), and the implementation: the backend function's source, or the bytes of the R files the version lists. Any change to those is a new version.
 
 This is a software-release check. It is not a lab validation gate, which is out of scope.
+
+## Array-input unit tests
+
+`tests/test_calculation_kat_s2.py` includes unit tests that pass synthetic arrays through the harness. One sums the value `1.25` three times, which is `3.75` in decimal. Another posts x and y from the line y = 0.5 + 2x, with two replicate copies of each y. Those tests are not KAT cases. Their citations do not say KAT and do not cite an SOP. They do not call the release check, and they do not add a case to any catalog version. The scalar harness fixtures are unchanged.
 
 ## Not in S2
 

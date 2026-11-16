@@ -13,10 +13,13 @@ The split follows CALC-REQ-37:
 - Backend versions run the backend's decimal code with no R call. Any HTTP
   request made while a backend case runs fails that case.
 
-Values are decimal strings. Comparison is in Python ``decimal`` (precision
-50, ROUND_HALF_EVEN). The run log names the lock hash and built image digest
-it ran on, and per case the function name and version, R or backend, the
-observed and expected values, the tolerance, pass or fail, and the citation.
+Values are decimal strings. An input may also be an array of decimal
+strings, or nested arrays of them (a concentration or response vector, an
+x or y vector, or replicates). Comparison of outputs is in Python
+``decimal`` (precision 50, ROUND_HALF_EVEN). The run log names the lock hash
+and built image digest it ran on, and per case the function name and version,
+R or backend, the observed and expected values, the tolerance, pass or fail,
+and the citation.
 """
 from __future__ import annotations
 
@@ -52,9 +55,13 @@ RELATIVE_TOLERANCE_UNIT = "1"
 
 @dataclass(frozen=True)
 class Quantity:
-    """One decimal string with its unit."""
+    """One decimal string, or an array of them, with one unit.
 
-    value: str
+    ``value`` is a decimal string for a scalar. An array is a tuple of decimal
+    strings, or a tuple of such arrays for replicates. Every leaf uses ``unit``.
+    """
+
+    value: str | tuple
     unit: str
 
 
@@ -78,7 +85,10 @@ class KatCase:
     citation: str
 
 
-BackendCompute = Callable[[Mapping[str, Decimal]], Mapping[str, Decimal | str]]
+# A scalar input is one Decimal. An array input is a tuple of those, nested
+# the same way the case wrote it (one level for a vector, two for replicates).
+DecimalTree = Decimal | tuple["DecimalTree", ...]
+BackendCompute = Callable[[Mapping[str, DecimalTree]], Mapping[str, Decimal | str]]
 
 
 @dataclass(frozen=True)
@@ -125,10 +135,49 @@ def _canonical_json(data: Any) -> bytes:
     )
 
 
+def _is_array(value: Any) -> bool:
+    return isinstance(value, (tuple, list))
+
+
+def _json_value(value: Any) -> Any:
+    """A decimal string, or nested JSON arrays of them. Tuples become lists."""
+    if isinstance(value, str):
+        return value
+    if _is_array(value):
+        return [_json_value(item) for item in value]
+    raise ValueError(f"{value!r} is not a decimal string or an array of decimal strings")
+
+
+def _decimal_tree(value: Any) -> DecimalTree:
+    if isinstance(value, str):
+        return _decimal(value)
+    if _is_array(value):
+        return tuple(_decimal_tree(item) for item in value)
+    raise ValueError(f"{value!r} is not a decimal string or an array of decimal strings")
+
+
+def _value_problem(value: Any, name: str) -> Optional[str]:
+    if isinstance(value, str):
+        try:
+            _decimal(value)
+        except ValueError as exc:
+            return f"{name}: {exc}"
+        return None
+    if _is_array(value):
+        for index, item in enumerate(value):
+            problem = _value_problem(item, f"{name}[{index}]")
+            if problem is not None:
+                return problem
+        return None
+    return f"{name}: {value!r} is not a decimal string or an array of decimal strings"
+
+
 def _case_dict(case: KatCase) -> dict[str, Any]:
     return {
         "case_id": case.case_id,
-        "inputs": {k: {"value": q.value, "unit": q.unit} for k, q in case.inputs.items()},
+        "inputs": {
+            k: {"value": _json_value(q.value), "unit": q.unit} for k, q in case.inputs.items()
+        },
         "expected": {k: {"value": q.value, "unit": q.unit} for k, q in case.expected.items()},
         "tolerance": {
             k: {"kind": t.kind, "value": t.value, "unit": t.unit} for k, t in case.tolerance.items()
@@ -320,10 +369,9 @@ def _case_problem(fv: FunctionVersion, case: KatCase) -> Optional[str]:
     for name, q in case.inputs.items():
         if q.unit != fv.inputs[name]:
             return f"input {name} unit {q.unit!r} is not the declared unit {fv.inputs[name]!r}"
-        try:
-            _decimal(q.value)
-        except ValueError as exc:
-            return f"input {name}: {exc}"
+        problem = _value_problem(q.value, f"input {name}")
+        if problem is not None:
+            return problem
     for name, q in case.expected.items():
         if q.unit != fv.outputs[name]:
             return f"expected {name} unit {q.unit!r} is not the declared unit {fv.outputs[name]!r}"
@@ -364,7 +412,7 @@ def no_r_calls() -> Iterator[None]:
 def _observe_backend(fv: FunctionVersion, case: KatCase) -> Mapping[str, Any]:
     if fv.compute is None:
         raise ValueError("backend version has no compute")
-    inputs = {name: _decimal(q.value) for name, q in case.inputs.items()}
+    inputs = {name: _decimal_tree(q.value) for name, q in case.inputs.items()}
     with decimal.localcontext() as ctx:
         ctx.prec = DECIMAL_PRECISION
         ctx.rounding = DECIMAL_ROUNDING
@@ -382,7 +430,7 @@ def _observe_r(
         raise ValueError("R-side KAT needs the pinned R service client")
     if not fv.route:
         raise ValueError("R-side version has no route")
-    payload = {name: q.value for name, q in case.inputs.items()}
+    payload = {name: _json_value(q.value) for name, q in case.inputs.items()}
     return r_client.execute_calculation_request(fv.route, payload)
 
 

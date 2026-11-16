@@ -351,3 +351,78 @@ def test_r_side_harness_kats_on_the_pinned_image(tmp_path: Path) -> None:
     assert caught.value.code == "kat_failed"
     record = prepare_release("harness-r-v2", [passing.key], catalog=catalog, ledger=[], run_log=log)
     assert record.lock_hash == log.lock_hash
+
+
+class _RecordingR:
+    """Test double for an R route. Records the payload the harness posts."""
+
+    def __init__(self, body: dict) -> None:
+        self.body = body
+        self.calls: list[tuple[str, dict]] = []
+
+    def execute_calculation_request(self, path: str, payload: dict) -> dict:
+        self.calls.append((path, payload))
+        return self.body
+
+
+def test_harness_accepts_synthetic_array_inputs_without_releasing() -> None:
+    """Array inputs on the harness. Not a catalog case and not a release.
+
+    The numbers are generated here from known parameters: 1.25 repeated, and
+    y = 0.5 + 2x. No SOP is cited. No catalog version gains a case.
+    """
+    from app.services import calculation_catalog_r as catalog
+
+    log = run_kats([hf.backend_sum(), hf.backend_array_sum()], health=_health())
+    by_id = {case.case_id: case for case in log.cases}
+    assert by_id["hf-sum-exact"].passed
+    assert by_id["hf-sum-exact"].outputs[0].observed == "2.572"
+    array_case = by_id["hf-array-sum-synthetic"]
+    assert array_case.passed
+    assert array_case.outputs[0].observed == "3.75"
+    assert array_case.citation == hf.ARRAY_CITATION
+    assert "KAT" not in array_case.citation and "SOP" not in array_case.citation
+    assert hf.harness_array_sum({"values": ()})["total"] == Decimal(0)
+
+    recorder = _RecordingR({"echo": "1"})
+    posted = run_kats([hf.r_vectors()], health=_health(), r_client=recorder)
+    assert posted.cases[0].passed
+    assert posted.cases[0].citation == hf.VECTOR_CITATION
+    path, payload = recorder.calls[0]
+    assert path == "/kat-harness/array-vectors"
+    assert payload["concentration"] == ["1", "2", "4", "8"]
+    assert payload["response"] == ["2.5", "4.5", "8.5", "16.5"]
+    assert payload["replicates"] == [
+        ["2.5", "2.5"],
+        ["4.5", "4.5"],
+        ["8.5", "8.5"],
+        ["16.5", "16.5"],
+    ]
+    assert all(isinstance(item, str) for item in payload["concentration"])
+    assert hf.r_vectors().name not in {version.name for version in catalog.R_CATALOG_VERSIONS}
+    assert all(version.kats == () for version in catalog.R_CATALOG_VERSIONS)
+    assert "KAT" not in posted.cases[0].citation and "SOP" not in posted.cases[0].citation
+    version_fingerprint(hf.backend_array_sum())
+    version_fingerprint(hf.r_vectors())
+
+
+def test_array_input_with_a_non_decimal_element_fails_before_it_runs() -> None:
+    from dataclasses import replace
+
+    from app.services.calculation_kat import Quantity
+
+    called = {"compute": False}
+
+    def compute(_inputs: dict) -> dict:
+        called["compute"] = True
+        return {"total": Decimal(0)}
+
+    bad = replace(
+        hf.array_sum_case(),
+        inputs={"values": Quantity(value=("1.25", "1.25x", "1.25"), unit="1")},
+    )
+    version = replace(hf.backend_array_sum(), kats=(bad,), compute=compute)
+    result = run_kats([version], health=_health()).cases[0]
+    assert not result.passed
+    assert not called["compute"]
+    assert "1.25x" in (result.error or "")

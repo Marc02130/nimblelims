@@ -8,7 +8,7 @@ the run log, and the release check. No value here comes from an SOP.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Mapping
+from typing import Any, Mapping
 
 import httpx
 
@@ -120,6 +120,97 @@ def r_round_trip_case(case_id: str, value: str, expected: str, citation: str) ->
         expected={"value": _q(expected)},
         tolerance={"value": _exact()},
         citation=citation,
+    )
+
+
+# Synthetic array fixture. Not a catalog case and not a release. The three
+# values are the known parameter 1.25 repeated, so the total is exact in decimal.
+ARRAY_LEVEL = "1.25"
+ARRAY_CITATION = (
+    "Harness unit-test fixture (not a catalog case): synthetic values generated "
+    "from the known parameter 1.25; the expected total is their exact decimal sum"
+)
+# x and y are the exact line y = 0.5 + 2x. Replicates are two copies of each y.
+VECTOR_SLOPE = "2"
+VECTOR_INTERCEPT = "0.5"
+VECTOR_X = ("1", "2", "4", "8")
+VECTOR_CITATION = (
+    "Harness unit-test fixture (not a catalog case): synthetic x and y generated "
+    "from slope 2 and intercept 0.5; replicates are two copies of each y"
+)
+
+
+def harness_array_sum(inputs: Mapping[str, Any]) -> Mapping[str, Decimal]:
+    total = Decimal(0)
+    for value in inputs["values"]:
+        total += value
+    return {"total": total}
+
+
+def array_sum_case() -> KatCase:
+    level = Decimal(ARRAY_LEVEL)
+    values = tuple(ARRAY_LEVEL for _ in range(3))
+    return KatCase(
+        case_id="hf-array-sum-synthetic",
+        inputs={"values": Quantity(value=values, unit=UNITLESS)},
+        expected={"total": _q(str(level * len(values)))},
+        tolerance={"total": _exact()},
+        citation=ARRAY_CITATION,
+    )
+
+
+def backend_array_sum() -> FunctionVersion:
+    """Backend harness fixture whose only input is an array of decimal strings."""
+    return FunctionVersion(
+        name="harness_fixture_array_sum",
+        version=1,
+        side="backend",
+        description="total = the exact decimal sum of an array of values",
+        inputs={"values": UNITLESS},
+        outputs={"total": UNITLESS},
+        stop_rule="none",
+        missing_data_rule="an empty array sums to 0",
+        kats=(array_sum_case(),),
+        compute=harness_array_sum,
+    )
+
+
+def vector_case() -> KatCase:
+    """Concentration, response, and replicate arrays a fit case would send.
+
+    The expected echo is 1. This case checks that the harness posts the arrays.
+    It does not check a fit.
+    """
+    slope = Decimal(VECTOR_SLOPE)
+    intercept = Decimal(VECTOR_INTERCEPT)
+    ys = tuple(str(intercept + slope * Decimal(x)) for x in VECTOR_X)
+    replicates = tuple((y, y) for y in ys)
+    return KatCase(
+        case_id="hf-array-vectors-synthetic",
+        inputs={
+            "concentration": Quantity(value=VECTOR_X, unit=UNITLESS),
+            "response": Quantity(value=ys, unit=UNITLESS),
+            "replicates": Quantity(value=replicates, unit=UNITLESS),
+        },
+        expected={"echo": _q("1")},
+        tolerance={"echo": _exact()},
+        citation=VECTOR_CITATION,
+    )
+
+
+def r_vectors() -> FunctionVersion:
+    """R-side harness fixture that posts array inputs. The route is a test double."""
+    return FunctionVersion(
+        name="harness_fixture_array_vectors",
+        version=1,
+        side="r",
+        description="posts concentration, response, and replicate arrays unchanged",
+        inputs={"concentration": UNITLESS, "response": UNITLESS, "replicates": UNITLESS},
+        outputs={"echo": UNITLESS},
+        stop_rule="none",
+        missing_data_rule="none",
+        kats=(vector_case(),),
+        route="/kat-harness/array-vectors",
     )
 
 
