@@ -601,9 +601,9 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-8 | Handling a missing single tube, or a split duplicate (one tube with onset, one not detected). | CALC-REQ-14, 16 | Lab-set; not in STE-1.2 |
 | OQ-CALC-9 | Which of several valid dilutions is reported in the LAL configuration. | CALC-REQ-16, 43 | Lab-set; not in STE-1.2 |
 | OQ-CALC-10 | **Not in this Spec (Marc, 2026-11-07/08).** Onset-time cutoff: fixed, or set per lysate lot (STE-1.2 §7.4 allows longer). The onset-time cutoff is a configurable value bound directly in the calculation (CALC-REQ-23). Storing it in the [#258](https://github.com/Marc02130/nimblelims/issues/258) constants table, once that exists, is recommended, not required. It is not hardcoded in code. This Spec does not name it. Constants that would hold it are parked toward [#258](https://github.com/Marc02130/nimblelims/issues/258). [#258](https://github.com/Marc02130/nimblelims/issues/258) lists `onset_cutoff` among its eleven identifiers. Whether the cutoff is fixed or set per lysate lot stays open. | CALC-REQ-20 | Marc 2026-11-10. |
-| OQ-CALC-11 | **Open, narrowed (Marc, 2026-11-07/08; acceptance limits Marc, 2026-11-10).** Still open here: blank handling, 4PL weighting, the repeat policy after `curve_not_fitted`, the number shown after `<` or `>` (the qualifier direction is decided in CALC-REQ-9), and the concentration unit of the IL-6 pack (the synthetic fixture's `Conc/Dil` column has none). Curve acceptance and the duplicate %CV limit are configurable values in the calculation (CALC-REQ-23), not hardcoded. Constants that would hold them are parked toward [#258](https://github.com/Marc02130/nimblelims/issues/258). Kit QC ranges are acceptance ranges and are parked toward [#259](https://github.com/Marc02130/nimblelims/issues/259). This Spec does not say that either issue lists them. Acceptance limits are not only those QC ranges. They apply to tests and sample results generally, and they vary by test, by sample type, and by QC role (§2). Acceptance ranges are per QC type and per analyte within an analysis. | CALC-REQ-42 | Lab-set; IL-6 pack. |
+| OQ-CALC-11 | **Open, narrowed (Marc, 2026-11-07/08; acceptance limits Marc, 2026-11-10).** Still open here: blank handling, 4PL weighting, fixed and bounded parameters, and outlier handling (draft options below, Marc decides), the repeat policy after `curve_not_fitted`, the number shown after `<` or `>` (the qualifier direction is decided in CALC-REQ-9), and the concentration unit of the IL-6 pack (the synthetic fixture's `Conc/Dil` column has none). Curve acceptance and the duplicate %CV limit are configurable values in the calculation (CALC-REQ-23), not hardcoded. Constants that would hold them are parked toward [#258](https://github.com/Marc02130/nimblelims/issues/258). Kit QC ranges are acceptance ranges and are parked toward [#259](https://github.com/Marc02130/nimblelims/issues/259). This Spec does not say that either issue lists them. Acceptance limits are not only those QC ranges. They apply to tests and sample results generally, and they vary by test, by sample type, and by QC role (§2). Acceptance ranges are per QC type and per analyte within an analysis. | CALC-REQ-42 | Lab-set; IL-6 pack. |
 | OQ-CALC-12 | The closed list of validation-state values recorded at activation. | CALC-REQ-35 | Product |
-| OQ-CALC-13 | Who supplies independent expected values for the function KATs and the IL-6 and LAL configuration KATs. | CALC-REQ-6, 44 | Product / QA |
+| OQ-CALC-13 | **Decided (Marc, 2026-11-15).** Known-answer test (KAT) expected values come from the SOP when applicable. The KAT test code is separate work, built like a unit test. Katinka (SOP researcher) may source a test, its results, and the SOP for one. An SOP is cited by section, not copied into the repo. | CALC-REQ-6, 44 | Marc 2026-11-15. |
 | OQ-CALC-14 | **Decided (Marc, 2026-11-03).** Only an Admin may activate a calculation, enforced server-side. | CALC-REQ-35 | Marc. Günter's re-review B2 is closed by this answer. |
 | OQ-CALC-15 | **Decided (Marc, 2026-11-03).** Self-activation is allowed, because a startup cannot be assumed to have a second person. The proposer, or the owner of the agent run that proposed it, may activate their own proposal. The row records that named person (`created_by = current_user_id()`). The configuring agent can never activate. The person must still be an Admin (OQ-CALC-14). | CALC-REQ-35 | Marc. Günter's re-review B2 is closed by this answer. |
 | OQ-CALC-16 | Timeout lengths. **Default, Marc to confirm:** R stops a request at 50 s. The backend stops waiting at 60 s, matching the shipped `FIT_TIMEOUT_SECONDS`. | CALC-REQ-4a | Product. Tobias N2. |
@@ -643,6 +643,38 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-50 | **Open.** No default. How a non-numeric metadata value (such as a date or a duration) is typed, and whether the existing `tests.test_date`, `tests.review_date`, and `results.entry_date` columns stay as columns or become analytes. Metadata about a test is an analyte on that test, with a result, and a calculation reads it as an analyte (CALC-REQ-58). This question does not choose the type. The names in the labeled example under CALC-REQ-58 are not this question. On `main` at `8e327c2`, `analytes.data_type` is a string whose comment lists numeric, text, date, and boolean (`backend/models/analysis.py` line 34). `AnalyteDataType` is `numeric`, `text`, `date`, and `boolean` (`backend/app/schemas/analyte.py` lines 14–17). Duration is not one of those values. `analysis_analytes.data_type` is a string whose comment lists numeric and text (`backend/models/analysis.py` line 83). `analysis_analytes.high_value` and `low_value` are `Numeric(15, 6)` (lines 85–86). `results.raw_result`, `reported_result`, and `calculated_result` are each `String(255)` (`backend/models/result.py` lines 29–32). This Spec carries every gate input as a decimal string (CALC-REQ-37) and defines a result as a numeric, qualified, or pass/fail output (§2). `tests.review_date` and `tests.test_date` are `Date` columns (`backend/models/test.py` lines 15–16). `results.entry_date` is a `Date` column (`backend/models/result.py` line 33). Those are the columns `main` stores today. This question does not choose a type. | CALC-REQ-58 | Marc, 2026-11-11. |
 | OQ-CALC-51 | **Open.** No default. What a value past a high cutoff (`>`) is stored as, and how `limit_compare` treats it against an at-most, at-least, or within limit. | CALC-REQ-19, 20 | Edmund, 2026-11-11, from Marc's cutoff decision |
 
+---
+### OQ-CALC-11 fit options: weighting, fixed and bounded parameters, outliers (draft, Marc decides)
+
+Status: draft options for Marc. Nothing in this subsection is decided. Nothing here changes CALC-REQ-8 until Marc decides.
+
+Today `fit_4pl` (CALC-REQ-8) uses drc defaults: ordinary least squares, no weights, and no parameter bounds. Marc asked that the options be modeled on IDBS XLfit, which offers weighting options, fixed and constrained parameters, automatic outlier detection, global fitting, and many models. XLfit is a reference for the options. It is not a requirement.
+
+**Option A. Proposed minimal set for this build.**
+1. Weighting is a configured choice in the calculation. The proposed choices are none (today's behavior), 1/y, and 1/y². The fit output records which weighting was used.
+2. Fixed parameters. The configuration may fix bottom, top, or both to a configured value. A fixed parameter is not fitted and is reported as fixed.
+3. Bounds. The configuration may set a lower bound, an upper bound, or both on any of the four parameters. A fit that ends on a bound is flagged.
+4. Outliers. No automatic outlier detection in this build. CALC-REQ-8's rule stands: a replicate with no numeric response is excluded and counted.
+5. Where it is configured. These choices belong to the calculation on the analysis-analyte pair (the calculation lives on analysis_analytes, Marc 2026-11-10). They are configurable values in the calculation (CALC-REQ-23), not hardcoded, and a change is a new version (CALC-REQ-40).
+6. Proof. Each weighting choice, and fixed and bounded fits, have their own KATs (CALC-REQ-5). Adding a choice is a new function version.
+
+**Option B. Later, not this build.**
+- More weightings: 1/x, 1/x², 1/SD², Poisson. 1/SD² needs a replicate SD per calibrator level, which ties the fit to `replicate_mean_cv`.
+- Automatic outlier detection. It needs a rule defined by the lab SOP. Flag: this pulls speculative scope.
+- Global or shared-parameter fitting across plates or curves. Flag: this pulls speculative scope.
+- Other models, such as 5PL. The catalog has `fit_4pl` and `fit_loglog_linear` only. XLfit's 70+ models are out of scope. Flag: this pulls speculative scope.
+- "NIST/NPL validated" is XLfit's claim. In this Spec, "validated" means only CALC-REQ-46. Public reference datasets may serve as KAT sources (OQ-CALC-13). No validation claim is made.
+
+**Option C.** Keep drc defaults only (ordinary least squares, no weights, no bounds) in this build, and park all of Option A as later scope.
+
+**Questions for Marc.**
+1. Option A, a smaller part of A, or Option C?
+2. Which weightings are in the minimal set?
+3. When a parameter is fixed, does the four-level minimum in CALC-REQ-8 still apply?
+4. Can a lab tech exclude a calibrator point by hand, with a reason? This Spec does not say so today.
+5. With weighting on, which r_squared is reported (weighted or unweighted)? The residual-based fit statistic is still pending Marc.
+
+Flags: drc's `weights` argument does not take 1/y-style weights directly in every case. How each choice maps to drc is implementation work, and the KAT proves it. Nothing here says which choice is the default for a new configuration.
 ---
 
 ## 5. Out of scope
@@ -703,4 +735,6 @@ History, not stamps at this head:
 | Spec | Marc | Decision (5:05 PM ET): "calc never changes raw." | 2026-11-11 | 2c58528 |
 | Spec | Marc | Decision (6:12 PM ET): "clear and write are audited." Stopped re-calc: "transaction to clear / transaction to set calculated values / if the calc transaction fails, it stays clear." | 2026-11-11 | d6af169 |
 | Spec | Marc | Decision (6:17 PM ET): "the row is not published, it should not be read." | 2026-11-11 | 61e6b2e |
-| Spec | Marc | Decision (6:25 PM ET): "calculated and reported are set together." | 2026-11-11 | this revision |
+| Spec | Marc | Decision (6:25 PM ET): "calculated and reported are set together." | 2026-11-11 | ced25c1 |
+| Spec | Marc | Decision: OQ-CALC-13. KAT expected values come from the SOP when applicable. KAT test code is separate work, built like a unit test. Katinka may source a test, results, and SOP for one. | 2026-11-15 | this revision |
+| Spec | Marc | Decisions on S3 choices the Spec was silent on (implementation is separate work): slope 0 is valid (inactive or nonreactive) and is not refused; the inverse of a flat curve returns no number, with an inactive flag; negative concentrations are refused; all points dropped gives missing_input; stops return 200 and refusals return 400; r_squared is kept as a QC metric, plus a residual-based fit statistic whose exact form is pending Marc. OQ-CALC-11 fit options drafted for Marc's decision. | 2026-11-15 | this revision |
