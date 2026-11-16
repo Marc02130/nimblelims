@@ -34,3 +34,4 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [workflow-accessioning-to-reporting.md](workflow-accessioning-to-reporting.md) | End-to-end workflow |
 | [useful-command-line.md](useful-command-line.md) | CLI notes |
 | [uat-artifacts.md](uat-artifacts.md) | UAT backups (`/workspace/.uat-backups/`), quarantine (`/workspace/.uat-quarantine/`), `--secrets-out`; evidence stays local |
+| [calculation-catalog-decimal.md](calculation-catalog-decimal.md) | Backend decimal catalog functions (S4): `apply_dilution`, `subtract`, `copy_raw`, `convert_units` |

@@ -4,7 +4,7 @@ The four R-side catalog functions: `fit_4pl`, `inverse_4pl`, `fit_loglog_linear`
 
 **Release state:** all four versions are declared and **not released**. They have no KAT cases, because no citable reference values are in the repository (CALC-REQ-6, OQ-CALC-13). The S2 release check refuses each of them with `kat_absent`. Synthetic data, including the instrument CSVs under `UAT_Scripts/instrument-exports/` and `backend/tests/fixtures/elisa/`, is not a citable source and is not used for KATs.
 
-Nothing in S3 writes an attempt or a result, reads a configuration, or adds an API route or a screen. Backend catalog functions are S4.
+Nothing in S3 writes an attempt or a result, reads a configuration, or adds an API route or a screen. The backend decimal catalog functions (S4) are on [calculation-catalog-decimal.md](calculation-catalog-decimal.md).
 
 ## Where it lives
 

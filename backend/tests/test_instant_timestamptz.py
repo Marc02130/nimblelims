@@ -335,8 +335,9 @@ def _typed(conn, data_type: str) -> set[str]:
 def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
     """0101 is before ELISA and instrument-tracking catalog rows.
 
-    Head adds empty tables, renames instrument_types, and seeds lists.
-    Every other table keeps the same row count.
+    Head adds empty tables, renames instrument_types, seeds lists, and
+    seeds the calculation units OD, s, and 1. Every other table keeps
+    the same row count.
     """
     extra = set(after) - set(before)
     allowed_extra = {
@@ -366,14 +367,16 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
     missing = set(before) - set(after)
     assert missing <= {"instrument_types"}
     # 0111 seeds instrument_types / maintenance_types / downtime_reasons and
-    # their entries. The 0102 frozen counts cannot include lists/list_entries
-    # after that, or the round-trip would treat those seed rows as drift.
+    # their entries. 0122 seeds units OD, s, and 1. The 0102 frozen counts
+    # cannot include lists/list_entries/units after that, or the round-trip
+    # would treat those seed rows as drift.
     skip = {
         "schema_tables",
         "schema_columns",
         "schema_privileges",
         "lists",
         "list_entries",
+        "units",
     } | extra | missing
     left = {key: value for key, value in before.items() if key not in skip}
     right = {key: value for key, value in after.items() if key not in skip}
