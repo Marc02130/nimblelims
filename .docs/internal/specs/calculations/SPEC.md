@@ -646,7 +646,7 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-49 | **Open.** No default. What a no-value input produces. A calculation handles an input that has no value (CALC-REQ-57). This question does not state the product. OQ-CALC-8 stays open. | CALC-REQ-57 | Marc, 2026-11-11. |
 | OQ-CALC-50 | **Open.** No default. How a non-numeric metadata value (such as a date or a duration) is typed, and whether the existing `tests.test_date`, `tests.review_date`, and `results.entry_date` columns stay as columns or become analytes. Metadata about a test is an analyte on that test, with a result, and a calculation reads it as an analyte (CALC-REQ-58). This question does not choose the type. The names in the labeled example under CALC-REQ-58 are not this question. On `main` at `8e327c2`, `analytes.data_type` is a string whose comment lists numeric, text, date, and boolean (`backend/models/analysis.py` line 34). `AnalyteDataType` is `numeric`, `text`, `date`, and `boolean` (`backend/app/schemas/analyte.py` lines 14–17). Duration is not one of those values. `analysis_analytes.data_type` is a string whose comment lists numeric and text (`backend/models/analysis.py` line 83). `analysis_analytes.high_value` and `low_value` are `Numeric(15, 6)` (lines 85–86). `results.raw_result`, `reported_result`, and `calculated_result` are each `String(255)` (`backend/models/result.py` lines 29–32). This Spec carries every gate input as a decimal string (CALC-REQ-37) and defines a result as a numeric, qualified, or pass/fail output (§2). `tests.review_date` and `tests.test_date` are `Date` columns (`backend/models/test.py` lines 15–16). `results.entry_date` is a `Date` column (`backend/models/result.py` line 33). Those are the columns `main` stores today. This question does not choose a type. | CALC-REQ-58 | Marc, 2026-11-11. |
 | OQ-CALC-51 | **Decided (Marc, 2026-11-17).** A result past the high end has two fields: the calculated result holds the actual computed number; the reported result holds the qualified value (for example `>100`, stored `>` with its limit). Calculated and reported are still set together. Which of the two values a step uses, and how the `>` value is reported, is set by the calculation formula (the configuration), not hard-coded in `limit_compare`. Locking the 4PL top upstream (OQ-CALC-11 fixed parameters) is how a lab handles this. | CALC-REQ-19, 20 | Edmund, 2026-11-11, from Marc's cutoff decision |
-| OQ-CALC-52 | **Decided in part (Marc, 2026-11-17, about 9:15 PM ET).** Direction (about 8:43 PM ET): "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results." Formulas should work "like excel." Direction (about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." **Decided:** (1) that literal text means the mean, (R1 + R2 + R3) / 3; (2) unary minus binds tighter than `^`, as in Excel, so `-2^2` = 4; (3) the function list is approved: AVERAGE, SUM, MIN, MAX, COUNT, STDEV (n−1), ABS, ROUND, SQRT, LOG10, LN, EXP, POWER, and IF, AND, OR, NOT, with the comparison operators `=` `<>` `<` `<=` `>` `>=`; (4) a saved reusable formula is pinned by version, and only a lab admin may write a formula, saved or ad hoc. A lab admin is any user with the Admin role (Marc, 2026-11-18, 2:55 PM ET). The configuring agent may propose and cannot activate (CALC-REQ-47, CALC-REQ-34); (5) ROUND on an exact .5 tie uses round-half-to-even (banker's rounding). That differs from Excel, which rounds halves away from zero (Marc, 2026-11-18, 2:55 PM ET). **Still open:** STDEV.P, range-like references, units in formulas, missing inputs, qualified inputs, error mapping, and the test (KAT) gate before activation. | CALC-REQ-22, 23, 24, 40, 47, 34 | Marc 2026-11-17 (via Edmund). |
+| OQ-CALC-52 | **Decided in part (Marc, 2026-11-17, about 9:15 PM ET).** Direction (about 8:43 PM ET): "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results." Formulas should work "like excel." Direction (about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." **Decided:** (1) that literal text means the mean, (R1 + R2 + R3) / 3; (2) unary minus binds tighter than `^`, as in Excel, so `-2^2` = 4; (3) the function list is approved: AVERAGE, SUM, MIN, MAX, COUNT, STDEV (n−1), ABS, ROUND, SQRT, LOG10, LN, EXP, POWER, and IF, AND, OR, NOT, with the comparison operators `=` `<>` `<` `<=` `>` `>=`; (4) a saved reusable formula is pinned by version, and only a lab admin may write a formula, saved or ad hoc. A lab admin is any user with the Admin role (Marc, 2026-11-18, 2:55 PM ET). The configuring agent may propose and cannot activate (CALC-REQ-47, CALC-REQ-34); (5) ROUND on an exact .5 tie uses round-half-to-even (banker's rounding). That differs from Excel, which rounds halves away from zero (Marc, 2026-11-18, 2:55 PM ET). **Decided direction (Marc, 2026-11-18, 2:59 PM ET), not a detailed lock:** the eleven catalog functions stay in code, KAT-tested and versioned with releases, and are callable from lab formulas, along with regression, interpolation, outlier tests, and lookups. The model is Excel / XLfit. A lab can write and save the whole chain as one formula with no code: fit a standard curve, back-calculate unknowns, average replicates, and check %CV against a limit. A new code function is needed only for a genuinely new algorithm. The detail is the draft expansion below and is not a lock. Conflicts with existing lines are listed there and were not rewritten. **Still open:** STDEV.P, range-like references, units in formulas, missing inputs, qualified inputs, error mapping, and the test (KAT) gate before activation. The numbered questions in the expansion are also open. | CALC-REQ-22, 23, 24, 40, 47, 34 | Marc 2026-11-17 (via Edmund). |
 
 ---
 ### OQ-CALC-11 fit options: weighting, fixed and bounded parameters, outliers (draft, Marc decides)
@@ -684,7 +684,7 @@ Flags: drc's `weights` argument does not take 1/y-style weights directly in ever
 
 ### OQ-CALC-52 draft: lab-entered formulas (partly decided)
 
-Status: **Decided in part (Marc, 2026-11-17, about 9:15 PM ET),** on top of the quoted direction. Marc (2026-11-17, about 8:43 PM ET): formulas should work "like excel." Marc (2026-11-17, about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." **Decided:** the literal replicate text means the mean, (R1 + R2 + R3) / 3; unary minus binds tighter than `^`, as in Excel (`-2^2` = 4); the function list below, including IF, AND, OR, NOT, and the comparison operators; a saved reusable formula is pinned by version; only a lab admin may write a formula, saved or ad hoc. **Decided further (Marc, 2026-11-18, 2:55 PM ET):** a lab admin is any user with the Admin role, and ROUND on an exact .5 tie uses round-half-to-even (banker's rounding), which differs from Excel. The configuring agent may propose and cannot activate (CALC-REQ-47, CALC-REQ-34). **Still open:** STDEV.P, range-like references, units in formulas, missing inputs, qualified inputs, error mapping, and the test (KAT) gate before activation. Everything else in this subsection stays a draft.
+Status: **Decided in part (Marc, 2026-11-17, about 9:15 PM ET),** on top of the quoted direction. Marc (2026-11-17, about 8:43 PM ET): formulas should work "like excel." Marc (2026-11-17, about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." **Decided:** the literal replicate text means the mean, (R1 + R2 + R3) / 3; unary minus binds tighter than `^`, as in Excel (`-2^2` = 4); the function list below, including IF, AND, OR, NOT, and the comparison operators; a saved reusable formula is pinned by version; only a lab admin may write a formula, saved or ad hoc. **Decided further (Marc, 2026-11-18, 2:55 PM ET):** a lab admin is any user with the Admin role, and ROUND on an exact .5 tie uses round-half-to-even (banker's rounding), which differs from Excel. The configuring agent may propose and cannot activate (CALC-REQ-47, CALC-REQ-34). **Decided direction (Marc, 2026-11-18, 2:59 PM ET), not a detailed lock:** the eleven catalog functions stay in code and are callable from lab formulas, with regression, interpolation, outlier tests, and lookups. A lab can save the whole chain as one formula with no code. A new code function is needed only for a genuinely new algorithm. The expansion below is a draft for Marc. It is not a lock. **Still open:** STDEV.P, range-like references, units in formulas, missing inputs, qualified inputs, error mapping, and the test (KAT) gate before activation. Everything else in this subsection stays a draft.
 
 Marc, 2026-11-17, about 8:43 PM ET, quoted exactly: "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results."
 
@@ -800,6 +800,103 @@ Ask Günter to confirm these points.
 - CALC-REQ-22's "plain-language description of its formula" uses "formula" for a catalog entry's description (CALC-REQ-45). A later pass should keep that distinct from a lab-entered formula.
 - OQ-CALC-11 Option B: "The catalog has `fit_4pl` and `fit_loglog_linear` only". That sentence is about curve models, not the count of eleven. It is a related closed-catalog sentence.
 
+### OQ-CALC-52 expansion: catalog functions callable from formulas
+
+**Decided direction (Marc, 2026-11-18, 2:59 PM ET).** Not a detailed lock. Marc's view: if every moderately complex calculation needs code, the system is not configurable. The eleven catalog functions stay in code. They stay KAT-tested and versioned with releases (CALC-REQ-5, CALC-REQ-7, CALC-REQ-22). They also become callable from lab formulas, along with regression, interpolation, outlier tests, and lookups. The model is Excel / XLfit. The goal is that a lab can write and save the whole chain as one formula, with no code: fit a standard curve, back-calculate unknowns, average replicates, and check %CV against a limit. A new code function is needed only for a genuinely new algorithm. That new function is still a reviewed pull request with KATs (CALC-REQ-22). This paragraph does not choose names, signatures, or error behavior.
+
+**Draft / proposal for Marc. Not a lock.** Nothing in the numbered parts below is decided. This subsection adds no acceptance criterion. The fail bars for the Admin role and for ROUND's tie rule stay on CALC-REQ-23. This draft does not reopen a Decided lock. Where the direction meets an existing line, the conflict is listed at the end and the line is not rewritten.
+
+Example (not a requirement, not a default): one saved formula for the goal above. The names are the draft names in the table. They are not a required formula and not a default. `cv_limit` is a value bound in the calculation (CALC-REQ-23). No assay number is required.
+
+```
+fit = FIT_4PL(calibrator_concentration, calibrator_response)
+conc = INVERSE_4PL(fit, sample_response)
+stats = REPLICATE_MEAN_CV(conc)
+LIMIT_COMPARE(stats.cv, at_most, cv_limit)
+```
+
+**1. Which functions a formula can call.** Draft names only. Excel parity, including LINEST, FORECAST, and TREND, is open question 1. A catalog row calls that catalog function. It does not add a second implementation. A proposed row is not in the catalog. Adding it is a new algorithm and needs the CALC-REQ-22 path.
+
+| Draft formula name | Calls | Standing | What the call is |
+|--------------------|-------|----------|------------------|
+| FIT_4PL | `fit_4pl` | Catalog, version 1 | Four-parameter logistic fit (CALC-REQ-8). |
+| INVERSE_4PL | `inverse_4pl` | Catalog, version 1 | Back-calculation from a 4PL fit (CALC-REQ-9). |
+| FIT_LOGLOG | `fit_loglog_linear` | Catalog, version 1 | Linear regression of log10(y) on log10(x) (CALC-REQ-12). This is the catalog's linear fit. It is not an ordinary y-on-x line. |
+| INVERSE_LOGLOG | `inverse_loglog_linear` | Catalog, version 1 | Back-calculation from that log-log fit (CALC-REQ-17). |
+| REPLICATE_MEAN_CV | `replicate_mean_cv` | Catalog, version 1 | Arithmetic mean and sample %CV (CALC-REQ-14, OQ-CALC-5). |
+| SPIKE_RECOVERY | `spike_recovery` | Catalog, version 1 | Recovery percent (CALC-REQ-18, OQ-CALC-6). |
+| LIMIT_COMPARE | `limit_compare` | Catalog, version 1 | Pass, fail, or no verdict against a bound (CALC-REQ-19). |
+| APPLY_DILUTION | `apply_dilution` | Catalog, version 1 | Value times a dilution factor (CALC-REQ-38). |
+| CONVERT_UNITS | `convert_units` | Catalog, version 1 | Within-type conversion, or divide by a bound amount (CALC-REQ-39). |
+| SUBTRACT | `subtract` | Catalog, version 1 | Minuend minus subtrahend (CALC-REQ-51). |
+| COPY_RAW | `copy_raw` | Catalog, version 1 | The input decimal string, unchanged (CALC-REQ-53). |
+| FIT_LINEAR | none yet | Proposed | Ordinary linear regression of y on x. Not `fit_loglog_linear`. |
+| FIT_5PL | none yet | Proposed | A five-parameter logistic fit. Not a catalog function. Shipped `fit_compound` can fit a 5PL and is not in the catalog until it is brought under CALC-REQ-22. OQ-CALC-11 Option B parks 5PL. |
+| INTERPOLATE | the two inverses are the version-1 form | Proposed as a general name | Back-calculation from a fit value. Version 1 is INVERSE_4PL and INVERSE_LOGLOG. A general name in the direction of FORECAST or TREND is not chosen. |
+| OUTLIER_TEST | none yet | Proposed | A test on a set of numbers. The test is not chosen. The call returns a flag. It does not knock a point out (CALC-REQ-27). |
+| LOOKUP | none yet | Proposed | The configured value bound in the calculation, read by name (CALC-REQ-23). Not the constants table. That table is parked toward [#258](https://github.com/Marc02130/nimblelims/issues/258) and is not in this build. |
+
+The decided formula functions AVERAGE, SUM, MIN, MAX, COUNT, STDEV, ABS, ROUND, SQRT, LOG10, LN, EXP, POWER, IF, AND, OR, and NOT stay as decided. They are formula functions. They are not catalog functions. This table does not replace that list.
+
+**2. Signatures.** Draft. Each catalog call takes the inputs and returns the outputs its own rule already names. This draft does not add a scientific field those rules do not name.
+
+A curve fit returns one fit value. The formula can store that value in a named intermediate and pass it to a later call. The fit value bundles the outputs the catalog function already returns:
+
+- the parameters (for `fit_4pl`: bottom, top, slope, inflection; for `fit_loglog_linear`: slope, intercept, and r)
+- r_squared
+- `sum_residuals`, `sum_abs_residuals`, and `sum_sq_residuals`
+- points used and points excluded
+- status, including a fit stop such as `curve_not_fitted` or `non_positive_log_input`, or the flag `inactive`
+
+Those field names are a proposal. They are not locked.
+
+Locked or fixed parameters are optional arguments. They follow the decided rule in OQ-CALC-11 Option A item 2: the lab's configuration says which parameters may be fixed, and each fixed parameter and its value are visible with the fit. This draft does not set a count. It does not change CALC-REQ-8.
+
+Example (not a requirement, not a default): a formula may fix the top, or the bottom, of a 4PL. Fixing both is one lab's configuration. It is not a required pair, and it is not a limit of two.
+
+A named intermediate is a name inside the formula, as `fit` is in the example above. Under CALC-REQ-28, a value passed to a later step inside the same calculation is not a stored result and has no stored unit column of its own. This draft uses the fit value that way. It does not store it. Whether a lab may also store or audit the intermediate is open question 7. Requiring that store would conflict with CALC-REQ-28. This draft does not require it.
+
+**3. Errors and flags through a chain.** Draft. The error mapping earlier in this question stays open. This part does not decide it. It proposes how an outcome reaches the final calculated and reported fields.
+
+- The Excel names in view are `#DIV/0!`, `#VALUE!`, `#NUM!`, and `#N/A`. `#NAME?` stays the earlier proposal: refused at save. `#NUM!` is the earlier question for a square root of a negative and for LOG10 or LN of a non-positive number. `#N/A` is a proposal for no value. None of these mappings is decided.
+- A fit failure sets the fit value's status and does not yield a numeric concentration. A later call that needs that number receives no number.
+- Qualified `<` and `>` follow OQ-CALC-51, which is decided and is not reopened. When there is a computed number, calculated holds that number. When the formula says the reported field is the qualified value, reported holds that qualified value (stored `<` or `>` with its limit). Calculated and reported are still set together. Which of the two a later call reads is set by the formula. How a qualified value enters arithmetic stays open (item f above).
+- A flag raised by a call is carried toward the final row's qualifiers. This draft does not name a new flag spelling. It does not decide whether that flag is also a stop. The final write still clears calculated and reported when the stage stops (CALC-REQ-25).
+
+**4. Saved formulas, one chain, and who may write.** The decided rules stay. A saved formula is pinned by name and version. A newer version does not change a calculation that pinned the older one (item g, item k, CALC-REQ-40). The chain in the decided direction is one saved formula, or one ad hoc formula. It is not a new catalog function. Named intermediates are names in that formula. Only a user with the Admin role may write it, saved or ad hoc (item i). The configuring agent may propose it and cannot activate it (CALC-REQ-34, CALC-REQ-47). Whether that one formula is one stage, or one stage per call, is open question 8. CALC-REQ-48 still requires every stage to declare its on-fail outcome, flag, gated stages, and precedence place. This draft does not change that rule.
+
+**5. Security notes for Günter.** Draft, same standing as the list above this expansion. Not a lock. Not a confirmation from Günter.
+
+- No `eval`, no `exec`, and no evaluation of the formula text as Python, R, SQL, or JavaScript.
+- A safe parser with an allow-listed grammar. The allow-list is the decided formula functions plus a catalog name from the table. A proposed name is allow-listed only after that function exists. Any other name is refused at save.
+- A fit call is a call to the catalog function. It is not a string of code, and it is not a new route that accepts an unknown model name (CALC-REQ-24). The formula evaluator does not refit in decimal. The fit still runs as the catalog function (CALC-REQ-37).
+- Evaluation and complexity limits extend to fits and to iteration. A formula cannot demand an unbounded fit iteration or an unbounded loop over points. This draft does not set the numeric limits. POWER, `^`, and EXP keep the earlier bound question.
+- The earlier points still apply: a length limit, a nesting limit, escaped display, a name that resolves only to a result the user can already see, a change that requires the Admin role and is audited, and no activation by the configuring agent.
+- This does not reopen CALC-REQ-24. A formula stays an expression, not user code.
+
+**6. Open questions for Marc.** Not decided.
+
+1. What are the formula names, and which Excel names are required (LINEST, FORECAST, TREND, or the draft names in the table)?
+2. Which fit models does version 1 expose to a formula? `fit_4pl` and `fit_loglog_linear` are the catalog fits. Ordinary linear and 5PL are proposed only.
+3. What are the fit-value field names?
+4. Which outlier test, if any (Grubbs, Dixon, or another)? The choice is open. The draft does not delete a point.
+5. Where does LOOKUP read? The draft reads a value bound in the calculation. The constants table is not in this build.
+6. What numeric limits apply to fit iterations and to loops?
+7. Are named intermediates stored or audited, or only passed inside the formula?
+8. Is the chain one stage, or one stage per call, for CALC-REQ-48's on-fail declarations?
+9. How are the ELISA and LAL reference chains expressed as a formula, if they are expressed that way at all? They stay fixtures (OQ-CALC-24). This question does not make them product configurations.
+10. The items that were already open stay open: STDEV.P, range-like references, units in formulas, missing inputs, qualified inputs, error mapping, and the test (KAT) gate before activation.
+
+**Conflicts noted, not rewritten.** The decided direction is recorded above. These lines were not changed.
+
+1. CALC-REQ-28. There are no intermediate results and no intermediate units. A value passed to a later step inside the same calculation is not a stored result. A named fit value fits that sentence when it is not stored. Requiring a store would conflict. Storage stays open question 7.
+2. CALC-REQ-40. "The closed catalog stays." The catalog is not a fixed ceiling (CALC-REQ-22). This direction also saves the chain as one formula. That sentence was left as written. It is also in the follow-up list above.
+3. CALC-REQ-45 items 5 and 6. The plain-language description is rendered from the catalog entries' declared descriptions, and the diff lists function versions, bindings, and stage on-fail declarations. It does not list formula text. A chain saved as one formula is formula text. This direction does not change CALC-REQ-45.
+4. OQ-CALC-11 Option B. 5PL is parked, and that option says the catalog has `fit_4pl` and `fit_loglog_linear` only. 5PL is not a catalog function. This draft does not add it and does not reopen Option B.
+5. OQ-CALC-11 Option B also parks automatic outlier detection as not this build. Option A item 4, which is not decided, says the same for this build. This direction names outlier tests as formula-callable. The draft does not choose a test and does not knock a point out. Those option lines were not edited.
+6. CALC-REQ-24 is a boundary this draft keeps, not a change. User code and a generic run-any-code endpoint stay prohibited. A formula that ran caller-supplied code, or that passed an unknown model name, would conflict. This draft forbids that and calls the catalog function instead. CALC-REQ-37 is the same kind of boundary: the formula does not refit in decimal.
+
+
 ---
 
 ## 5. Out of scope
@@ -874,4 +971,5 @@ History, not stamps at this head:
 | Spec | Marc | Direction (about 8:43 PM ET): the eleven catalog functions are prebuilt, not a hard ceiling; more can be added; the builder must handle lab-entered formulas over named results such as (R1 + R2 + R3) / 3. Opened OQ-CALC-52 with a draft for Marc; nothing else decided. | 2026-11-17 | a4ecf9a |
 | Spec | Marc | Direction (about 8:43 PM ET): formulas should work "like excel." Direction (about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." | 2026-11-17 | 4153343 |
 | Spec | Marc | Decision (about 9:15 PM ET): OQ-CALC-52. (R1 + R2 + R3) / 3 is the mean; unary minus binds tighter than ^ as in Excel; the function list is approved, including IF/AND/OR/NOT; saved formulas are pinned by version; only lab admins write formulas. CALC-REQ-22 and 23 rewritten to match. | 2026-11-17 | c505b2f |
-| Spec | Marc | Decision (2:55 PM ET): OQ-CALC-52. A lab admin is any user with the Admin role, for saved and ad hoc formulas. ROUND on an exact .5 tie uses round-half-to-even, which differs from Excel (ROUND(2.5, 0) is 2 here and 3 in Excel; ROUND(3.5, 0) is 4 in both). Closed-catalog and eleven-only wording removed from §0 item 2, §2, and CALC-REQ-1, 5, 24, 30, 34, 37, and 47. | 2026-11-18 | this revision |
+| Spec | Marc | Decision (2:55 PM ET): OQ-CALC-52. A lab admin is any user with the Admin role, for saved and ad hoc formulas. ROUND on an exact .5 tie uses round-half-to-even, which differs from Excel (ROUND(2.5, 0) is 2 here and 3 in Excel; ROUND(3.5, 0) is 4 in both). Closed-catalog and eleven-only wording removed from §0 item 2, §2, and CALC-REQ-1, 5, 24, 30, 34, 37, and 47. | 2026-11-18 | 9b0616ea |
+| Spec | Marc | Direction (2:59 PM ET): OQ-CALC-52. The eleven catalog functions stay in code and are callable from lab formulas, with regression, interpolation, outlier tests, and lookups. A lab can save a whole chain as one formula with no code. A new code function is only for a genuinely new algorithm. Detail is a draft, not a lock. | 2026-11-18 | this revision |
