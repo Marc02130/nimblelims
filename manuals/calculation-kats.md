@@ -20,10 +20,11 @@ S2 is the harness only. There are no catalog functions yet (S3 to S5), no real K
 
 A function version declares its name, integer version, R or backend side, a plain-language formula, every input and output with its unit, defaults, its stop rule, its missing-data rule, and its KATs. An R-side version names its R route. A backend version names its decimal code.
 
-A KAT case supplies every input itself, with a unit. A scalar input is one decimal string. An array input is a tuple of decimal strings, or nested tuples of them: a concentration or response vector, an x or y vector, or replicates. Every leaf is a decimal string and uses the one declared unit. The case gives the expected value of every output with its unit, a tolerance for every output, and a source citation. A case reads nothing from a configuration. Outputs stay scalars.
+A KAT case supplies every input itself, with a unit. A scalar input is one decimal string. An array input is a tuple of decimal strings, or nested tuples of them: a concentration or response vector, an x or y vector, or replicates. Every leaf is a decimal string and uses the one declared unit. An input whose declared unit is `token` is one non-decimal string, used for a comparison form. The case gives the expected value of every output with its unit, a tolerance for every output, and a source citation. A case reads nothing from a configuration. Outputs stay scalars.
 
 - An absolute tolerance is in the output's unit. A relative tolerance is a fraction of the expected value and has unit `1`.
-- A case with no citation, a unit that is not the declared unit, a missing tolerance, or a value that is not a decimal string fails before it runs. An array fails the same way when any element is not a decimal string.
+- A pass/fail output has no unit. The declared unit is an empty string. The expected value is `pass` or `fail`, and the tolerance is absolute `0` with that same empty unit. The match is exact.
+- A case with no citation, a unit that is not the declared unit, a missing tolerance, or a value that is not a decimal string fails before it runs. A token input fails when it is empty or has whitespace. An array fails the same way when any element is not a decimal string.
 
 The runner posts an array as a JSON array of strings. A backend case receives a tuple of `Decimal` values, nested the same way. Scalar cases are unchanged: one decimal string in, one string on the wire.
 
@@ -80,7 +81,7 @@ This is a software-release check. It is not a lab validation gate, which is out 
 
 ## Not in S2
 
-- Catalog functions, real KAT cases, and their expected values were not in S2. Expected values for real cases come from the SOP when the SOP has them (OQ-CALC-13). The S3 R-side functions are on [calculation-catalog-r.md](calculation-catalog-r.md). They have no KAT cases yet and are not released. The S4 backend functions are on [calculation-catalog-decimal.md](calculation-catalog-decimal.md). Each has one KAT at absolute tolerance 0, worked from its Spec acceptance criterion, and none is released.
+- Catalog functions, real KAT cases, and their expected values were not in S2. Expected values for real cases come from the SOP when the SOP has them (OQ-CALC-13). The S3 R-side functions are on [calculation-catalog-r.md](calculation-catalog-r.md). They have no KAT cases yet and are not released. The S4 backend functions are on [calculation-catalog-decimal.md](calculation-catalog-decimal.md). Each has one KAT at absolute tolerance 0, worked from its Spec acceptance criterion, and none is released. The S5 functions are on [calculation-catalog-s5.md](calculation-catalog-s5.md). Their KATs use the same tolerance. `limit_compare` verdicts use the empty-unit pass/fail match.
 - ELISA and LAL reference-configuration KATs (S14).
 - A committed release ledger. The first catalog release (S3 onward) chooses where records are committed.
 - Configurations, attempts, and result writes.

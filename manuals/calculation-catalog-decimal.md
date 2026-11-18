@@ -115,7 +115,7 @@ Each KAT uses absolute tolerance `0` because the result is exact in decimal. `ru
 
 ## Not in this slice
 
-- Replicate mean and CV, spike recovery, and limit compare (S5).
+- Replicate mean and CV, spike recovery, and limit compare are S5, on [calculation-catalog-s5.md](calculation-catalog-s5.md).
 - A run-time stop when `copy_raw` file units differ from the pairing unit (OQ-CALC-39, S9).
 - Reference resolution for `subtract` (S9).
 - A committed release record.

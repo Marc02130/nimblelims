@@ -15,7 +15,10 @@ The split follows CALC-REQ-37:
 
 Values are decimal strings. An input may also be an array of decimal
 strings, or nested arrays of them (a concentration or response vector, an
-x or y vector, or replicates). Comparison of outputs is in Python
+x or y vector, or replicates). An input whose declared unit is ``token`` is
+a single non-decimal string (a comparison form). A pass/fail output declares
+no unit: the unit string is empty, the value is ``pass`` or ``fail``, and the
+tolerance is absolute 0. Comparison of decimal outputs is in Python
 ``decimal`` (precision 50, ROUND_HALF_EVEN). The run log names the lock hash
 and built image digest it ran on, and per case the function name and version,
 R or backend, the observed and expected values, the tolerance, pass or fail,
@@ -51,6 +54,11 @@ DECIMAL_PRECISION = 50
 DECIMAL_ROUNDING = decimal.ROUND_HALF_EVEN
 # A relative tolerance is a fraction of the expected value and carries this unit.
 RELATIVE_TOLERANCE_UNIT = "1"
+# A comparison form (at_most, at_least, within). Not a measured unit.
+TOKEN_UNIT = "token"
+# CALC-REQ-22 / CALC-REQ-28: a pass/fail output has no unit.
+NO_UNIT = ""
+PASS_FAIL = ("pass", "fail")
 
 
 @dataclass(frozen=True)
@@ -88,7 +96,7 @@ class KatCase:
 # A scalar input is one Decimal. An array input is a tuple of those, nested
 # the same way the case wrote it (one level for a vector, two for replicates).
 DecimalTree = Decimal | tuple["DecimalTree", ...]
-BackendCompute = Callable[[Mapping[str, DecimalTree]], Mapping[str, Decimal | str]]
+BackendCompute = Callable[[Mapping[str, Any]], Mapping[str, Decimal | str]]
 
 
 @dataclass(frozen=True)
@@ -156,7 +164,13 @@ def _decimal_tree(value: Any) -> DecimalTree:
     raise ValueError(f"{value!r} is not a decimal string or an array of decimal strings")
 
 
-def _value_problem(value: Any, name: str) -> Optional[str]:
+def _value_problem(value: Any, name: str, unit: Optional[str] = None) -> Optional[str]:
+    if unit == TOKEN_UNIT:
+        if isinstance(value, str) and value != "" and value.strip() == value and not any(
+            char.isspace() for char in value
+        ):
+            return None
+        return f"{name}: {value!r} is not a token"
     if isinstance(value, str):
         try:
             _decimal(value)
@@ -165,7 +179,7 @@ def _value_problem(value: Any, name: str) -> Optional[str]:
         return None
     if _is_array(value):
         for index, item in enumerate(value):
-            problem = _value_problem(item, f"{name}[{index}]")
+            problem = _value_problem(item, f"{name}[{index}]", unit)
             if problem is not None:
                 return problem
         return None
@@ -369,17 +383,25 @@ def _case_problem(fv: FunctionVersion, case: KatCase) -> Optional[str]:
     for name, q in case.inputs.items():
         if q.unit != fv.inputs[name]:
             return f"input {name} unit {q.unit!r} is not the declared unit {fv.inputs[name]!r}"
-        problem = _value_problem(q.value, f"input {name}")
+        problem = _value_problem(q.value, f"input {name}", fv.inputs[name])
         if problem is not None:
             return problem
     for name, q in case.expected.items():
         if q.unit != fv.outputs[name]:
             return f"expected {name} unit {q.unit!r} is not the declared unit {fv.outputs[name]!r}"
+        if fv.outputs[name] == NO_UNIT:
+            if q.value not in PASS_FAIL:
+                return f"expected {name}: a pass/fail output is 'pass' or 'fail'"
+            continue
         try:
             _decimal(q.value)
         except ValueError as exc:
             return f"expected {name}: {exc}"
     for name, tol in case.tolerance.items():
+        if fv.outputs[name] == NO_UNIT:
+            if not (tol.kind == "absolute" and tol.value == "0" and tol.unit == NO_UNIT):
+                return f"tolerance for {name} must be absolute 0 with no unit"
+            continue
         want = fv.outputs[name] if tol.kind == "absolute" else RELATIVE_TOLERANCE_UNIT
         if tol.unit != want:
             return f"tolerance for {name} must have unit {want!r}"
@@ -412,7 +434,12 @@ def no_r_calls() -> Iterator[None]:
 def _observe_backend(fv: FunctionVersion, case: KatCase) -> Mapping[str, Any]:
     if fv.compute is None:
         raise ValueError("backend version has no compute")
-    inputs = {name: _decimal_tree(q.value) for name, q in case.inputs.items()}
+    inputs: dict[str, Any] = {}
+    for name, quantity in case.inputs.items():
+        if fv.inputs[name] == TOKEN_UNIT:
+            inputs[name] = quantity.value
+        else:
+            inputs[name] = _decimal_tree(quantity.value)
     with decimal.localcontext() as ctx:
         ctx.prec = DECIMAL_PRECISION
         ctx.rounding = DECIMAL_ROUNDING
@@ -487,11 +514,16 @@ def _run_case(
     for name, want in case.expected.items():
         got = observed.get(name) if isinstance(observed, Mapping) else None
         tol = case.tolerance[name]
-        try:
-            ok = _within(_decimal(got), _decimal(want.value), tol)
-        except ValueError as exc:
-            errors.append(f"{name}: observed {exc}")
-            ok = False
+        if fv.outputs[name] == NO_UNIT:
+            ok = got == want.value
+            if not ok:
+                errors.append(f"{name}: observed {got!r}")
+        else:
+            try:
+                ok = _within(_decimal(got), _decimal(want.value), tol)
+            except ValueError as exc:
+                errors.append(f"{name}: observed {exc}")
+                ok = False
         outputs.append(
             OutputResult(
                 name=name,

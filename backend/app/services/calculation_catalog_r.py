@@ -76,7 +76,13 @@ class StageResult:
     (CALC-REQ-25) and then ``outputs`` is empty. ``qualifier`` is ``<`` or
     ``>`` for a response past the low or high end, with ``end`` ``low`` or
     ``high``; the kind's name, label, and limit come from configuration.
-    ``flags`` holds ``missing_input``, ``response_at_asymptote``, or ``inactive``.
+    ``flags`` holds ``missing_input``, ``response_at_asymptote``, ``inactive``,
+    ``replicate_missing``, ``mean_zero``, ``limit_above_el``, or
+    ``limit_below_el``. ``kind`` is the qualified kind the caller supplied.
+    ``qualifier_limit`` is the limit text after ``<`` or ``>``, unchanged.
+    ``no_verdict`` is set when there is no pass or fail and no flag: the
+    stage names a missing-limit flag, or the Spec does not define the
+    qualified comparison. Neither is a review flag.
     """
 
     function: str
@@ -89,6 +95,9 @@ class StageResult:
     end: Optional[str] = None
     flags: tuple[str, ...] = ()
     dropped: tuple[str, ...] = ()
+    kind: Optional[str] = None
+    qualifier_limit: Optional[str] = None
+    no_verdict: Optional[str] = None
 
 
 def is_decimal_string(value: Any) -> bool:

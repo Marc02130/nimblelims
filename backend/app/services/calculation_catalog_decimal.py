@@ -557,6 +557,16 @@ def stage_http_body(result: StageResult) -> dict[str, Any]:
         body["stop"] = result.stop
         if result.detail:
             body["detail"] = result.detail
+    if result.qualifier is not None:
+        body["qualifier"] = result.qualifier
+    if result.qualifier_limit is not None:
+        body["qualifier_limit"] = result.qualifier_limit
+    if result.kind is not None:
+        body["kind"] = result.kind
+    if result.end is not None:
+        body["end"] = result.end
+    if result.no_verdict is not None:
+        body["no_verdict"] = result.no_verdict
     if result.flags:
         body["flags"] = list(result.flags)
     return body
