@@ -644,7 +644,7 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-49 | **Open.** No default. What a no-value input produces. A calculation handles an input that has no value (CALC-REQ-57). This question does not state the product. OQ-CALC-8 stays open. | CALC-REQ-57 | Marc, 2026-11-11. |
 | OQ-CALC-50 | **Open.** No default. How a non-numeric metadata value (such as a date or a duration) is typed, and whether the existing `tests.test_date`, `tests.review_date`, and `results.entry_date` columns stay as columns or become analytes. Metadata about a test is an analyte on that test, with a result, and a calculation reads it as an analyte (CALC-REQ-58). This question does not choose the type. The names in the labeled example under CALC-REQ-58 are not this question. On `main` at `8e327c2`, `analytes.data_type` is a string whose comment lists numeric, text, date, and boolean (`backend/models/analysis.py` line 34). `AnalyteDataType` is `numeric`, `text`, `date`, and `boolean` (`backend/app/schemas/analyte.py` lines 14–17). Duration is not one of those values. `analysis_analytes.data_type` is a string whose comment lists numeric and text (`backend/models/analysis.py` line 83). `analysis_analytes.high_value` and `low_value` are `Numeric(15, 6)` (lines 85–86). `results.raw_result`, `reported_result`, and `calculated_result` are each `String(255)` (`backend/models/result.py` lines 29–32). This Spec carries every gate input as a decimal string (CALC-REQ-37) and defines a result as a numeric, qualified, or pass/fail output (§2). `tests.review_date` and `tests.test_date` are `Date` columns (`backend/models/test.py` lines 15–16). `results.entry_date` is a `Date` column (`backend/models/result.py` line 33). Those are the columns `main` stores today. This question does not choose a type. | CALC-REQ-58 | Marc, 2026-11-11. |
 | OQ-CALC-51 | **Open.** No default. What a value past a high cutoff (`>`) is stored as, and how `limit_compare` treats it against an at-most, at-least, or within limit. | CALC-REQ-19, 20 | Edmund, 2026-11-11, from Marc's cutoff decision |
-| OQ-CALC-52 | **Open, direction from Marc 2026-11-17.** Marc (about 8:43 PM ET): "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results." How lab-entered formulas over named results work is the draft below, and how CALC-REQ-22 and CALC-REQ-23 and their ACs change is part of this question. | CALC-REQ-22, 23, 24, 40, 47, 34 | Marc 2026-11-17 (via Edmund). |
+| OQ-CALC-52 | **Open, direction from Marc 2026-11-17.** Marc (about 8:43 PM ET): "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results." Formulas should work "like excel." Marc (about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." How lab-entered formulas over named results work, on that Excel model, and how predefined and ad hoc formulas work, is the draft below. How CALC-REQ-22 and CALC-REQ-23 and their ACs change is part of this question. | CALC-REQ-22, 23, 24, 40, 47, 34 | Marc 2026-11-17 (via Edmund). |
 
 ---
 ### OQ-CALC-11 fit options: weighting, fixed and bounded parameters, outliers (draft, Marc decides)
@@ -682,21 +682,74 @@ Flags: drc's `weights` argument does not take 1/y-style weights directly in ever
 
 ### OQ-CALC-52 draft: lab-entered formulas (not decided)
 
-Status: only Marc's quoted direction is decided. The rest of this subsection is a draft for Marc. Nothing else here is decided. The requirement text and the ACs of CALC-REQ-22 and CALC-REQ-23 are not rewritten in this revision. They will change when Marc decides OQ-CALC-52.
+Status: only Marc's quoted direction is decided. Marc (2026-11-17, about 8:43 PM ET): formulas should work "like excel." Marc (2026-11-17, about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." The rest of this subsection is a draft for Marc. Nothing else here is decided. Nothing in the proposed function table is decided. The requirement text and the ACs of CALC-REQ-22 and CALC-REQ-23 are not rewritten in this revision. They will change when Marc decides OQ-CALC-52.
 
 Marc, 2026-11-17, about 8:43 PM ET, quoted exactly: "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results."
 
-That quoted direction is two things. The eleven catalog functions are prebuilt, not a hard ceiling, and more can be added. The builder must also accept a lab-entered formula over named results. Replicate 1, replicate 2, and replicate 3 are results.
+Marc, 2026-11-17, about 8:43 PM ET: formulas should work "like excel."
 
-Marc's literal text is "Replicate 1 + replicate 2 + replicate 3 / 3". Under ordinary operator precedence, division binds before addition, so that text divides only replicate 3 by 3. The intent is the mean of the three results, so the example in this draft is written with parentheses. Operator precedence is a draft question: whether the builder requires the parentheses, rewrites the literal text, or evaluates the literal text as written is not decided.
+Marc, 2026-11-17, about 8:44 PM ET, quoted exactly: "you can use predefined formulas or ad hoc formulas."
+
+That quoted direction is the following. The eleven catalog functions are prebuilt, not a hard ceiling, and more can be added. The builder must also accept a lab-entered formula over named results. Replicate 1, replicate 2, and replicate 3 are results. Formulas should work like Excel. A calculation can use a predefined formula or an ad hoc formula. How those two paths work is item k. The Excel model for operators, names, and functions is items a and b and the table under them. None of that model is decided beyond the quoted words.
+
+Marc's literal text is "Replicate 1 + replicate 2 + replicate 3 / 3". Under Excel precedence, as under ordinary arithmetic, division binds before addition, so that text divides only replicate 3 by 3. The intent is the mean of the three results, so the example in this draft is written with parentheses. Whether the builder requires the parentheses, rewrites the literal text, or evaluates the literal text as written is not decided.
 
 Example (not a requirement, not a default): (Replicate 1 + Replicate 2 + Replicate 3) / 3. Those three names are results. This shows a lab-entered formula the framework must be able to accept. It is not a required formula and not a default.
 
 The shipped free-text `analysis_analytes.calculation` column is still not this formula (CALC-REQ-23, CALC-REQ-40). This draft does not change that sentence.
 
-**a. Allowed operators.** Proposed minimal option: addition, subtraction, multiplication, and division (+ − × ÷), parentheses, and unary minus, with standard precedence. Parentheses group first, then unary minus, then × and ÷, then + and −. Candidates to ask about, and not in that minimal set: min, max, mean, sum, abs, sqrt, log10, ln, exp, and power. The minimal set has no string operations and no conditionals. Question for Marc: which of those candidates, if any, belong in the minimal set, and do string operations or conditionals belong there?
+**a. Allowed operators (Excel model).** Proposed, not decided. The arithmetic operators are `+`, `−`, `*`, `/`, and `^`, plus parentheses and unary minus. Precedence follows Excel for those operators: parentheses, then unary minus, then `^`, then `*` and `/`, then `+` and `−`. Percent (`%`) and text concatenation (`&`) are not in this set. Comparison operators (`=`, `<>`, `<`, `<=`, `>`, `>=`) are not in this arithmetic set. They are listed with IF in the proposed function table, and they are part of the conditional scope question there.
 
-**b. Binding results by name.** Proposed minimal option: each name in a formula binds, through the existing binding rules (CALC-REQ-23, CALC-REQ-50), to a result (an analyte) on the same sample and the same test in the same LIMS run, or to an upstream stage output, or to a configured value. An unknown name is refused at save. Names are resolved at save time, not at run time. Replicate results stay under CALC-REQ-27 and CALC-REQ-54. Question for Marc: when a formula names a knocked-out replicate, is that refused, dropped from the formula, or a missing input? This draft does not choose.
+Note for Marc: Excel evaluates unary minus before `^`.
+
+Example (not a requirement, not a default): in Excel, `-2^2` equals 4. Under the usual math convention, `^` binds before unary minus, and `-2^2` equals −4. Ask whether the formula copies Excel or uses the math convention. Those two results are not a required formula.
+
+**b. References to named results (Excel model).** Proposed, not decided. A name in the formula stands for a bound result, as a cell reference stands for a cell. There is no cell grid. What a name may bind to is still the existing binding rules (CALC-REQ-23, CALC-REQ-50): a result (an analyte) on the same sample and the same test in the same LIMS run, an upstream stage output, or a configured value. An unknown name is refused at save (the `#NAME?` mapping below). Names are resolved at save time, not at run time. Replicate results stay under CALC-REQ-27 and CALC-REQ-54.
+
+Question for Marc: may a formula use a range-like reference to a set of replicates, for example all replicates of one result? This draft does not choose. A second question, also not chosen: when a formula names a knocked-out replicate, or a range that contains one, is that refused, dropped, or a missing input?
+
+**Proposed function set (Marc to approve).** Nothing in this table is decided. Each row is a draft function for the lab-entered formula. It is not a new catalog function and not a requirement.
+
+| Name | What it does | Excel equivalent | Notes |
+|------|----------------|------------------|-------|
+| AVERAGE | The arithmetic mean of its numeric arguments. | AVERAGE | A range-like set of replicates is the question in (b). |
+| SUM | The sum of its numeric arguments. | SUM | |
+| MIN | The smallest numeric argument. | MIN | |
+| MAX | The largest numeric argument. | MAX | |
+| COUNT | The count of numeric arguments. | COUNT | |
+| STDEV | The sample standard deviation, divide by n−1. | STDEV and STDEV.S | Proposed to match the OQ-CALC-5 SD-form decision on PR #263 (sample SD, n−1, the same form as Excel STDEV). This table does not edit the OQ-CALC-5 row. STDEV.P, the population form (divide by n), is a separate question and is not in this set. |
+| ABS | The absolute value. | ABS | |
+| ROUND | Round to a stated number of decimal places. | ROUND | Decimal half-up and Excel's round-half-away-from-zero match for positive numbers. Excel's rule is below. Ask which rule to use. |
+| SQRT | The square root. | SQRT | |
+| LOG10 | The base-10 logarithm. | LOG10 | |
+| LN | The natural logarithm. | LN | |
+| EXP | e raised to the argument. | EXP | Needs an evaluation bound. See the security list. |
+| POWER | Raise a number to a power. The operator `^` is the same operation. | POWER and `^` | Needs an evaluation bound. See the security list. |
+| IF | Choose one of two values from a comparison. The comparisons are `=` `<>` `<` `<=` `>` `>=`. | IF | Introduces conditionals. That is a scope question for Marc. |
+| AND, OR, NOT | Combine or negate comparisons. | AND, OR, and NOT | Introduces conditionals, with IF. That is a scope question for Marc. One group, not three decided functions. |
+
+Excel's ROUND rule, stated for the ask: a tie rounds half away from zero. A positive tie and a negative tie both move to the number with the larger magnitude.
+
+Example (not a requirement, not a default): Excel `ROUND(1.5, 0)` is 2, and Excel `ROUND(−1.5, 0)` is −2. Decimal half-up matches Excel on the positive tie. A half-up reading that sends ties toward positive infinity gives −1 for −1.5. Those inputs are not a required rounding case. Ask Marc whether ROUND copies Excel, including on a negative tie, or uses decimal half-up.
+
+Excel returns `#NUM!` for a square root of a negative number, and for LOG10 or LN of a non-positive number. That error is not in the mapping below. Ask Marc whether it is no number and a flag.
+
+**Differences from Excel to flag.** Draft. Not decided. Ask Marc to confirm each one. "Like excel" is the model for operators, names, and the function list. These are the places this draft does not copy Excel.
+
+- Decimal, not binary float. Excel calculates in IEEE double. A formula here is evaluated in Python `decimal` under the CALC-REQ-37 context (item c). The same formula can differ in the last digits. The Spec's decimal rule wins. This draft does not switch formulas onto binary float.
+- No cell grid. Names stand for bound results (item b). There are no columns, rows, or sheets.
+- No text functions.
+- No volatile functions. NOW and RAND are not in the set.
+- No external references. A name does not reach outside the bindings in item b.
+- Errors map to flags and stop reasons. They are not stored as Excel error strings.
+
+Proposed error mapping, not decided:
+
+| Excel error | Proposed result |
+|-------------|-----------------|
+| `#DIV/0!` | No number, and a flag. Whether that flag is also a stop is the question in item c. |
+| `#NAME?` | Refused at save. |
+| `#VALUE!` | A qualified value, or a non-numeric value, bound into the arithmetic. See item f. The refuse, propagate, or flag question there is not chosen. |
 
 **c. Decimal math.** Proposed minimal option: the backend evaluates the formula in Python `decimal`, under the CALC-REQ-37 context. It does not use a binary float. It does not call R. Division by zero gives no number and a flag. Question for Marc: is division by zero a stop, or only a flag?
 
@@ -712,14 +765,21 @@ The shipped free-text `analysis_analytes.calculation` column is still not this f
 
 **i. Who can author.** Proposed minimal option: the configuring agent proposes the formula and cannot activate it (CALC-REQ-47, CALC-REQ-34). Question for Marc: may a lab user with configure permission author a formula, or does the configuring agent propose it only?
 
-**j. Adding more prebuilt functions.** Marc's direction is that more prebuilt functions can be added, and that the eleven are not a hard ceiling. Proposed minimal option: a new prebuilt function is still a reviewed pull request in code, with KATs. That keeps the process CALC-REQ-22 already states. Only the count ceiling goes. The catalog still does not change through the API, the UI, a database row, runtime config, or any agent. Question for Marc: confirm that this process stays, and that only the ceiling of eleven goes.
+**j. Adding more prebuilt functions.** Marc's direction is that more prebuilt functions can be added, and that the eleven are not a hard ceiling. Proposed minimal option: a new prebuilt function is still a reviewed pull request in code, with KATs. That keeps the process CALC-REQ-22 already states. Only the count ceiling goes. The catalog still does not change through the API, the UI, a database row, runtime config, or any agent. Question for Marc: confirm that this process stays, and that only the ceiling of eleven goes. A saved reusable formula (item k) is not this path. It is an expression, not a new catalog function.
+
+**k. Predefined formulas and ad hoc formulas.** Direction, quoted above: "you can use predefined formulas or ad hoc formulas." The split below is a draft for how those two paths work. It is not decided.
+
+- **Predefined.** One path is the prebuilt catalog functions: the current eleven, and later additions. A later addition is still a reviewed pull request in code, with KATs (item j). The other path is a draft proposal for Marc: a saved reusable formula. That is a lab-entered formula saved by name and version, so another calculation can use it. Questions for Marc: who may save one; whether a saved formula needs KAT-style test cases before another calculation may use it (item h); whether its scope is lab-wide or per analysis; and whether a new version of a saved formula updates calculations that already use it. Proposed answer to that last question, not decided: no. A calculation pins the saved formula's name and version, consistent with CALC-REQ-40. A newer version of the saved formula does not change a calculation that pinned the older one.
+- **Ad hoc.** A formula typed into one calculation. It is part of that calculation configuration's version (item g). It is not reusable in another calculation.
+- **Same rules for both.** A predefined saved formula and an ad hoc formula use the same parser, the same grammar, the same function set, the same decimal rule, the same unit rules, the same missing-input and qualified-input rules, and the same security points. The catalog functions stay on their own KAT and release path (CALC-REQ-5, CALC-REQ-7, item j).
 
 **Security points for Günter (CSO) to review.** Draft for Günter to confirm. Not decided.
 
 - No code execution of any kind. No `eval`, no `exec`, and no evaluation of the formula text as Python, R, SQL, or JavaScript.
-- A safe expression parser with a fixed grammar. Allow-listed tokens only: numbers, bound names, and the allowed operators and functions. The parser builds an abstract syntax tree. The backend evaluates that tree.
+- A safe expression parser with a fixed grammar. Allow-listed tokens only: numbers, bound names, and the allowed operators and functions. The function set is allow-listed. A call to any other function is rejected at save. The parser builds an abstract syntax tree. The backend evaluates that tree.
+- IF must not short-circuit into anything outside the grammar. Both branches are parsed with that same grammar. Short-circuit does not skip the parser and does not run code.
 - Anything else is rejected at save.
-- A length limit, a nesting limit, and evaluation limits, so a formula cannot exhaust resources. One evaluation limit is a refusal of an exponent blowup. This draft does not set the numeric limits.
+- A length limit, a nesting limit, and evaluation limits, so a formula cannot exhaust resources. One evaluation limit is a refusal of an exponent blowup. POWER, the operator `^`, and EXP need bounds so a large power or a large exponential cannot exhaust resources in decimal. This draft does not set the numeric limits.
 - Formula text is data. The UI renders it escaped.
 - A name resolves only to a result the user can already see under row-level security.
 - A formula change requires config permission and is audited.
@@ -819,4 +879,4 @@ History, not stamps at this head:
 | Spec | Marc | Decision (about 9:56 PM ET): keep the negative calibrator concentration refusal on fit_4pl inputs as an input check. Robust fitting not yet decided. | 2026-11-15 | 3e27bcd |
 | Spec | Marc | Decision (about 9:58 PM ET): OQ-CALC-11 fixed parameters: no fixed limit; how many a lab may fix is set per lab in configuration; each fixed parameter and its value are visible with the fit result and in the calculation record. | 2026-11-15 | f568450 |
 | Spec | Marc | Decision (about 10:03 PM ET): OQ-CALC-44 decided. The convert_units lookup of units.multiplier does not run under row-level security; units is shared reference data with no RLS policy. | 2026-11-15 | this revision |
-| Spec | Marc | Direction (about 8:43 PM ET): the eleven catalog functions are prebuilt, not a hard ceiling; more can be added; the builder must handle lab-entered formulas over named results such as (R1 + R2 + R3) / 3. Opened OQ-CALC-52 with a draft for Marc; nothing else decided. | 2026-11-17 | this revision |
+| Spec | Marc | Direction (about 8:43 PM ET): the eleven catalog functions are prebuilt, not a hard ceiling; more can be added; the builder must handle lab-entered formulas over named results such as (R1 + R2 + R3) / 3; formulas should work "like excel." Direction (about 8:44 PM ET): "you can use predefined formulas or ad hoc formulas." Opened OQ-CALC-52 with a draft for Marc; nothing else decided. | 2026-11-17 | this revision |
