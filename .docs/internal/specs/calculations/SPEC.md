@@ -401,8 +401,10 @@ Example (not a requirement, not a default): a kinetic-turbidity LAL configuratio
 ### 3.9 Closed catalog and no-code builder
 
 - **CALC-REQ-22 [Not built]** The catalog is closed and generic (Rolf B1). Version 1 contains exactly eleven functions: `fit_4pl`, `inverse_4pl`, `fit_loglog_linear`, `inverse_loglog_linear`, `replicate_mean_cv`, `spike_recovery`, `limit_compare`, `apply_dilution`, `convert_units`, `subtract`, `copy_raw`. No catalog function is named for an assay, and none carries an assay threshold. Each entry declares name, version, every input and output with its declared unit, its missing-data rule, its stop rule, a plain-language description of its formula (CALC-REQ-45), and its KATs. A pass/fail output has no unit (CALC-REQ-28). Result-row units are not these declarations (CALC-REQ-28). Shipped dose-response `fit_compound` is not in the catalog until it is brought under these rules. The catalog changes only through a PR-reviewed code change (Günter H2). It never changes through the API, the UI, a database row, runtime config, or any agent. None of those paths can add a function or enable a version.
+  - **Pending OQ-CALC-52 (Marc, 2026-11-17).** The eleven catalog functions are prebuilt, not a hard ceiling, and more can be added. The requirement text of this rule and the ACs below this note are not yet rewritten and will change when Marc decides OQ-CALC-52.
   - AC: the catalog lists exactly these eleven entries, each with every declared field filled. No entry is named `elisa_*` or `lal_*`. An attempt to add or enable an entry through the API, the UI, a database write by the application role, runtime config, or an agent run is refused, and the catalog is unchanged. A new entry appears only after a reviewed pull request that changes the catalog in code is merged.
 - **CALC-REQ-23 [Not built]** Calculations are configured only in a no-code builder: pick catalog functions, bind each input to a field on an entry in the same LIMS run (experiment data or experiment sample data), to an upstream stage output, or to a reference input (CALC-REQ-50), and declare each stage's on-fail outcome, flag, gated stages, and precedence place (CALC-REQ-48). The field to use is specified in the configuration. There is no expression language and no free-text formula. The shipped free-text `analysis_analytes.calculation` column is not a formula. Direct binding is allowed (Marc, 2026-11-10). A directly bound value is a hard value embedded in the calculation itself, and it is configurable. It is not hardcoded in code. A threshold that has no other source may be bound directly as that value, and that covers the thresholds in CALC-REQ-44, CALC-REQ-13, CALC-REQ-16, CALC-REQ-10, CALC-REQ-11, CALC-REQ-43, CALC-REQ-37, CALC-REQ-54, and CALC-REQ-31. This supersedes the earlier stance that those acceptance criteria wait on [#257](https://github.com/Marc02130/nimblelims/issues/257) (closed, absorbed into [#258](https://github.com/Marc02130/nimblelims/issues/258)). Recommendation (Marc, 2026-11-11): lab-bound values should be stored in the [#258](https://github.com/Marc02130/nimblelims/issues/258) constants table. Direct binding stays allowed, because not all use cases are known yet. Constants, including a constants table incorporated into the calculation configuration, are not part of this build. They are parked toward [#258](https://github.com/Marc02130/nimblelims/issues/258).
+  - **Pending OQ-CALC-52 (Marc, 2026-11-17).** The builder must also accept a lab-entered formula over named results. The requirement text of this rule and the ACs below this note are not yet rewritten and will change when Marc decides OQ-CALC-52.
 
 - Example (not a requirement, not a default): [#258](https://github.com/Marc02130/nimblelims/issues/258) lists eleven constant identifiers, and it says Spec values go in its constants table. The identifiers are `abs_correlation_min`, `percent_cv_max`, `percent_range`, `min_point_count`, `endotoxin_limit`, `max_valid_dilution`, `nominal_spike`, `onset_cutoff`, `replicate_count`, `min_in_range`, and `max_remaining_span`. They illustrate a future constants table. The framework must support named constants usable in a calculation. This build does not implement that table, and these identifiers are not a builder menu and not a default. [#258](https://github.com/Marc02130/nimblelims/issues/258) does not state a check that `max_remaining_span` is greater than 0, and it does not state a `percent_range.high` bound.
 
@@ -642,6 +644,7 @@ Status labels follow [`.docs/review/open-questions/README.md`](../../../review/o
 | OQ-CALC-49 | **Open.** No default. What a no-value input produces. A calculation handles an input that has no value (CALC-REQ-57). This question does not state the product. OQ-CALC-8 stays open. | CALC-REQ-57 | Marc, 2026-11-11. |
 | OQ-CALC-50 | **Open.** No default. How a non-numeric metadata value (such as a date or a duration) is typed, and whether the existing `tests.test_date`, `tests.review_date`, and `results.entry_date` columns stay as columns or become analytes. Metadata about a test is an analyte on that test, with a result, and a calculation reads it as an analyte (CALC-REQ-58). This question does not choose the type. The names in the labeled example under CALC-REQ-58 are not this question. On `main` at `8e327c2`, `analytes.data_type` is a string whose comment lists numeric, text, date, and boolean (`backend/models/analysis.py` line 34). `AnalyteDataType` is `numeric`, `text`, `date`, and `boolean` (`backend/app/schemas/analyte.py` lines 14–17). Duration is not one of those values. `analysis_analytes.data_type` is a string whose comment lists numeric and text (`backend/models/analysis.py` line 83). `analysis_analytes.high_value` and `low_value` are `Numeric(15, 6)` (lines 85–86). `results.raw_result`, `reported_result`, and `calculated_result` are each `String(255)` (`backend/models/result.py` lines 29–32). This Spec carries every gate input as a decimal string (CALC-REQ-37) and defines a result as a numeric, qualified, or pass/fail output (§2). `tests.review_date` and `tests.test_date` are `Date` columns (`backend/models/test.py` lines 15–16). `results.entry_date` is a `Date` column (`backend/models/result.py` line 33). Those are the columns `main` stores today. This question does not choose a type. | CALC-REQ-58 | Marc, 2026-11-11. |
 | OQ-CALC-51 | **Open.** No default. What a value past a high cutoff (`>`) is stored as, and how `limit_compare` treats it against an at-most, at-least, or within limit. | CALC-REQ-19, 20 | Edmund, 2026-11-11, from Marc's cutoff decision |
+| OQ-CALC-52 | **Open, direction from Marc 2026-11-17.** Marc (about 8:43 PM ET): "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results." How lab-entered formulas over named results work is the draft below, and how CALC-REQ-22 and CALC-REQ-23 and their ACs change is part of this question. | CALC-REQ-22, 23, 24, 40, 47, 34 | Marc 2026-11-17 (via Edmund). |
 
 ---
 ### OQ-CALC-11 fit options: weighting, fixed and bounded parameters, outliers (draft, Marc decides)
@@ -675,6 +678,80 @@ Today `fit_4pl` (CALC-REQ-8) uses drc defaults: ordinary least squares, no weigh
 5. With weighting on, which r_squared is reported (weighted or unweighted)? The residual-based fit statistic is still pending Marc.
 
 Flags: drc's `weights` argument does not take 1/y-style weights directly in every case. How each choice maps to drc is implementation work, and the KAT proves it. Nothing here says which choice is the default for a new configuration.
+---
+
+### OQ-CALC-52 draft: lab-entered formulas (not decided)
+
+Status: only Marc's quoted direction is decided. The rest of this subsection is a draft for Marc. Nothing else here is decided. The requirement text and the ACs of CALC-REQ-22 and CALC-REQ-23 are not rewritten in this revision. They will change when Marc decides OQ-CALC-52.
+
+Marc, 2026-11-17, about 8:43 PM ET, quoted exactly: "11 functions could be prefigured and that was not a hard ceiling, we could do more. but it needs to handle formulas like Replicate 1 + replicate 2 + replicate 3 / 3. replicate 1,2,3 are results."
+
+That quoted direction is two things. The eleven catalog functions are prebuilt, not a hard ceiling, and more can be added. The builder must also accept a lab-entered formula over named results. Replicate 1, replicate 2, and replicate 3 are results.
+
+Marc's literal text is "Replicate 1 + replicate 2 + replicate 3 / 3". Under ordinary operator precedence, division binds before addition, so that text divides only replicate 3 by 3. The intent is the mean of the three results, so the example in this draft is written with parentheses. Operator precedence is a draft question: whether the builder requires the parentheses, rewrites the literal text, or evaluates the literal text as written is not decided.
+
+Example (not a requirement, not a default): (Replicate 1 + Replicate 2 + Replicate 3) / 3. Those three names are results. This shows a lab-entered formula the framework must be able to accept. It is not a required formula and not a default.
+
+The shipped free-text `analysis_analytes.calculation` column is still not this formula (CALC-REQ-23, CALC-REQ-40). This draft does not change that sentence.
+
+**a. Allowed operators.** Proposed minimal option: addition, subtraction, multiplication, and division (+ − × ÷), parentheses, and unary minus, with standard precedence. Parentheses group first, then unary minus, then × and ÷, then + and −. Candidates to ask about, and not in that minimal set: min, max, mean, sum, abs, sqrt, log10, ln, exp, and power. The minimal set has no string operations and no conditionals. Question for Marc: which of those candidates, if any, belong in the minimal set, and do string operations or conditionals belong there?
+
+**b. Binding results by name.** Proposed minimal option: each name in a formula binds, through the existing binding rules (CALC-REQ-23, CALC-REQ-50), to a result (an analyte) on the same sample and the same test in the same LIMS run, or to an upstream stage output, or to a configured value. An unknown name is refused at save. Names are resolved at save time, not at run time. Replicate results stay under CALC-REQ-27 and CALC-REQ-54. Question for Marc: when a formula names a knocked-out replicate, is that refused, dropped from the formula, or a missing input? This draft does not choose.
+
+**c. Decimal math.** Proposed minimal option: the backend evaluates the formula in Python `decimal`, under the CALC-REQ-37 context. It does not use a binary float. It does not call R. Division by zero gives no number and a flag. Question for Marc: is division by zero a stop, or only a flag?
+
+**d. Units.** Proposed minimal option: every bound input carries its unit. Addition and subtraction require one unit type. A mix of unit types is refused, consistent with `convert_units` refusing a conversion across unit types. The output unit is declared on the formula. Question for Marc: for multiplication and division, does the formula derive the output unit, or does the lab declare the output unit only?
+
+**e. Missing inputs.** Proposed minimal option: a missing bound input gives `missing_input` and no number. Question for Marc: may any input be optional?
+
+**f. Qualified inputs (`<`, `>`).** Written to stay consistent with Marc's statement of 2026-11-17, about 8:36 PM ET: the calculated result holds the computed number, and the reported result holds the qualified value. Which of the two values a step uses is set by the calculation formula. This draft does not decide that statement, and it does not edit OQ-CALC-51. Proposed minimal option: the formula binds either the calculated number or the reported value, and the binding names which one. Question for Marc: if a qualified reported value is bound into the arithmetic, is that refused, does the qualifier propagate, or does the step set a flag?
+
+**g. Versioning.** Proposed minimal option: a formula is part of the calculation configuration. That version is immutable once active. A change is a new version (CALC-REQ-40). The calculation attempt records the formula text and the version. Question for Marc: confirm this versioning for a lab-entered formula.
+
+**h. Testing.** Proposed minimal option: each formula needs KAT-style test cases, with expected values from a cited source (CALC-REQ-5, CALC-REQ-6, CALC-REQ-7, OQ-CALC-13), before activation. Question for Marc: does the same activation gate as a catalog function apply?
+
+**i. Who can author.** Proposed minimal option: the configuring agent proposes the formula and cannot activate it (CALC-REQ-47, CALC-REQ-34). Question for Marc: may a lab user with configure permission author a formula, or does the configuring agent propose it only?
+
+**j. Adding more prebuilt functions.** Marc's direction is that more prebuilt functions can be added, and that the eleven are not a hard ceiling. Proposed minimal option: a new prebuilt function is still a reviewed pull request in code, with KATs. That keeps the process CALC-REQ-22 already states. Only the count ceiling goes. The catalog still does not change through the API, the UI, a database row, runtime config, or any agent. Question for Marc: confirm that this process stays, and that only the ceiling of eleven goes.
+
+**Security points for Günter (CSO) to review.** Draft for Günter to confirm. Not decided.
+
+- No code execution of any kind. No `eval`, no `exec`, and no evaluation of the formula text as Python, R, SQL, or JavaScript.
+- A safe expression parser with a fixed grammar. Allow-listed tokens only: numbers, bound names, and the allowed operators and functions. The parser builds an abstract syntax tree. The backend evaluates that tree.
+- Anything else is rejected at save.
+- A length limit, a nesting limit, and evaluation limits, so a formula cannot exhaust resources. One evaluation limit is a refusal of an exponent blowup. This draft does not set the numeric limits.
+- Formula text is data. The UI renders it escaped.
+- A name resolves only to a result the user can already see under row-level security.
+- A formula change requires config permission and is audited.
+- The configuring agent cannot activate.
+- This does not reopen CALC-REQ-24's ban on user code, scripts, plugins, a webhook runtime, and generic run endpoints. A formula is an expression, not code.
+
+Ask Günter to confirm these points.
+
+**Places that assume a closed eleven-function catalog.** Not edited here. They will need revising when Marc decides OQ-CALC-52. Sentences that say [#258](https://github.com/Marc02130/nimblelims/issues/258) lists eleven constant identifiers are about that constants table. They are not this catalog ceiling, and they are not in this list.
+
+- §0 item 2: "A closed catalog of generic, named, versioned functions" built in "a no-code builder".
+- §2 **Function:** "a generic, named calculation in the closed catalog".
+- §2 **Calculation configuration:** "a no-code composition of catalog functions".
+- §2 **Stage:** "one function call inside a configuration".
+- CALC-REQ-1: the first slice ends at "(c) the generic catalog functions", with no lab-entered formula.
+- CALC-REQ-5: the R-side list and the backend list name the eleven functions, and the AC says "each of the eleven catalog functions has at least one KAT".
+- CALC-REQ-22: "The catalog is closed" and "Version 1 contains exactly eleven functions", and the AC says the catalog "lists exactly these eleven entries". The pending note above that AC does not rewrite this text.
+- CALC-REQ-23: "There is no expression language and no free-text formula", and the AC says "the builder offers only catalog functions; there is no text field that accepts a formula or code". The pending note on this rule does not rewrite this text.
+- CALC-REQ-24: the allowed routes are the eleven named functions, then "No other route", and an unknown function or model name is refused.
+- CALC-REQ-30: the attempt records function name and version for every stage, and it does not record a formula text.
+- CALC-REQ-34: the agent proposes "functions, bindings, and stage declarations" and "cannot change the catalog".
+- CALC-REQ-37: the split assigns the four R functions and the seven backend functions as the whole of what runs. The words "Within a formula" in that rule mean the gate arithmetic of those functions, not a lab-entered formula.
+- CALC-REQ-40: "The closed catalog stays", and the shipped free-text column "is not a formula". The same "not a formula" sentence for that column is in CALC-REQ-23.
+- CALC-REQ-41 AC: "`limit_compare` is still one of the eleven catalog functions".
+- CALC-REQ-42: the fixture is "built only from catalog functions", and the example above it is "a configuration built only from catalog functions".
+- CALC-REQ-43: the fixture is "built only from catalog functions", and its AC says "The fixture uses no function outside the closed catalog".
+- CALC-REQ-45 item 5, the plain-language formula: a description "rendered from the catalog entries' declared descriptions", "not free text written by an agent". The AC says "The plain-language description matches the catalog descriptions of the pinned function versions". Item 6's diff lists function versions, bindings, and stage on-fail declarations, and does not list a formula text.
+- CALC-REQ-47: "Catalog functions are still added only by PR-reviewed code".
+- §3.9 heading: "Closed catalog and no-code builder".
+- CALC-REQ-22's "plain-language description of its formula" uses "formula" for a catalog entry's description (CALC-REQ-45). A later pass should keep that distinct from a lab-entered formula.
+- OQ-CALC-11 Option B: "The catalog has `fit_4pl` and `fit_loglog_linear` only". That sentence is about curve models, not the count of eleven. It is a related closed-catalog sentence.
+
 ---
 
 ## 5. Out of scope
@@ -742,3 +819,4 @@ History, not stamps at this head:
 | Spec | Marc | Decision (about 9:56 PM ET): keep the negative calibrator concentration refusal on fit_4pl inputs as an input check. Robust fitting not yet decided. | 2026-11-15 | 3e27bcd |
 | Spec | Marc | Decision (about 9:58 PM ET): OQ-CALC-11 fixed parameters: no fixed limit; how many a lab may fix is set per lab in configuration; each fixed parameter and its value are visible with the fit result and in the calculation record. | 2026-11-15 | f568450 |
 | Spec | Marc | Decision (about 10:03 PM ET): OQ-CALC-44 decided. The convert_units lookup of units.multiplier does not run under row-level security; units is shared reference data with no RLS policy. | 2026-11-15 | this revision |
+| Spec | Marc | Direction (about 8:43 PM ET): the eleven catalog functions are prebuilt, not a hard ceiling; more can be added; the builder must handle lab-entered formulas over named results such as (R1 + R2 + R3) / 3. Opened OQ-CALC-52 with a draft for Marc; nothing else decided. | 2026-11-17 | this revision |
