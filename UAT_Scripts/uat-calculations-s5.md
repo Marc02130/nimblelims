@@ -38,12 +38,12 @@
 
 ## Limit compare (CALC-REQ-19)
 
-16. `test_limit_compare_uses_the_value_it_is_fed`: numeric `90` at most `100` passes. The same function, fed `>100` at most `100`, fails and echoes qualifier `>` with limit text `100`. Numeric `150` at most `100` fails. `>100` at most `150` is no verdict and `limit_below_el`. The function does not choose calculated versus reported and does not format a reported result.
+16. `test_limit_compare_uses_the_value_it_is_fed`: numeric `90` at most `100` passes. The same function, fed `>100` at most `100`, returns no verdict (`unspecified`) and echoes qualifier `>` with limit text `100`. Numeric `150` at most `100` fails. `>100` at most `150` is the same no-verdict result, with the qualifier echoed. The function does not choose calculated versus reported and does not format a reported result.
 17. `0.5` at most `0.5` passes and `0.6` fails. `0.50` at most `0.500` passes. `50` and `200` within `50`–`200` pass. `49` and `201` fail.
 18. `|-0.98|` at least `0.980` passes. `|-0.97995|` at least `0.980` fails. The value is not rounded onto the bound. Without the absolute switch, `-0.98` at least `0.980` fails.
 19. Qualified `<0.4` and `<0.5` at most `0.5` pass. `<0.6` gives no verdict and `limit_above_el`. Two kinds, `below_range` and `non_detect`, both stored `<` with limit `0.4`, both pass, and each kind comes back unchanged.
-20. Qualified `>0.5` at most `0.5` fails. `>0.4` at most `0.5` gives no verdict and `limit_below_el`.
-21. A qualified value on `at_least` or `within` gives no verdict, no flag, and `no_verdict` `unspecified`. The Spec states the qualified rules for at most only. Those rules are not copied onto the other forms. `unspecified` is not a review flag.
+20. `test_qualified_greater_than_at_most_is_not_judged`: `>0.5` at most `0.5` and `>0.4` at most `0.5` both give no verdict, no flag, and `no_verdict` `unspecified`. Each echoes qualifier `>` and kind `above_curve`. The module source does not contain `limit_below_el`. The HTTP route for `>100` at most `100` with that kind is HTTP 200 and the same body.
+21. A qualified `>` on `at_least`, and a qualified `<` on `within`, give no verdict, no flag, and `no_verdict` `unspecified`. `unspecified` is not a review flag. The `<` at-most rule is not copied onto those forms.
 22. No value is `missing_input`. No bound is `no_verdict` `missing_limit` and sets no flag. `el_missing` is not emitted. The stage names that flag later. A missing value wins over a missing bound. A low bound above the high bound is refused even when the value is missing.
 23. An unknown comparison, a JSON number, absolute on a qualified value, a kind on a numeric value, two different kinds, and a malformed `> 100` are HTTP 400 `invalid_input`. The compare functions do not contain the literals `0.5` or `0.980`.
 

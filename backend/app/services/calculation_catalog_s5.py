@@ -64,7 +64,6 @@ from app.services.calculation_kat import (
 REPLICATE_MISSING = "replicate_missing"
 MEAN_ZERO = "mean_zero"
 LIMIT_ABOVE_EL = "limit_above_el"
-LIMIT_BELOW_EL = "limit_below_el"
 
 AT_MOST = "at_most"
 AT_LEAST = "at_least"
@@ -72,8 +71,8 @@ WITHIN = "within"
 COMPARISONS = (AT_MOST, AT_LEAST, WITHIN)
 
 # Not review flags. ``missing_limit`` means the stage's own flag is not
-# chosen here. ``unspecified`` means CALC-REQ-19 states no qualified rule
-# for that form.
+# chosen here. ``unspecified`` means this function does not judge that
+# qualified value: a ``>`` on any form, or a ``<`` on at_least or within.
 MISSING_LIMIT = "missing_limit"
 UNSPECIFIED = "unspecified"
 
@@ -401,12 +400,12 @@ LIMIT_COMPARE_V1 = FunctionVersion(
         "at_most (value <= limit), at_least (value >= limit), or within "
         "(low <= value <= high). Every bound is inclusive. The absolute "
         "switch compares the absolute value and does not round first. A "
-        "qualified value stored < or > is judged only for at_most, using the "
-        "limit written after the symbol. For <, a stored limit at or under "
-        "the bound passes, and a stored limit above the bound gives no "
-        "verdict and limit_above_el. For >, a stored limit at or above the "
-        "bound fails, and a stored limit below the bound gives no verdict "
-        "and limit_below_el. The kind that was supplied is returned with the "
+        "qualified value stored < is judged only for at_most, using the "
+        "limit written after the symbol: a stored limit at or under the "
+        "bound passes, and a stored limit above the bound gives no verdict "
+        "and limit_above_el. A qualified value stored > is not judged on "
+        "any form, including at_most. The formula decides how that result "
+        "is reported. The kind that was supplied is returned with the "
         "outcome."
     ),
     inputs={
@@ -426,9 +425,10 @@ LIMIT_COMPARE_V1 = FunctionVersion(
     missing_data_rule=(
         "No numeric or qualified value gives no verdict and missing_input. "
         "No bound for the form gives no verdict and does not set a flag; the "
-        "stage declaration names that flag. A qualified value on at_least or "
-        "within gives no verdict and no flag, because CALC-REQ-19 states the "
-        "qualified rules for at most only. A missing input is never zero."
+        "stage declaration names that flag. A qualified value stored > gives "
+        "no verdict and no flag on every form, including at_most. A qualified "
+        "value stored < on at_least or within gives no verdict and no flag. "
+        "A missing input is never zero."
     ),
     kats=(
         _limit_case("limit-at-most-0.5-passes", AT_MOST, "0.5", "0.5", "0", "1", "0", "pass"),
@@ -615,16 +615,12 @@ def _stage(
     )
 
 
-def _qualified_at_most(symbol: str, stored: Decimal, bound: Decimal) -> tuple[str, Optional[str]]:
-    """CALC-REQ-19 at-most rules. Returns ``(verdict, flag)``. One of them is empty."""
+def _qualified_less_than(stored: Decimal, bound: Decimal) -> tuple[str, Optional[str]]:
+    """At-most rule for a stored ``<``. Returns ``(verdict, flag)``. One of them is empty."""
     with decimal.localcontext(_context()):
-        if symbol == "<":
-            if stored <= bound:
-                return "pass", None
-            return "", LIMIT_ABOVE_EL
-        if stored >= bound:
-            return "fail", None
-        return "", LIMIT_BELOW_EL
+        if stored <= bound:
+            return "pass", None
+        return "", LIMIT_ABOVE_EL
 
 
 def limit_compare(
@@ -669,7 +665,17 @@ def limit_compare(
         symbol, limit_text, stored, stored_kind = subject[1], subject[2], subject[3], subject[4]
         if absolute:
             raise CatalogInputRefused("absolute applies to a numeric value")
-        if comparison != AT_MOST:
+        if comparison == AT_MOST and symbol == "<":
+            if parsed_limit is None:
+                return _stage(
+                    {},
+                    qualifier=symbol,
+                    qualifier_limit=limit_text,
+                    kind=stored_kind,
+                    no_verdict=MISSING_LIMIT,
+                )
+            verdict, flag = _qualified_less_than(stored, parsed_limit)
+        else:
             return _stage(
                 {},
                 qualifier=symbol,
@@ -677,15 +683,6 @@ def limit_compare(
                 kind=stored_kind,
                 no_verdict=UNSPECIFIED,
             )
-        if parsed_limit is None:
-            return _stage(
-                {},
-                qualifier=symbol,
-                qualifier_limit=limit_text,
-                kind=stored_kind,
-                no_verdict=MISSING_LIMIT,
-            )
-        verdict, flag = _qualified_at_most(symbol, stored, parsed_limit)
         if flag is not None:
             return _stage(
                 {},

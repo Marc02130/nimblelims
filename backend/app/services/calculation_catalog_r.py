@@ -77,12 +77,13 @@ class StageResult:
     ``>`` for a response past the low or high end, with ``end`` ``low`` or
     ``high``; the kind's name, label, and limit come from configuration.
     ``flags`` holds ``missing_input``, ``response_at_asymptote``, ``inactive``,
-    ``replicate_missing``, ``mean_zero``, ``limit_above_el``, or
-    ``limit_below_el``. ``kind`` is the qualified kind the caller supplied.
-    ``qualifier_limit`` is the limit text after ``<`` or ``>``, unchanged.
-    ``no_verdict`` is set when there is no pass or fail and no flag: the
-    stage names a missing-limit flag, or the Spec does not define the
-    qualified comparison. Neither is a review flag.
+    ``replicate_missing``, ``mean_zero``, or ``limit_above_el``. ``kind`` is
+    the qualified kind the caller supplied. ``qualifier_limit`` is the limit
+    text after ``<`` or ``>``, unchanged. ``no_verdict`` is set when there is
+    no pass or fail and no flag: the stage names a missing-limit flag, or
+    this function does not judge the qualified value. A stored ``>`` is not
+    judged on any comparison, including at most. Neither reason is a review
+    flag.
     """
 
     function: str

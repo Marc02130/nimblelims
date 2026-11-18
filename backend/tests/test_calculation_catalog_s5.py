@@ -248,14 +248,18 @@ def test_limit_compare_uses_the_value_it_is_fed() -> None:
     assert calculated.outputs == {"verdict": "pass"}
     assert calculated.qualifier is None
     reported = s5.limit_compare(">100", comparison="at_most", limit="100")
-    assert reported.outputs == {"verdict": "fail"}
+    assert reported.outputs == {}
+    assert reported.flags == ()
+    assert reported.no_verdict == s5.UNSPECIFIED
     assert reported.qualifier == ">"
     assert reported.qualifier_limit == "100"
     assert s5.limit_compare("150", comparison="at_most", limit="100").outputs == {"verdict": "fail"}
-    below = s5.limit_compare(">100", comparison="at_most", limit="150")
-    assert below.outputs == {}
-    assert below.flags == (s5.LIMIT_BELOW_EL,)
-    assert below.qualifier_limit == "100"
+    wider = s5.limit_compare(">100", comparison="at_most", limit="150")
+    assert wider.outputs == {}
+    assert wider.flags == ()
+    assert wider.no_verdict == s5.UNSPECIFIED
+    assert wider.qualifier == ">"
+    assert wider.qualifier_limit == "100"
 
 
 def test_at_most_equal_bound_passes_and_above_fails() -> None:
@@ -321,15 +325,22 @@ def test_two_less_than_kinds_pass_and_stay_distinct() -> None:
     assert first.qualifier == "<" and second.qualifier == "<"
 
 
-def test_qualified_greater_than_at_most_follows_calc_req_19() -> None:
-    fails = s5.limit_compare(">0.5", comparison="at_most", limit="0.5")
-    no_verdict = s5.limit_compare(">0.4", comparison="at_most", limit="0.5")
-    assert fails.outputs == {"verdict": "fail"}
-    assert fails.qualifier == ">" and fails.qualifier_limit == "0.5"
-    assert fails.flags == ()
-    assert no_verdict.outputs == {}
-    assert no_verdict.flags == (s5.LIMIT_BELOW_EL,)
-    assert no_verdict.qualifier_limit == "0.4"
+def test_qualified_greater_than_at_most_is_not_judged() -> None:
+    at_bound = s5.limit_compare(">0.5", comparison="at_most", limit="0.5", kind="above_curve")
+    under_bound = s5.limit_compare(
+        {"qualifier": ">", "limit": "0.4", "kind": "above_curve"},
+        comparison="at_most",
+        limit="0.5",
+    )
+    for result, limit_text in ((at_bound, "0.5"), (under_bound, "0.4")):
+        assert result.outputs == {}
+        assert result.flags == ()
+        assert result.no_verdict == s5.UNSPECIFIED
+        assert result.qualifier == ">"
+        assert result.qualifier_limit == limit_text
+        assert result.kind == "above_curve"
+        assert result.stop is None
+    assert "limit_below_el" not in Path(s5.__file__).read_text(encoding="utf-8")
 
 
 def test_qualified_value_on_at_least_or_within_has_no_verdict_and_no_new_flag() -> None:
@@ -342,8 +353,7 @@ def test_qualified_value_on_at_least_or_within_has_no_verdict_and_no_new_flag() 
     assert within.no_verdict == s5.UNSPECIFIED
     assert within.flags == ()
     assert within.kind == "below_range"
-    assert s5.LIMIT_ABOVE_EL not in within.flags
-    assert s5.LIMIT_BELOW_EL not in within.flags
+    assert within.flags == ()
 
 
 def test_missing_value_or_missing_limit_gives_no_verdict() -> None:
@@ -491,6 +501,25 @@ def test_http_refusal_is_400_and_flags_are_200() -> None:
         assert carried.json()["no_verdict"] == "unspecified"
         assert carried.json()["qualifier"] == ">"
         assert "flags" not in carried.json()
+
+        greater = client.post(
+            "/catalog/limit_compare/v1",
+            json={
+                "comparison": "at_most",
+                "value": ">100",
+                "limit": "100",
+                "kind": "above_curve",
+            },
+        )
+        assert greater.status_code == 200
+        body = greater.json()
+        assert body["outputs"] == {}
+        assert body["no_verdict"] == "unspecified"
+        assert body["qualifier"] == ">"
+        assert body["qualifier_limit"] == "100"
+        assert body["kind"] == "above_curve"
+        assert "flags" not in body
+        assert "stop" not in body
 
 
 def test_s5_routes_are_not_mounted_on_the_lims_app_or_in_r() -> None:
