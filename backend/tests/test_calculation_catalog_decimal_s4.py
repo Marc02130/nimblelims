@@ -458,7 +458,7 @@ def test_versions_are_backend_v1_with_no_r_route() -> None:
                 assert tolerance.kind == "absolute" and tolerance.value == "0"
 
 
-def test_0122_is_the_single_alembic_head() -> None:
+def test_0122_sits_under_the_single_alembic_head() -> None:
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
@@ -472,8 +472,9 @@ def test_0122_is_the_single_alembic_head() -> None:
     assert "DELETE FROM units" not in src.split("def downgrade()", 1)[0]
     cfg = Config(str(backend / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
-    heads = ScriptDirectory.from_config(cfg).get_heads()
-    assert heads == [revision], heads
+    script = ScriptDirectory.from_config(cfg)
+    assert script.get_heads() == ["0123_result_entry_data_model"], script.get_heads()
+    assert script.get_revision("0123_result_entry_data_model").down_revision == revision
 
 
 # ---- units seed and the real multiplier lookup -----------------------------

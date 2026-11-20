@@ -335,9 +335,9 @@ def _typed(conn, data_type: str) -> set[str]:
 def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
     """0101 is before ELISA and instrument-tracking catalog rows.
 
-    Head adds empty tables, renames instrument_types, seeds lists, and
-    seeds the calculation units OD, s, and 1. Every other table keeps
-    the same row count.
+    Head adds empty tables (including 0123's result_entries), renames
+    instrument_types, seeds lists, and seeds the calculation units OD, s,
+    and 1. Every other table keeps the same row count.
     """
     extra = set(after) - set(before)
     allowed_extra = {
@@ -354,6 +354,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "instrument_template_inactivations",
         "instrument_entry_slot_audits",
         "instrument_type_deactivations",
+        "result_entries",
     }
     assert extra <= allowed_extra
     nonempty_ok = {

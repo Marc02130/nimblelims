@@ -80,6 +80,7 @@ from .lims_run_checklist import (
 from .field_definition import FieldDefinition
 from .entry import (
     Entry,
+    ResultEntry,
     EntryFieldDefinition,
     EntryFieldValue,
     ELNProcessDefinition,

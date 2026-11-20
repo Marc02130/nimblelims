@@ -58,3 +58,19 @@ def custom_attr(session, entity_type, attr_name, data_type="text"):
     session.add(cfg)
     session.flush()
     return cfg
+
+
+def scratch_lims_run_id(session, user_id=None, analysis_id=None):
+    """A LIMS run to own a Test. Results live only on a Test with a run (0123)."""
+    from models.flexible_experiment import LimsRun, LimsRunStatus
+
+    run = LimsRun(
+        name=f"scratch_run_{uuid4().hex[:8]}",
+        analysis_id=analysis_id,
+        status=LimsRunStatus.running,
+        created_by=user_id,
+        modified_by=user_id,
+    )
+    session.add(run)
+    session.flush()
+    return run.id

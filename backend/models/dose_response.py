@@ -2,13 +2,13 @@
 Dose-response curve fitting models.
 
 dose_response_results  — IC50/EC50 fit results with versioning + review workflow
-lims_run_data_exclusions — soft knockout audit trail (DELETE row to reverse)
+lims_run_data_exclusions — soft knockout audit trail (a clear is recorded on the row)
 """
 import uuid
 import enum
 from sqlalchemy import (
     Column, String, Text, Numeric, Integer, Boolean,
-    DateTime, ForeignKey, Enum as SAEnum,
+    DateTime, ForeignKey, Enum as SAEnum, CheckConstraint, Index, text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
@@ -104,10 +104,24 @@ class LimsRunDataExclusion(Base):
     """
     Soft knockout: excludes a single lims_run_data point from curve fitting.
 
-    Reversal: DELETE this row (soft exclusion, hard reversal — no deleted_at).
-    The unique constraint on lims_run_data_id prevents double-exclusion.
+    Clearing it records ``cleared_by`` / ``cleared_at`` on the same row, which
+    then no longer excludes the point (CALC-REQ-27). The row is never deleted,
+    so who knocked the point out stays visible. One active (uncleared) row per
+    data point; a later knockout of the same point is a new row.
     """
     __tablename__ = 'lims_run_data_exclusions'
+    __table_args__ = (
+        CheckConstraint(
+            "(cleared_at IS NULL) = (cleared_by IS NULL)",
+            name="ck_lims_run_data_exclusions_cleared",
+        ),
+        Index(
+            "uq_lims_run_data_exclusions_active",
+            "lims_run_data_id",
+            unique=True,
+            postgresql_where=text("cleared_at IS NULL"),
+        ),
+    )
 
     id                  = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     lims_run_data_id  = Column(PostgresUUID(as_uuid=True), ForeignKey('lims_run_data.id'), nullable=False, index=True)
@@ -115,3 +129,5 @@ class LimsRunDataExclusion(Base):
     excluded_at         = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reason              = Column(Text(), nullable=True)
     client_id           = Column(PostgresUUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
+    cleared_by          = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='RESTRICT'), nullable=True)
+    cleared_at          = Column(DateTime(timezone=True), nullable=True)

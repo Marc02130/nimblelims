@@ -48,6 +48,8 @@ APPEND_ONLY_REVOKES: Mapping[str, FrozenSet[str]] = {
     "lims_run_data": frozenset({"UPDATE", "DELETE"}),
     # 0119
     "instrument_type_deactivations": frozenset({"UPDATE", "DELETE"}),
+    # 0123 — a knockout clear is recorded on the row (UPDATE stays).
+    "lims_run_data_exclusions": frozenset({"DELETE"}),
 }
 
 # Login roles that may skip app-row guards. session_user is not changed by

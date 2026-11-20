@@ -90,7 +90,11 @@ class AnalysisAnalyte(Base):
     display_order = Column(Integer, nullable=True)
     is_required = Column(Boolean, default=False, nullable=False)
     default_value = Column(String(255), nullable=True)
+    # Final units of calculated and reported; defaults from analytes.units_default
+    # when the analyte is added (CALC-REQ-28).
+    pairing_unit_id = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'), nullable=True)
     
     # Relationships
     analysis = relationship("Analysis", back_populates="analysis_analytes")
     analyte = relationship("Analyte", back_populates="analysis_analytes")
+    pairing_unit = relationship("Unit", foreign_keys=[pairing_unit_id])

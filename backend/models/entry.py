@@ -29,6 +29,7 @@ from sqlalchemy import (
     DateTime,
     Text,
     Numeric,
+    CheckConstraint,
     UniqueConstraint,
     Index,
     text,
@@ -256,13 +257,29 @@ class Entry(Base):
     """
 
     __tablename__ = "entries"
+    __table_args__ = (
+        CheckConstraint(
+            "num_nonnulls(experiment_id, lims_run_id) = 1 "
+            "AND (lims_run_id IS NULL OR entry_type IN "
+            "('experiment_data', 'experiment_sample_data'))",
+            name="ck_entries_experiment_xor_lims_run",
+        ),
+    )
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
+    # Exactly one of experiment_id / lims_run_id (CALC-REQ-49). Only experiment
+    # data and experiment sample data entries may be on a LIMS run.
     experiment_id = Column(
         PostgresUUID(as_uuid=True),
         ForeignKey("experiments.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("lims_runs.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
 
@@ -295,7 +312,13 @@ class Entry(Base):
     )
 
     experiment = relationship("Experiment", back_populates="entries")
+    lims_run = relationship("LimsRun", foreign_keys=[lims_run_id])
     process_step = relationship("ELNProcessStep", back_populates="entries")
+    result_rows = relationship(
+        "ResultEntry",
+        back_populates="entry",
+        cascade="all, delete-orphan",
+    )
 
     field_definitions = relationship(
         "FieldDefinition",
@@ -409,6 +432,90 @@ class EntryFieldValue(Base):
 
     entry = relationship("Entry", back_populates="values")
     field_definition = relationship("FieldDefinition")
+
+
+RAW_ORIGINS = ("upload", "typed")
+
+
+class ResultEntry(Base):
+    """One result-entry row on a LIMS run (CALC-REQ-49, CALC-REQ-54).
+
+    A record in the run's experiment sample data entry: one replicate, or the
+    average analyte, of one analyte for one Test. Dedicated columns, not
+    entry_field_values cells. Not an official ``results`` row; publish copies it.
+    """
+
+    __tablename__ = "result_entries"
+    __table_args__ = (
+        UniqueConstraint(
+            "test_id",
+            "analyte_id",
+            "replicate",
+            name="uq_result_entries_test_analyte_replicate",
+        ),
+        CheckConstraint("replicate >= 1", name="ck_result_entries_replicate"),
+        CheckConstraint(
+            "raw_origin IS NULL OR raw_origin IN ('upload', 'typed')",
+            name="ck_result_entries_raw_origin",
+        ),
+        CheckConstraint(
+            "raw_result IS NULL OR raw_origin IS NOT NULL",
+            name="ck_result_entries_raw_has_origin",
+        ),
+        CheckConstraint(
+            "knocked_out OR (knocked_out_by IS NULL AND knocked_out_at IS NULL)",
+            name="ck_result_entries_knockout_fields",
+        ),
+        CheckConstraint(
+            "NOT knocked_out OR knocked_out_at IS NOT NULL",
+            name="ck_result_entries_knockout_time",
+        ),
+    )
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entry_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("entries.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    test_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("tests.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    analyte_id = Column(PostgresUUID(as_uuid=True), ForeignKey("analytes.id"), nullable=False)
+    replicate = Column(Integer, nullable=False, server_default="1", default=1)
+
+    raw_result = Column(String(255), nullable=True)
+    raw_units = Column(String(64), nullable=True)
+    raw_origin = Column(String(16), nullable=True)
+    final_units_id = Column(PostgresUUID(as_uuid=True), ForeignKey("units.id"), nullable=True)
+    calculated_result = Column(String(255), nullable=True)
+    reported_result = Column(String(255), nullable=True)
+    qualifiers = Column(PostgresUUID(as_uuid=True), ForeignKey("list_entries.id"), nullable=True)
+    knocked_out = Column(Boolean, nullable=False, server_default="false", default=False)
+    knocked_out_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    knocked_out_at = Column(DateTime(timezone=True), nullable=True)
+    display_order = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    modified_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    modified_by = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+
+    entry = relationship("Entry", back_populates="result_rows")
+    test = relationship("Test")
+    analyte = relationship("Analyte")
 
 
 # To wire this up, add to the Experiment model:

@@ -17,11 +17,20 @@ class Test(BaseModel):
     technician_id = Column(PostgresUUID(as_uuid=True), ForeignKey('users.id'))
     custom_attributes = Column(JSONB, nullable=True, server_default='{}')
     asked_for_params = Column(JSONB, nullable=True)
+    # The LIMS run this Test belongs to (CALC-REQ-49). A result is refused on a
+    # Test with no run. Set once; a new generation is a new Test (CALC-REQ-55).
+    lims_run_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey('lims_runs.id', ondelete='RESTRICT'),
+        nullable=True,
+        index=True,
+    )
     
     # Relationships
     sample = relationship("Sample", back_populates="tests")
     analysis = relationship("Analysis", back_populates="tests")
     technician = relationship("User", foreign_keys=[technician_id])
+    lims_run = relationship("LimsRun", foreign_keys=[lims_run_id])
     results = relationship("Result", back_populates="test")
     experiment_sample_executions = relationship(
         "ExperimentSampleExecution",
