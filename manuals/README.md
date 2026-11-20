@@ -36,3 +36,4 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [uat-artifacts.md](uat-artifacts.md) | UAT backups (`/workspace/.uat-backups/`), quarantine (`/workspace/.uat-quarantine/`), `--secrets-out`; evidence stays local |
 | [calculation-catalog-decimal.md](calculation-catalog-decimal.md) | Backend decimal catalog functions (S4): `apply_dilution`, `subtract`, `copy_raw`, `convert_units` |
 | [calculation-catalog-s5.md](calculation-catalog-s5.md) | Backend decimal catalog functions (S5): `replicate_mean_cv`, `spike_recovery`, `limit_compare` |
+| [calculation-data-model-s6.md](calculation-data-model-s6.md) | Calculations S6: Test on one LIMS run, run result entries (`/v1/lims-runs/{id}/result-entries`), calculated lock, pairing unit, knock-in record |
