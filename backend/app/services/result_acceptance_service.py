@@ -112,15 +112,20 @@ class ResultAcceptanceService:
                 ),
             )
 
-        test = (
-            self.db.query(Test)
+        # Each run has its own Test (tests.lims_run_id). The accepted value is
+        # the one active result for the slot, on the picked run's Test.
+        slot_tests = {
+            t.lims_run_id: t
+            for t in self.db.query(Test)
             .filter(
                 Test.sample_id == body.sample_id,
                 Test.analysis_id == run.analysis_id,
+                Test.lims_run_id.in_([run.id, other.id]),
                 Test.active == True,  # noqa: E712
             )
-            .first()
-        )
+            .all()
+        }
+        test = slot_tests.get(picked.lims_run_id)
         if test is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -130,22 +135,32 @@ class ResultAcceptanceService:
                 },
             )
 
-        existing = (
-            self.db.query(Result)
-            .filter(
-                Result.test_id == test.id,
-                Result.analyte_id == body.analyte_id,
-                Result.replicate == body.replicate,
-                Result.active == True,  # noqa: E712
+        def slot_result(owner: Optional[Test]) -> Optional[Result]:
+            if owner is None:
+                return None
+            return (
+                self.db.query(Result)
+                .filter(
+                    Result.test_id == owner.id,
+                    Result.analyte_id == body.analyte_id,
+                    Result.replicate == body.replicate,
+                    Result.active == True,  # noqa: E712
+                )
+                .first()
             )
-            .first()
-        )
-        previous_value = existing.raw_result if existing else None
-        previous_run = existing.lims_run_id if existing else None
+
+        unpicked_run_id = other.id if picked.lims_run_id == run.id else run.id
+        existing = slot_result(test)
+        shown_elsewhere = slot_result(slot_tests.get(unpicked_run_id))
+        shown = shown_elsewhere or existing
+        previous_value = shown.raw_result if shown else None
+        previous_run = shown.lims_run_id if shown else None
         user_id = self._user_id()
+        if shown_elsewhere is not None:
+            shown_elsewhere.active = False
+            shown_elsewhere.modified_by = user_id
         if existing:
             existing.raw_result = picked.raw_result
-            existing.lims_run_id = picked.lims_run_id
             existing.modified_by = user_id
             existing.entry_date = current_lab_day()
         else:
@@ -157,9 +172,8 @@ class ResultAcceptanceService:
                     analyte_id=body.analyte_id,
                     raw_result=picked.raw_result,
                     replicate=body.replicate,
-                    lims_run_id=picked.lims_run_id,
                     entry_date=current_lab_day(),
-                    entered_by=user_id,
+                    entered_by=shown.entered_by if shown is not None else user_id,
                     created_by=user_id,
                     modified_by=user_id,
                 )
@@ -262,32 +276,31 @@ class ResultAcceptanceService:
             .filter(
                 Test.sample_id.in_(list(sample_ids)),
                 Test.analysis_id == run.analysis_id,
+                Test.lims_run_id.in_(list(runs)),
                 Test.active == True,  # noqa: E712
             )
             .all()
         )
-        test_by_sample = {t.sample_id: t for t in tests}
+        test_by_id = {t.id: t for t in tests}
         if tests:
             results = (
                 self.db.query(Result)
                 .filter(
-                    Result.test_id.in_([t.id for t in tests]),
+                    Result.test_id.in_(list(test_by_id)),
                     Result.active == True,  # noqa: E712
                 )
                 .all()
             )
             for result in results:
-                if result.analyte_id not in analytes or not result.lims_run_id:
+                if result.analyte_id not in analytes or not result.raw_result:
                     continue
-                if result.lims_run_id not in runs:
-                    continue
-                sample_id = next(
-                    (sid for sid, test in test_by_sample.items() if test.id == result.test_id),
-                    None,
+                owner_test = test_by_id[result.test_id]
+                slot = (
+                    owner_test.sample_id,
+                    result.analyte_id,
+                    result.replicate,
+                    owner_test.lims_run_id,
                 )
-                if sample_id is None or not result.raw_result:
-                    continue
-                slot = (sample_id, result.analyte_id, result.replicate, result.lims_run_id)
                 values[slot] = (result.raw_result, "result")
 
         acceptances = (

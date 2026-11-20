@@ -867,6 +867,7 @@ class TestWorkOrderP2:
             .filter(
                 Test.sample_id == sample_id,
                 Test.analysis_id == p2_seed["analysis_a"].id,
+                Test.lims_run_id == run_id,
             )
             .one()
         )
@@ -896,6 +897,7 @@ class TestWorkOrderP2:
             .filter(
                 Test.sample_id == sample_id,
                 Test.analysis_id == p2_seed["analysis_a"].id,
+                Test.lims_run_id == run2.json()['id'],
             )
             .one()
         )
@@ -924,6 +926,7 @@ class TestWorkOrderP2:
             .filter(
                 Test.sample_id == sample_id,
                 Test.analysis_id == p2_seed["analysis_a"].id,
+                Test.lims_run_id == run3.json()['id'],
             )
             .one()
         )

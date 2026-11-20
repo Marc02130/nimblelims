@@ -17,15 +17,15 @@ class ResultBase(BaseModel):
     raw_result: Optional[str] = Field(None, max_length=255, description="Raw result value")
     reported_result: Optional[str] = Field(None, max_length=255, description="Reported result value")
     qualifiers: Optional[UUID] = Field(None, description="ID of qualifier from list_entries")
-    calculated_result: Optional[str] = Field(None, max_length=255, description="Calculated result (post-MVP)")
+    calculated_result: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Written only by a calculation. Sending a value is refused (400 calculated_locked).",
+    )
     entry_date: datetime = Field(default_factory=current_lab_day, description="Date result was entered")
     entered_by: UUID = Field(..., description="ID of user who entered result")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
     replicate: int = Field(1, ge=1, description="Replicate number (default 1)")
-    lims_run_id: Optional[UUID] = Field(
-        None,
-        description="Source LimsRun when created via promote-on-publish",
-    )
 
 
 class ResultCreate(ResultBase):
@@ -69,6 +69,15 @@ class ResultResponse(ResultBase):
     modified_at: datetime
     modified_by: Optional[UUID] = None
     description: Optional[str] = None
+    lims_run_id: Optional[UUID] = Field(
+        None, description="The LIMS run of this result's Test (tests.lims_run_id)"
+    )
+    display_order: Optional[int] = None
+    raw_units: Optional[str] = None
+    final_units_id: Optional[UUID] = None
+    knocked_out: bool = False
+    knocked_out_by: Optional[UUID] = None
+    knocked_out_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

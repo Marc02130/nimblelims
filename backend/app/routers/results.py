@@ -38,6 +38,31 @@ from uuid import UUID
 router = APIRouter()
 
 
+def _refuse_calculated(value: Optional[str]) -> None:
+    if value is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "calculated_locked",
+                "message": "calculated_result is written only by a calculation.",
+            },
+        )
+
+
+def _require_run_test(test: Test) -> None:
+    if test.lims_run_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "result_test_has_no_run",
+                "message": (
+                    "Results are entered on a LIMS run. "
+                    "This Test has no LIMS run (tests.lims_run_id)."
+                ),
+            },
+        )
+
+
 @router.get("/", response_model=ResultListResponse)
 def get_results(
     request: Request,
@@ -165,6 +190,8 @@ def create_result(
     
     # Validate client access: non-System/Admin users can only create results for their own client's projects
     validate_client_access(current_user, test.sample.project.client_id)
+    _refuse_calculated(result_data.calculated_result)
+    _require_run_test(test)
     
     # Validate custom_attributes if provided
     validated_custom_attributes = {}
@@ -187,12 +214,10 @@ def create_result(
         raw_result=result_data.raw_result,
         reported_result=result_data.reported_result,
         qualifiers=result_data.qualifiers,
-        calculated_result=result_data.calculated_result,
         entry_date=result_data.entry_date,
         entered_by=result_data.entered_by,
         custom_attributes=validated_custom_attributes,
         replicate=getattr(result_data, 'replicate', None) or 1,
-        lims_run_id=getattr(result_data, 'lims_run_id', None),
         created_by=current_user.id,
         modified_by=current_user.id
     )
@@ -319,6 +344,13 @@ def enter_batch_results_us28(
                 validation_errors.append({
                     "test_id": str(test_result_entry.test_id),
                     "error": "Test not found in batch"
+                })
+                continue
+            if test.lims_run_id is None:
+                validation_errors.append({
+                    "test_id": str(test_result_entry.test_id),
+                    "code": "result_test_has_no_run",
+                    "error": "Results are entered on a LIMS run; this Test has no LIMS run"
                 })
                 continue
             
@@ -693,8 +725,12 @@ def update_result(
     # Validate client access: non-System/Admin users can only update results for their own client's projects
     validate_client_access(current_user, result.test.sample.project.client_id)
     
-    # Validate custom_attributes if provided
     update_data = explicit_updates(result_data, result)
+    if 'calculated_result' in update_data:
+        _refuse_calculated(update_data['calculated_result'] or '')
+    _require_run_test(result.test)
+
+    # Validate custom_attributes if provided
     if 'custom_attributes' in update_data and update_data['custom_attributes'] is not None:
         from app.core.custom_attributes import validate_custom_attributes
         try:

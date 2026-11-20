@@ -3,10 +3,11 @@ Promote LimsRun JSONB data → structured tests/results on publish (P3).
 
 Rules (open-questions/run-results.md):
 - Only when run.analysis_id is set
-- Ensure Test instance per (sample, analysis)
+- The run's own Test per (sample, analysis); tests.lims_run_id is the lineage
 - Column → analyte via name or analyte_aliases (casefold)
-- raw_result only; lims_run_id lineage; replicate from JSONB or row order
-- Same lims_run_id → update; other lims_run_id → conflict fail
+- raw_result only; replicate from JSONB or row order
+- Slot on this run's Test → update; slot on another Test → held when that
+  Test's run is replaced by this one, else conflict fail
 - Rows whose sample is not on the run cohort are skipped
 """
 from __future__ import annotations
@@ -179,24 +180,31 @@ class ResultPromotionService:
             )
         return entry.id
 
+    def _run_test(
+        self, sample_id: uuid.UUID, analysis_id: uuid.UUID, run_id: uuid.UUID
+    ) -> Optional[Test]:
+        return (
+            self.db.query(Test)
+            .filter(
+                Test.sample_id == sample_id,
+                Test.analysis_id == analysis_id,
+                Test.lims_run_id == run_id,
+                Test.active == True,  # noqa: E712
+            )
+            .first()
+        )
+
     def ensure_test(
         self,
         sample_id: uuid.UUID,
         analysis_id: uuid.UUID,
         *,
         cache: Dict[uuid.UUID, Test],
+        run_id: uuid.UUID,
     ) -> Test:
         if sample_id in cache:
             return cache[sample_id]
-        test = (
-            self.db.query(Test)
-            .filter(
-                Test.sample_id == sample_id,
-                Test.analysis_id == analysis_id,
-                Test.active == True,  # noqa: E712
-            )
-            .first()
-        )
+        test = self._run_test(sample_id, analysis_id, run_id)
         if test:
             cache[sample_id] = test
             return test
@@ -210,18 +218,11 @@ class ResultPromotionService:
         sample_id: uuid.UUID,
         analysis_id: uuid.UUID,
         cache: Dict[uuid.UUID, Optional[Test]],
+        run_id: uuid.UUID,
     ) -> Optional[Test]:
         if sample_id in cache:
             return cache[sample_id]
-        test = (
-            self.db.query(Test)
-            .filter(
-                Test.sample_id == sample_id,
-                Test.analysis_id == analysis_id,
-                Test.active == True,  # noqa: E712
-            )
-            .first()
-        )
+        test = self._run_test(sample_id, analysis_id, run_id)
         cache[sample_id] = test
         return test
 
@@ -304,12 +305,12 @@ class ResultPromotionService:
             test: Optional[Test] = None
             if dry_run:
                 test = self._get_or_none_test(
-                    row.sample_id, run.analysis_id, dry_test_cache
+                    row.sample_id, run.analysis_id, dry_test_cache, run.id
                 )
             else:
                 try:
                     test = self.ensure_test(
-                        row.sample_id, run.analysis_id, cache=test_cache
+                        row.sample_id, run.analysis_id, cache=test_cache, run_id=run.id
                     )
                 except HTTPException as e:
                     plan.errors.append(str(e.detail))
@@ -348,24 +349,29 @@ class ResultPromotionService:
                     order_counters[(row.sample_id, analyte.id)] += 1
                     replicate = order_counters[(row.sample_id, analyte.id)]
 
-                existing = None
-                if test is not None:
-                    existing = (
-                        self.db.query(Result)
-                        .filter(
-                            Result.test_id == test.id,
-                            Result.analyte_id == analyte.id,
-                            Result.replicate == replicate,
-                            Result.active == True,  # noqa: E712
-                        )
-                        .first()
+                # The slot is (sample, analysis, analyte, replicate). Its
+                # official value may sit on this run's Test or another one.
+                slot_owner = (
+                    self.db.query(Test.lims_run_id)
+                    .join(Result, Result.test_id == Test.id)
+                    .filter(
+                        Test.sample_id == row.sample_id,
+                        Test.analysis_id == run.analysis_id,
+                        Test.active == True,  # noqa: E712
+                        Result.analyte_id == analyte.id,
+                        Result.replicate == replicate,
+                        Result.active == True,  # noqa: E712
                     )
+                    .order_by((Test.lims_run_id == run.id).desc().nullslast())
+                    .first()
+                )
 
-                if existing:
-                    if existing.lims_run_id == run.id:
+                if slot_owner is not None:
+                    owner_run_id = slot_owner[0]
+                    if owner_run_id == run.id:
                         action = "update"
                         plan.update_count += 1
-                    elif existing.lims_run_id in replaced_ids:
+                    elif owner_run_id in replaced_ids:
                         action = "held"
                         plan.held_count += 1
                     else:
@@ -460,7 +466,7 @@ class ResultPromotionService:
                         Result.test_id == test_id,
                         Result.analyte_id == analyte_id,
                         Result.replicate == item.replicate,
-                        Result.lims_run_id == run.id,
+                        Result.active == True,  # noqa: E712
                     )
                     .first()
                 )
@@ -476,7 +482,6 @@ class ResultPromotionService:
                     analyte_id=analyte_id,
                     raw_result=item.raw_result,
                     replicate=item.replicate,
-                    lims_run_id=run.id,
                     entry_date=now,
                     entered_by=user_id,
                     created_by=user_id,

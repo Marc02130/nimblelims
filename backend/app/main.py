@@ -15,7 +15,7 @@ from app.core.lab_time import (
     require_lab_timezone_on_startup,
 )
 from app.services.calculation_runtime import note_calculation_runtime_on_startup
-from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, instrument_ops, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings
+from app.routers import auth, samples, tests, containers, batches, results, aliquots, lists, projects, analyses, analytes, units, users, roles, permissions, clients, test_batteries, client_projects, custom_attributes, help, admin, sequences, workflows, experiments, lims_runs, sop_parse, lims_run_checklists, dose_response, field_definitions, eln_processes, eln_process_definitions, entries, sample_journey, instrument_catalog, instrument_ops, data_parsers, asked_for, work_orders, sample_type_transitions, ui_schema, config_schema, configuring_agent, reagents, lab_settings, result_entries
 import logging
 
 # S3: refuse missing/default JWT secret unless explicit local insecure flags.
@@ -147,6 +147,7 @@ app.include_router(configuring_agent.router, prefix="/v1")
 app.include_router(lab_settings.router)
 app.include_router(sample_journey.router, prefix="/v1")
 app.include_router(dose_response.router, prefix="/v1")
+app.include_router(result_entries.router, prefix="/v1")
 logger.info("All routers registered")
 
 @app.get("/")

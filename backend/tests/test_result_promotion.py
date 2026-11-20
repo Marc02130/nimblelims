@@ -238,7 +238,7 @@ class TestResultPromotion:
 
         # JSON /import takes pre-parsed rows; no parser is needed (parsers are
         # resolved only for /import-file by analysis + instrument/CRO).
-        # Pre-existing test + result (manual, lims_run_id null)
+        # Pre-existing test + result (manual: the Test has no LIMS run)
         lst = db_session.query(List).filter(List.name == "test_status").first()
         status_id = (
             db_session.query(ListEntry)
@@ -269,7 +269,6 @@ class TestResultPromotion:
                 analyte_id=UUID(analysis_and_analyte["lead_id"]),
                 raw_result="99.0",
                 replicate=1,
-                lims_run_id=None,
                 entry_date=datetime.now(),
                 entered_by=test_admin_user.id,
                 created_by=test_admin_user.id,

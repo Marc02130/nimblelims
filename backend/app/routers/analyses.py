@@ -36,6 +36,48 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _default_pairing_units(db: Session, analysis_id: UUID) -> None:
+    """A newly linked analyte's pairing unit starts as its default unit (CALC-REQ-28)."""
+    rows = db.query(AnalysisAnalyte).filter(
+        AnalysisAnalyte.analysis_id == analysis_id,
+        AnalysisAnalyte.pairing_unit_id.is_(None),
+    ).all()
+    for row in rows:
+        if row.analyte is not None and row.analyte.units_default is not None:
+            row.pairing_unit_id = row.analyte.units_default
+
+
+def _require_unit(db: Session, unit_id: Optional[UUID]) -> None:
+    from models.unit import Unit
+
+    if unit_id is None:
+        return
+    unit = db.query(Unit).filter(Unit.id == unit_id, Unit.active == True).first()  # noqa: E712
+    if unit is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pairing_unit_id is not an active unit",
+        )
+
+
+def _rule_response(rule: AnalysisAnalyte, analyte_name: str) -> AnalyteRuleResponse:
+    return AnalyteRuleResponse(
+        analyte_id=rule.analyte_id,
+        analyte_name=analyte_name,
+        data_type=rule.data_type,
+        list_id=rule.list_id,
+        high_value=rule.high_value,
+        low_value=rule.low_value,
+        significant_figures=rule.significant_figures,
+        calculation=rule.calculation,
+        reported_name=rule.reported_name,
+        display_order=rule.display_order,
+        is_required=rule.is_required,
+        default_value=rule.default_value,
+        pairing_unit_id=rule.pairing_unit_id,
+    )
+
+
 def _build_analysis_response(analysis: Analysis) -> AnalysisResponse:
     """Helper to build AnalysisResponse from Analysis model"""
     return AnalysisResponse(
@@ -395,7 +437,9 @@ def link_analytes_to_analysis(
         new_analytes = [a for a in analytes if a.id not in existing_ids]
         for analyte in new_analytes:
             analysis.analytes.append(analyte)
-        
+        db.flush()
+        _default_pairing_units(db, analysis_id)
+
         analysis.modified_by = current_user.id
         db.commit()
         db.refresh(analysis)
@@ -451,6 +495,8 @@ def update_analysis_analytes(
         
         # Clear existing analytes and set new ones
         analysis.analytes = analytes
+        db.flush()
+        _default_pairing_units(db, analysis_id)
         analysis.modified_by = current_user.id
         db.commit()
         db.refresh(analysis)
@@ -550,20 +596,7 @@ def get_analysis_analyte_rules(
         result = []
         for rule in rules:
             if rule.analyte and rule.analyte.active:
-                result.append(AnalyteRuleResponse(
-                    analyte_id=rule.analyte_id,
-                    analyte_name=rule.analyte.name,
-                    data_type=rule.data_type,
-                    list_id=rule.list_id,
-                    high_value=rule.high_value,
-                    low_value=rule.low_value,
-                    significant_figures=rule.significant_figures,
-                    calculation=rule.calculation,
-                    reported_name=rule.reported_name,
-                    display_order=rule.display_order,
-                    is_required=rule.is_required,
-                    default_value=rule.default_value,
-                ))
+                result.append(_rule_response(rule, rule.analyte.name))
         
         return result
     except HTTPException:
@@ -626,6 +659,8 @@ def create_analysis_analyte_rule(
                     detail="Low value must be less than or equal to high value"
                 )
         
+        _require_unit(db, rule_data.pairing_unit_id)
+
         # Create rule
         new_rule = AnalysisAnalyte(
             analysis_id=analysis_id,
@@ -640,26 +675,18 @@ def create_analysis_analyte_rule(
             display_order=rule_data.display_order,
             is_required=rule_data.is_required,
             default_value=rule_data.default_value,
+            pairing_unit_id=(
+                rule_data.pairing_unit_id
+                if rule_data.pairing_unit_id is not None
+                else analyte.units_default
+            ),
         )
         
         db.add(new_rule)
         db.commit()
         db.refresh(new_rule)
         
-        return AnalyteRuleResponse(
-            analyte_id=new_rule.analyte_id,
-            analyte_name=analyte.name,
-            data_type=new_rule.data_type,
-            list_id=new_rule.list_id,
-            high_value=new_rule.high_value,
-            low_value=new_rule.low_value,
-            significant_figures=new_rule.significant_figures,
-            calculation=new_rule.calculation,
-            reported_name=new_rule.reported_name,
-            display_order=new_rule.display_order,
-            is_required=new_rule.is_required,
-            default_value=new_rule.default_value,
-        )
+        return _rule_response(new_rule, analyte.name)
     except HTTPException:
         raise
     except Exception as e:
@@ -705,6 +732,8 @@ def update_analysis_analyte_rule(
         
         # An explicit null clears a nullable limit. is_required is NOT NULL.
         updates = explicit_updates(rule_data, rule)
+        if "pairing_unit_id" in updates:
+            _require_unit(db, updates["pairing_unit_id"])
         low_value = updates["low_value"] if "low_value" in updates else rule.low_value
         high_value = updates["high_value"] if "high_value" in updates else rule.high_value
         if low_value is not None and high_value is not None:
@@ -719,20 +748,7 @@ def update_analysis_analyte_rule(
         db.refresh(rule)
         
         analyte = rule.analyte
-        return AnalyteRuleResponse(
-            analyte_id=rule.analyte_id,
-            analyte_name=analyte.name if analyte else "Unknown",
-            data_type=rule.data_type,
-            list_id=rule.list_id,
-            high_value=rule.high_value,
-            low_value=rule.low_value,
-            significant_figures=rule.significant_figures,
-            calculation=rule.calculation,
-            reported_name=rule.reported_name,
-            display_order=rule.display_order,
-            is_required=rule.is_required,
-            default_value=rule.default_value,
-        )
+        return _rule_response(rule, analyte.name if analyte else "Unknown")
     except HTTPException:
         raise
     except Exception as e:

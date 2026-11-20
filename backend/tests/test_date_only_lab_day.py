@@ -28,7 +28,7 @@ from models.project import Project
 from models.result import Result
 from models.sample import Sample
 from models.test import Test
-from tests._fk_helpers import get_or_create_list_entry, scratch_entry_id
+from tests._fk_helpers import get_or_create_list_entry, scratch_entry_id, scratch_lims_run_id
 
 
 def _login(client):
@@ -120,6 +120,7 @@ def _world(db_session, admin):
         description="Date-only lab day",
         sample_id=sample.id,
         analysis_id=analysis.id,
+        lims_run_id=scratch_lims_run_id(db_session, admin.id, analysis.id),
         status=get_or_create_list_entry(db_session, "test_status", "In Process").id,
         created_by=admin.id,
         modified_by=admin.id,

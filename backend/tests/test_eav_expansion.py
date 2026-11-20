@@ -24,7 +24,7 @@ def test_data(db_session: Session, test_admin_user, test_org):
     from models.analysis import Analysis, Analyte, AnalysisAnalyte
     from models.sample import Sample
     from models.test import Test
-    from tests._fk_helpers import get_or_create_list_entry, scratch_entry_id
+    from tests._fk_helpers import get_or_create_list_entry, scratch_entry_id, scratch_lims_run_id
 
     project = Project(
         name=f"EAV Project {uuid4().hex[:6]}",
@@ -53,6 +53,7 @@ def test_data(db_session: Session, test_admin_user, test_org):
         name=f"EAV-T-{uuid4().hex[:6]}",
         sample_id=sample.id,
         analysis_id=analysis.id,
+        lims_run_id=scratch_lims_run_id(db_session, test_admin_user.id, analysis.id),
         status=get_or_create_list_entry(db_session, "test_status", "In Process").id,
         created_by=test_admin_user.id,
         modified_by=test_admin_user.id,

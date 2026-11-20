@@ -97,6 +97,7 @@ class AnalyteRuleResponse(BaseModel):
     display_order: Optional[int] = None
     is_required: bool
     default_value: Optional[str] = None
+    pairing_unit_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -115,6 +116,9 @@ class AnalyteRuleCreate(BaseModel):
     display_order: Optional[int] = None
     is_required: bool = False
     default_value: Optional[str] = None
+    pairing_unit_id: Optional[UUID] = Field(
+        None, description="Final units; defaults to the analyte's default unit"
+    )
 
 
 class AnalyteRuleUpdate(BaseModel):
@@ -129,6 +133,7 @@ class AnalyteRuleUpdate(BaseModel):
     display_order: Optional[int] = None
     is_required: Optional[bool] = None
     default_value: Optional[str] = None
+    pairing_unit_id: Optional[UUID] = None
 
 
 class AnalyteLinkRequest(BaseModel):

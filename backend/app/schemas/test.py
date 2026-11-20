@@ -65,6 +65,7 @@ class TestResponse(TestBase):
     modified_at: datetime
     modified_by: UUID
     asked_for_params: Optional[Dict[str, Any]] = None
+    lims_run_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True

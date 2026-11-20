@@ -516,7 +516,11 @@ class LimsRunService:
         return run
 
     def _mint_tests_at_start(self, run: LimsRun) -> None:
-        """WO-7: insert Test if missing; snapshot asked-for params and freeze."""
+        """WO-7: insert Test if missing; snapshot asked-for params and freeze.
+
+        Each Test belongs to one LIMS run. Start also creates the run's
+        result-entry rows (calculations S6).
+        """
         from app.core.lab_time import current_lab_day
         from models.analysis import Analysis
         from models.list import List, ListEntry
@@ -554,18 +558,41 @@ class LimsRunService:
                 detail="Test status 'Assigned/Pending' not found",
             )
 
+        from models.result import Result
+
         analysis = self.db.query(Analysis).filter(Analysis.id == run.analysis_id).first()
         for sid in sample_ids:
             params = self._asked_for_params_snapshot(run, sid)
+            # One Test per run (CALC-REQ-49): reuse this run's Test, else claim
+            # an unclaimed Test that has no results, else mint a new one.
+            same_slot = (
+                Test.sample_id == sid,
+                Test.analysis_id == run.analysis_id,
+                Test.active == True,  # noqa: E712
+            )
             test = (
                 self.db.query(Test)
-                .filter(
-                    Test.sample_id == sid,
-                    Test.analysis_id == run.analysis_id,
-                    Test.active == True,  # noqa: E712
-                )
+                .filter(*same_slot, Test.lims_run_id == run.id)
                 .first()
             )
+            if test is None:
+                unclaimed = (
+                    self.db.query(Test)
+                    .filter(*same_slot, Test.lims_run_id.is_(None))
+                    .order_by(Test.created_at)
+                    .all()
+                )
+                for candidate in unclaimed:
+                    has_results = (
+                        self.db.query(Result.id)
+                        .filter(Result.test_id == candidate.id, Result.active == True)  # noqa: E712
+                        .first()
+                    )
+                    if not has_results:
+                        candidate.lims_run_id = run.id
+                        candidate.modified_by = self._user_id()
+                        test = candidate
+                        break
             if test:
                 if test.asked_for_params is not None:
                     # Already frozen, including locked empty {}. Do not overwrite.
@@ -577,6 +604,16 @@ class LimsRunService:
             sample = self.db.query(Sample).filter(Sample.id == sid).first()
             if not sample or not analysis:
                 continue
+            # WO-7 freeze outlives the run: a later run's Test keeps the
+            # asked-for snapshot of the earlier Test for this sample.
+            earlier = (
+                self.db.query(Test.asked_for_params)
+                .filter(*same_slot, Test.asked_for_params.isnot(None))
+                .order_by(Test.created_at.desc())
+                .first()
+            )
+            if earlier is not None:
+                params = earlier[0]
             base_name = f"{sample.name}_{analysis.name}"
             name = base_name[:240]
             n = 0
@@ -588,6 +625,7 @@ class LimsRunService:
                     name=name,
                     sample_id=sid,
                     analysis_id=run.analysis_id,
+                    lims_run_id=run.id,
                     status=status_row.id,
                     asked_for_params=params,
                     test_date=current_lab_day(),
@@ -597,6 +635,9 @@ class LimsRunService:
                 )
             )
         self.db.flush()
+        from app.services.result_entry_service import ResultEntryService
+
+        ResultEntryService(self.db, self._user_id()).ensure_rows(run)
 
     def _asked_for_params_snapshot(self, run: LimsRun, cohort_sample_id: uuid.UUID) -> dict:
         """Freeze asked-for assay params onto the dest Test.
@@ -843,6 +884,7 @@ class LimsRunService:
                 .filter(
                     Test.sample_id == sid,
                     Test.analysis_id == run.analysis_id,
+                    Test.lims_run_id == run.id,
                     Test.active == True,  # noqa: E712
                 )
                 .first()

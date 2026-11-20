@@ -3,7 +3,7 @@ Tests for results API endpoints
 """
 import pytest
 from uuid import uuid4
-from tests._fk_helpers import scratch_entry_id, scratch_list_id, get_or_create_list_entry
+from tests._fk_helpers import scratch_lims_run_id, scratch_entry_id, scratch_list_id, get_or_create_list_entry
 
 
 @pytest.fixture(autouse=True)
@@ -124,7 +124,7 @@ class TestResultsAPI:
             name="Test Test",
             description="Test test for results",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -223,7 +223,7 @@ class TestResultsAPI:
             name="Test Test for Batch",
             description="Test test for batch results",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -361,7 +361,7 @@ class TestResultsAPI:
             name="Test Test for Validation",
             description="Test test for validation",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -473,7 +473,7 @@ class TestResultsAPI:
             name="Test Test for List",
             description="Test test for results list",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -577,7 +577,7 @@ class TestResultsAPI:
             name="Test Test for Get",
             description="Test test for getting result",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -680,7 +680,7 @@ class TestResultsAPI:
             name="Test Test for Update",
             description="Test test for updating result",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -785,7 +785,7 @@ class TestResultsAPI:
             name="Test Test for Delete",
             description="Test test for deleting result",
             sample_id=sample.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=scratch_entry_id(db_session),  # projects.status is NOT NULL (FK to list_entries)
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1047,7 +1047,7 @@ class TestResultsAPI:
         test1 = Test(
             name=f"T-{uuid4().hex[:8]}",  # tests.name is NOT NULL
             sample_id=sample1.id,
-            analysis_id=analysis.id,
+            analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session),
             status=in_process_status.id,
             created_by=sample_user.id,
             modified_by=sample_user.id
@@ -1221,7 +1221,7 @@ class TestResultsAPI:
         db_session.add(analysis_analyte)
         db_session.flush()
         
-        test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample.id, analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session), status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(test)
         db_session.flush()
         
@@ -1376,12 +1376,12 @@ class TestResultsAPI:
         db_session.add(analysis_analyte)
         db_session.flush()
         
-        test1 = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample1.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        test1 = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample1.id, analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session), status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(test1)
         db_session.flush()
         
         # QC test with no results (will trigger QC failure)
-        qc_test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=qc_sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        qc_test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=qc_sample.id, analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session), status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(qc_test)
         db_session.flush()
         
@@ -1569,11 +1569,11 @@ class TestResultsAPI:
         db_session.flush()
         
         # Create tests
-        test1 = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample1.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        test1 = Test(name=f"T-{uuid4().hex[:8]}", sample_id=sample1.id, analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session), status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(test1)
         db_session.flush()
         
-        qc_test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=qc_sample.id, analysis_id=analysis.id, status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
+        qc_test = Test(name=f"T-{uuid4().hex[:8]}", sample_id=qc_sample.id, analysis_id=analysis.id, lims_run_id=scratch_lims_run_id(db_session), status=in_process_status.id, created_by=sample_user.id, modified_by=sample_user.id)
         db_session.add(qc_test)
         db_session.flush()
         
