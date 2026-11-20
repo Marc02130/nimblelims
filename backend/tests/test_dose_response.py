@@ -766,22 +766,42 @@ def test_exclude_data_point_double_exclusion_returns_409(client, db_session, tes
 # 19. unexclude_data_point — removes exclusion row
 # ---------------------------------------------------------------------------
 
-def test_unexclude_data_point_removes_exclusion(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
+def test_unexclude_data_point_records_the_clear(client, db_session, test_admin_user, test_org, admin_token, dr_setup):
     data_row = dr_setup["test_data"]
+    headers = {"Authorization": f"Bearer {admin_token}"}
 
-    client.post(
+    knocked = client.post(
         f"/v1/lims-runs/data/{data_row.id}/exclude",
         json={"reason": "test"},
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers=headers,
     )
-    resp = client.delete(
-        f"/v1/lims-runs/data/{data_row.id}/exclude",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert resp.status_code == 200
+    assert knocked.status_code == 200, knocked.text
+    resp = client.delete(f"/v1/lims-runs/data/{data_row.id}/exclude", headers=headers)
+    assert resp.status_code == 200, resp.text
+    cleared = resp.json()
+    assert cleared["id"] == knocked.json()["id"]
+    assert cleared["excluded_by"] == str(test_admin_user.id)
+    assert cleared["cleared_by"] == str(test_admin_user.id)
+    assert cleared["cleared_at"] is not None
 
-    exc = db_session.query(LimsRunDataExclusion).filter_by(lims_run_data_id=data_row.id).first()
-    assert exc is None
+    db_session.expire_all()
+    rows = db_session.query(LimsRunDataExclusion).filter_by(lims_run_data_id=data_row.id).all()
+    assert len(rows) == 1
+    assert rows[0].excluded_at is not None and rows[0].reason == "test"
+    assert rows[0].cleared_by == test_admin_user.id and rows[0].cleared_at is not None
+
+    again = client.delete(f"/v1/lims-runs/data/{data_row.id}/exclude", headers=headers)
+    assert again.status_code == 404
+
+    # A later knockout of the same point is a new row; history keeps both.
+    assert client.post(
+        f"/v1/lims-runs/data/{data_row.id}/exclude", json={"reason": "again"}, headers=headers
+    ).status_code == 200
+    history = client.get(f"/v1/lims-runs/data/{data_row.id}/exclusions", headers=headers)
+    assert history.status_code == 200, history.text
+    body = history.json()
+    assert [row["reason"] for row in body] == ["test", "again"]
+    assert body[0]["cleared_at"] is not None and body[1]["cleared_at"] is None
 
 
 # ---------------------------------------------------------------------------

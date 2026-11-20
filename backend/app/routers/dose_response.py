@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 
 _logger = logging.getLogger(__name__)
@@ -265,6 +266,7 @@ def get_result_svg(
         str(exc.lims_run_data_id)
         for exc in db.query(LimsRunDataExclusion)
         .join(LimsRunData, LimsRunDataExclusion.lims_run_data_id == LimsRunData.id)
+        .filter(LimsRunDataExclusion.cleared_at.is_(None))
         .filter(LimsRunData.lims_run_id == run_id)
         .all()
     }
@@ -504,8 +506,8 @@ def exclude_data_point(
 ):
     """
     Creates an lims_run_data_exclusions row.
-    Unique constraint prevents double-exclusion.
-    Reverse by calling DELETE /data/{data_id}/exclude.
+    One active (uncleared) row per point prevents double-exclusion.
+    Reverse by calling DELETE /data/{data_id}/exclude, which records the clear.
     """
     data_row = (
         db.query(LimsRunData)
@@ -518,7 +520,10 @@ def exclude_data_point(
 
     existing = (
         db.query(LimsRunDataExclusion)
-        .filter(LimsRunDataExclusion.lims_run_data_id == data_id)
+        .filter(
+            LimsRunDataExclusion.lims_run_data_id == data_id,
+            LimsRunDataExclusion.cleared_at.is_(None),
+        )
         .first()
     )
     if existing:
@@ -530,6 +535,7 @@ def exclude_data_point(
     exclusion = LimsRunDataExclusion(
         lims_run_data_id=data_id,
         excluded_by=current_user.id,
+        excluded_at=datetime.now(timezone.utc),
         reason=body.reason,
         client_id=current_user.client_id,
     )
@@ -541,6 +547,7 @@ def exclude_data_point(
 
 @router.delete(
     "/data/{data_id}/exclude",
+    response_model=ExclusionRead,
     summary="Un-exclude a data point (reverse knockout)",
 )
 def unexclude_data_point(
@@ -548,7 +555,12 @@ def unexclude_data_point(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_experiment_manage),
 ):
-    """Deletes the exclusion row. Hard reversal — no soft-delete."""
+    """Clear the active exclusion (CALC-REQ-27).
+
+    The row stays. ``cleared_by`` and ``cleared_at`` record who cleared it and
+    when; ``excluded_by`` and ``excluded_at`` still show the original knockout.
+    Returns the cleared record.
+    """
     data_row = (
         db.query(LimsRunData)
         .join(LimsRun, LimsRunData.lims_run_id == LimsRun.id)
@@ -560,7 +572,11 @@ def unexclude_data_point(
 
     exclusion = (
         db.query(LimsRunDataExclusion)
-        .filter(LimsRunDataExclusion.lims_run_data_id == data_id)
+        .filter(
+            LimsRunDataExclusion.lims_run_data_id == data_id,
+            LimsRunDataExclusion.cleared_at.is_(None),
+        )
+        .with_for_update()
         .first()
     )
     if not exclusion:
@@ -569,6 +585,36 @@ def unexclude_data_point(
             detail="This data point has no active exclusion.",
         )
 
-    db.delete(exclusion)
+    exclusion.cleared_by = current_user.id
+    exclusion.cleared_at = datetime.now(timezone.utc)
     db.commit()
-    return {"status": "ok"}
+    db.refresh(exclusion)
+    return ExclusionRead.model_validate(exclusion)
+
+
+@router.get(
+    "/data/{data_id}/exclusions",
+    response_model=List[ExclusionRead],
+    summary="Knockout history of a data point",
+)
+def list_data_point_exclusions(
+    data_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_experiment_manage),
+):
+    """Every knockout of the point, cleared or not, oldest first."""
+    data_row = (
+        db.query(LimsRunData)
+        .join(LimsRun, LimsRunData.lims_run_id == LimsRun.id)
+        .filter(LimsRunData.id == data_id)
+        .first()
+    )
+    if not data_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Experiment data not found")
+    rows = (
+        db.query(LimsRunDataExclusion)
+        .filter(LimsRunDataExclusion.lims_run_data_id == data_id)
+        .order_by(LimsRunDataExclusion.excluded_at, LimsRunDataExclusion.id)
+        .all()
+    )
+    return [ExclusionRead.model_validate(row) for row in rows]

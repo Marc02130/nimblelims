@@ -135,6 +135,8 @@ class ExclusionRead(BaseModel):
     excluded_by:        uuid.UUID
     excluded_at:        datetime
     reason:             Optional[str] = None
+    cleared_by:         Optional[uuid.UUID] = None
+    cleared_at:         Optional[datetime] = None
 
     class Config:
         from_attributes = True

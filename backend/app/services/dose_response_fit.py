@@ -164,6 +164,7 @@ class DoseResponseFitService:
             str(exc.lims_run_data_id)
             for exc in self.db.query(LimsRunDataExclusion)
             .join(LimsRunData, LimsRunDataExclusion.lims_run_data_id == LimsRunData.id)
+            .filter(LimsRunDataExclusion.cleared_at.is_(None))
             .filter(LimsRunData.lims_run_id == run.id)
             .all()
         }
