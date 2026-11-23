@@ -25,6 +25,7 @@ from app.schemas.asked_for import (
     AnalysisParamDefsResponse,
 )
 from app.services.asked_for_service import AskedForService
+from app.services.calculation_config_service import refuse_if_active
 from app.core.security import get_current_user, get_user_permissions
 from app.core.rbac import require_any_permission, require_config_edit
 from app.core.patch_fields import assign_updates, explicit_updates
@@ -75,6 +76,10 @@ def _rule_response(rule: AnalysisAnalyte, analyte_name: str) -> AnalyteRuleRespo
         is_required=rule.is_required,
         default_value=rule.default_value,
         pairing_unit_id=rule.pairing_unit_id,
+        calculation_order=rule.calculation_order,
+        calculation_config_name=rule.calculation_config_name,
+        calculation_config_version=rule.calculation_config_version,
+        calculation_config_state=rule.calculation_config_state,
     )
 
 
@@ -94,6 +99,7 @@ def _build_analysis_response(analysis: Analysis) -> AnalysisResponse:
         cost=analysis.cost,
         shelf_life=analysis.shelf_life,
         custom_attributes=analysis.custom_attributes or {},
+        version=analysis.version,
         analytes=[
             AnalyteSimple(id=a.id, name=a.name, description=a.description)
             for a in analysis.analytes if a.active
@@ -493,6 +499,17 @@ def update_analysis_analytes(
                 detail="One or more analyte IDs are invalid"
             )
         
+        # An analyte that carries an active calculation configuration is not
+        # dropped in place (CALC-REQ-40).
+        kept_ids = {a.id for a in analytes}
+        existing_ids = {
+            row.analyte_id
+            for row in db.query(AnalysisAnalyte).filter(AnalysisAnalyte.analysis_id == analysis_id).all()
+        }
+        removed_ids = existing_ids - kept_ids
+        if removed_ids:
+            refuse_if_active(db, analysis_id, list(removed_ids))
+
         # Clear existing analytes and set new ones
         analysis.analytes = analytes
         db.flush()
@@ -551,6 +568,8 @@ def unlink_analyte_from_analysis(
                 detail="Analyte not linked to this analysis"
             )
         
+        refuse_if_active(db, analysis_id, [analyte_id])
+
         analysis.analytes.remove(analyte_to_remove)
         analysis.modified_by = current_user.id
         db.commit()
@@ -791,6 +810,8 @@ def delete_analysis_analyte_rule(
                 detail="Analyte rule not found"
             )
         
+        refuse_if_active(db, analysis_id, [analyte_id])
+
         db.delete(rule)
         db.commit()
         

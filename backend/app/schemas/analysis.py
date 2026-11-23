@@ -68,6 +68,7 @@ class AnalysisResponse(BaseModel):
     cost: Optional[Decimal] = None
     shelf_life: Optional[int] = Field(None, description="Days until expiration (expiration = date_sampled + shelf_life)")
     custom_attributes: Dict[str, Any] = Field(default_factory=dict, description="Custom attributes as JSON")
+    version: int = Field(1, description="Analysis version. The database increments it on every committed change (OQ-CALC-31).")
     analytes: List[AnalyteSimple] = Field(default_factory=list, description="Linked analytes")
 
     class Config:
@@ -98,6 +99,12 @@ class AnalyteRuleResponse(BaseModel):
     is_required: bool
     default_value: Optional[str] = None
     pairing_unit_id: Optional[UUID] = None
+    calculation_order: Optional[int] = Field(
+        None, description="Calculation order of this analyte's configuration; separate from display_order"
+    )
+    calculation_config_name: Optional[str] = None
+    calculation_config_version: Optional[int] = None
+    calculation_config_state: Optional[str] = Field(None, description="draft or active")
 
     class Config:
         from_attributes = True
