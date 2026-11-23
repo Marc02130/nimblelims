@@ -37,3 +37,4 @@ Review stamps stay under [`.docs/review/`](../.docs/review/). Local scratch copi
 | [calculation-catalog-decimal.md](calculation-catalog-decimal.md) | Backend decimal catalog functions (S4): `apply_dilution`, `subtract`, `copy_raw`, `convert_units` |
 | [calculation-catalog-s5.md](calculation-catalog-s5.md) | Backend decimal catalog functions (S5): `replicate_mean_cv`, `spike_recovery`, `limit_compare` |
 | [calculation-data-model-s6.md](calculation-data-model-s6.md) | Calculations S6: Test on one LIMS run, run result entries (`/v1/lims-runs/{id}/result-entries`), calculated lock, pairing unit, knock-in record |
+| [calculation-configuration-s7.md](calculation-configuration-s7.md) | Calculations S7: calculation configuration on `analysis_analytes`, analysis versions, saved and ad hoc formulas, direct binding, on-fail declarations, calculation order (`/v1/calculation-*`) |
