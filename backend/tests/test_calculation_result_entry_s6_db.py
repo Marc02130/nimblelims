@@ -618,7 +618,7 @@ def test_0123_backfills_and_splits_tests_by_run_then_downgrades(migrated_engine)
         assert "lims_run_id" not in test_cols
         assert restored == {"A1": ids["run"], "B2": run_b, "S1": ids["run"], "manual": None, "RB": run_b}
 
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, HEAD)
         with migrated_engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
         assert version == HEAD

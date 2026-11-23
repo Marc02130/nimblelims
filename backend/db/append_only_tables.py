@@ -50,6 +50,10 @@ APPEND_ONLY_REVOKES: Mapping[str, FrozenSet[str]] = {
     "instrument_type_deactivations": frozenset({"UPDATE", "DELETE"}),
     # 0123 — a knockout clear is recorded on the row (UPDATE stays).
     "lims_run_data_exclusions": frozenset({"DELETE"}),
+    # 0124 — saved formulas and analysis version snapshots. A changed formula
+    # is a new version row. A snapshot is written by a database trigger.
+    "calculation_formulas": frozenset({"UPDATE", "DELETE"}),
+    "analysis_versions": frozenset({"INSERT", "UPDATE", "DELETE"}),
 }
 
 # Login roles that may skip app-row guards. session_user is not changed by

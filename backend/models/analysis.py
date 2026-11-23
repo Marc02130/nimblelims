@@ -15,6 +15,9 @@ class Analysis(BaseModel):
     cost = Column(Numeric(10, 2), nullable=True)
     shelf_life = Column(Integer, nullable=True)  # Days until expiration = date_sampled + shelf_life
     custom_attributes = Column(JSONB, nullable=True, default={})  # Custom attributes as JSON
+    # Incremented by the database on every committed change (OQ-CALC-31); the
+    # application role cannot write it.
+    version = Column(Integer, nullable=False, server_default="1")
     
     # Relationships
     analytes = relationship("Analyte", secondary="analysis_analytes", back_populates="analyses")
@@ -93,6 +96,15 @@ class AnalysisAnalyte(Base):
     # Final units of calculated and reported; defaults from analytes.units_default
     # when the analyte is added (CALC-REQ-28).
     pairing_unit_id = Column(PostgresUUID(as_uuid=True), ForeignKey('units.id'), nullable=True)
+    # Calculation configuration (CALC-REQ-40, OQ-CALC-48). All five are null, or
+    # all are set. ``calculation_order`` is distinct from ``display_order``
+    # (OQ-CALC-35). The free-text ``calculation`` column above is not this
+    # configuration.
+    calculation_order = Column(Integer, nullable=True)
+    calculation_config_name = Column(String(100), nullable=True)
+    calculation_config_version = Column(Integer, nullable=True)
+    calculation_config = Column(JSONB, nullable=True)
+    calculation_config_state = Column(String(10), nullable=True)
     
     # Relationships
     analysis = relationship("Analysis", back_populates="analysis_analytes")

@@ -351,7 +351,7 @@ def test_0121_revision_id_and_single_head():
     for verb in ("NOT VALID", "GRANT DELETE", "UPDATE ", "DELETE FROM", "left(", "substring("):
         assert verb not in code, verb
     heads = ScriptDirectory.from_config(_alembic_cfg("postgresql://unused")).get_heads()
-    assert heads == ["0123_result_entry_data_model"], heads
+    assert heads == ["0124_calculation_configuration"], heads
 
 
 def test_0121_upgrade_refuses_with_counts_when_a_stored_reason_breaks_the_rule(migrated_engine):
@@ -409,7 +409,7 @@ def test_0121_downgrade_and_upgrade(migrated_engine):
         with migrated_engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
             back = [_constraint_def(conn, name) for _, name in CONSTRAINTS]
-        assert version == "0123_result_entry_data_model"
+        assert version == "0124_calculation_configuration"
         assert all(d and "4000" in d for d in back), back
     finally:
         command.upgrade(cfg, "head")
