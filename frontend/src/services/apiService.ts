@@ -749,6 +749,29 @@ export class ApiService {
     return response.data;
   }
 
+  async getCalculationActivationReview(analysisId: string, analyteId: string) {
+    const response: AxiosResponse = await this.api.get(
+      `/v1/analyses/${analysisId}/analytes/${analyteId}/calculation-config/activation-review`
+    );
+    return response.data;
+  }
+
+  async issueCalculationConfirmToken(analysisId: string, analyteId: string, reviewHash: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/analyses/${analysisId}/analytes/${analyteId}/calculation-config/activation-token`,
+      { review_hash: reviewHash }
+    );
+    return response.data;
+  }
+
+  async activateCalculationConfig(analysisId: string, analyteId: string, confirmToken: string) {
+    const response: AxiosResponse = await this.api.post(
+      `/v1/analyses/${analysisId}/analytes/${analyteId}/calculation-config/activate`,
+      { confirm_token: confirmToken }
+    );
+    return response.data;
+  }
+
   async updateAnalysisAnalytes(analysisId: string, analyteIds: string[]) {
     const response: AxiosResponse = await this.api.put(`/analyses/${analysisId}/analytes`, {
       analyte_ids: analyteIds,

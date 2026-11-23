@@ -23,12 +23,14 @@ import {
   Search,
   Clear,
   ArrowBack,
+  Calculate,
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem, GridRowParams } from '@mui/x-data-grid';
 import { useUser } from '../../contexts/UserContext';
 import { apiService, ApiService } from '../../services/apiService';
 import { FillHeightPage, FillHeightTable } from '../../components/common/FillHeightPage';
 import AnalyteRuleForm from './AnalyteRuleForm';
+import CalculationActivationDialog from '../../components/analyses/CalculationActivationDialog';
 
 interface AnalyteRule {
   analyte_id: string;
@@ -41,6 +43,9 @@ interface AnalyteRule {
   reported_name?: string;
   calculation?: string;
   default_value?: string;
+  calculation_config_name?: string | null;
+  calculation_config_version?: number | null;
+  calculation_config_state?: string | null;
 }
 
 interface Analysis {
@@ -62,8 +67,10 @@ const AnalysisAnalytesConfig: React.FC = () => {
   const [selectedRule, setSelectedRule] = useState<AnalyteRule | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnalyteRule | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<AnalyteRule | null>(null);
 
   const canEdit = hasPermission('config:edit') || hasPermission('test:configure');
+  const canActivateCalculation = user?.role === 'Administrator';
 
   useEffect(() => {
     if (analysisId) {
@@ -222,13 +229,39 @@ const AnalysisAnalytesConfig: React.FC = () => {
       valueGetter: (value) => value || 'N/A',
     },
     {
+      field: 'calculation_config_state',
+      headerName: 'Calculation',
+      width: 170,
+      renderCell: (params) => {
+        const rule = params.row as AnalyteRule;
+        if (!rule.calculation_config_state) return 'None';
+        return (
+          <Chip
+            size="small"
+            color={rule.calculation_config_state === 'active' ? 'success' : 'warning'}
+            label={`${rule.calculation_config_state}, version ${rule.calculation_config_version}`}
+          />
+        );
+      },
+    },
+    {
       field: 'actions',
       type: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 160,
       getActions: (params: GridRowParams) => {
         const rule = params.row as AnalyteRule;
         const actions = [];
+
+        if (canActivateCalculation && rule.calculation_config_state === 'draft') {
+          actions.push(
+            <GridActionsCellItem
+              icon={<Calculate />}
+              label="Review calculation"
+              onClick={() => setReviewTarget(rule)}
+            />
+          );
+        }
 
         if (canEdit) {
           actions.push(
@@ -376,6 +409,17 @@ const AnalysisAnalytesConfig: React.FC = () => {
         }}
         onSubmit={selectedRule ? handleUpdate : handleCreate}
       />
+
+      {reviewTarget && (
+        <CalculationActivationDialog
+          open
+          analysisId={analysisId || ''}
+          analyteId={reviewTarget.analyte_id}
+          analyteName={reviewTarget.analyte_name}
+          onClose={() => setReviewTarget(null)}
+          onActivated={loadData}
+        />
+      )}
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirm Delete</DialogTitle>
