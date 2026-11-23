@@ -117,6 +117,12 @@ _PATH_NAMES = {
     r"^/roles/[^/]+/permissions$": "/roles/{role_id}/permissions",
     r"^/containers/[^/]+/contents/[^/]+$": "/containers/{container_id}/contents/{sample_id}",
     r"^/analyses/[^/]+/analytes$": "/analyses/{analysis_id}/analytes",
+    r"^/v1/analyses/[^/]+/analytes/[^/]+/calculation-config$": (
+        "/v1/analyses/{analysis_id}/analytes/{analyte_id}/calculation-config"
+    ),
+    r"^/v1/analyses/[^/]+/analytes/[^/]+/calculation-config/test-cases$": (
+        "/v1/analyses/{analysis_id}/analytes/{analyte_id}/calculation-config/test-cases"
+    ),
     r"^/v1/instruments/[^/]+$": "/v1/instruments/{instrument_id}",
     r"^/v1/instrument-types/[^/]+$": "/v1/instrument-types/{type_id}",
 }
@@ -173,6 +179,17 @@ def route_formats() -> list[dict[str, str]]:
             body = "[" + _fields_text(schema.model_json_schema(), {}) + "] (a JSON array of rows)"
         elif path.startswith("/containers/") and "contents" in path:
             body = "{amount: 0} (exactly this)"
+        elif kind == "calculation_config":
+            body = (
+                "{calculation_order: integer >= 1, configuration: {name: string, stages: [{id, kind, ...}], "
+                "result: {stage, output}}} (a draft proposal. Stage functions and versions come only from "
+                "the closed catalog. It is never active, and only an Admin activates it)"
+            )
+        elif kind == "calculation_test_case":
+            body = (
+                "{name: string, inputs: object, expected: object} (stored for the draft version. "
+                "The expected value is recorded as system output)"
+            )
         elif schema is not None:
             full = schema.model_json_schema()
             if kind == "instrument":
@@ -1128,6 +1145,24 @@ def existing_named(db, user: User, target: Any) -> Optional[str]:
 def resolve_path(db, user: User, method: str, path: str) -> str:
     """Names in a path -> ids, where the route takes an id (analysis by name)."""
     clean = (path or "").split("?", 1)[0].rstrip("/")
+    calc = re.match(
+        r"^/v1/analyses/([^/]+)/analytes/([^/]+)/calculation-config(/test-cases)?$", clean
+    )
+    if calc and (_uuid(calc.group(1)) is None or _uuid(calc.group(2)) is None):
+        from urllib.parse import unquote
+
+        from models.analysis import Analysis, Analyte
+
+        analysis_ref, analyte_ref = unquote(calc.group(1)), unquote(calc.group(2))
+        analysis_id = analysis_ref
+        if _uuid(analysis_ref) is None:
+            found = db.query(Analysis).filter(func.lower(Analysis.name) == analysis_ref.lower()).first()
+            analysis_id = str(found.id) if found is not None else analysis_ref
+        analyte_id = analyte_ref
+        if _uuid(analyte_ref) is None:
+            found_analyte = db.query(Analyte).filter(func.lower(Analyte.name) == analyte_ref.lower()).first()
+            analyte_id = str(found_analyte.id) if found_analyte is not None else analyte_ref
+        return f"/v1/analyses/{analysis_id}/analytes/{analyte_id}/calculation-config{calc.group(3) or ''}"
     match = re.match(r"^/analyses/([^/]+)/analytes$", clean)
     if match and _uuid(match.group(1)) is None:
         from urllib.parse import unquote

@@ -473,7 +473,7 @@ def test_0122_sits_under_the_single_alembic_head() -> None:
     cfg = Config(str(backend / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0125_analysis_version_no_change"], script.get_heads()
+    assert script.get_heads() == ["0126_calculation_activation"], script.get_heads()
     assert script.get_revision("0123_result_entry_data_model").down_revision == revision
 
 

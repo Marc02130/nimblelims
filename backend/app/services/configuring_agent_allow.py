@@ -38,6 +38,19 @@ _OUT_OF_SCOPE = (
     ("/samples/receive", "Receive is a lab motion, not a configuration write."),
 )
 
+ACTIVATION_GAP = (
+    "The configuring agent proposes a calculation configuration and cannot activate one. "
+    "An Admin activates it after the activation review."
+)
+CATALOG_GAP = (
+    "The configuring agent cannot add, change, or enable a catalog function. "
+    "The catalog changes only through a reviewed code change."
+)
+_CALCULATION_ACTIVATION = re.compile(
+    r"^/v1/analyses/[^/]+/analytes/[^/]+/calculation-config/"
+    r"(activate|activation-token|activation-review|activations)(/|$)"
+)
+
 REAGENT_LOT_GAP = (
     "Reagent lots and lot use are recorded at the bench, not by this configuration run: receive a lot on "
     "the Reagents screen (POST /v1/reagent-lots) and record the lot used on the LIMS run or experiment "
@@ -86,6 +99,24 @@ _ALLOWED: tuple[tuple[str, re.Pattern[str], str, str, str], ...] = (
     ("POST", re.compile(r"^/analyses$"), "other", "config:edit", "analysis"),
     ("POST", re.compile(r"^/analytes$"), "other", "config:edit", "analyte"),
     ("POST", re.compile(r"^/analyses/[^/]+/analytes$"), "other", "config:edit", "analysis_analytes"),
+    # Calculations S8 (CALC-REQ-47): the agent proposes a calculation configuration as
+    # an inactive draft through the builder's contracts, and may record test cases
+    # (their expected value is always system output). It cannot activate: the
+    # activation review, confirm token, activate, and export routes are not here.
+    (
+        "PUT",
+        re.compile(r"^/v1/analyses/[^/]+/analytes/[^/]+/calculation-config$"),
+        "other",
+        "config:edit",
+        "calculation_config",
+    ),
+    (
+        "POST",
+        re.compile(r"^/v1/analyses/[^/]+/analytes/[^/]+/calculation-config/test-cases$"),
+        "other",
+        "config:edit",
+        "calculation_test_case",
+    ),
     # Container retire: contents amount -> 0 is the only container removal (L-B).
     ("PATCH", re.compile(r"^/containers/[^/]+/contents/[^/]+$"), "other", "sample:update", "contents_amount"),
     # Reagent tracking (step 2): the agent may add a vendor, a vendor-agnostic
@@ -268,6 +299,10 @@ def classify_call(method: str, path: str, body: Any = None) -> Classified:
         return Classified(
             False, "other", None, None, "No existing API grants a user access to a project. This run will not invent one."
         )
+    if _CALCULATION_ACTIVATION.match(path):
+        return Classified(False, "other", None, None, ACTIVATION_GAP)
+    if path == "/v1/calculation-catalog" or path.startswith("/v1/calculation-catalog/"):
+        return Classified(False, "other", None, None, CATALOG_GAP)
     for prefix in _REAGENT_BENCH:
         if path == prefix or path.startswith(prefix + "/"):
             return Classified(False, "other", None, None, REAGENT_LOT_GAP)

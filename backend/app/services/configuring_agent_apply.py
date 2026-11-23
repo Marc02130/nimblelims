@@ -21,6 +21,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app.core.agent_context import agent_run_context
 from app.core.security import get_user_permissions
 from app.services.configuring_agent_allow import Classified, classify_call, is_drop_or_delete
 from models.user import Permission, Role, User, role_permissions
@@ -285,7 +286,8 @@ def execute_step(db, user: User, method: str, path: str, body: Any) -> list[Appl
             # G5: the target already has these values. No call, no write.
             return [AppliedChange(classified.kind or "other", str(path), None, noop=True)]
     try:
-        return _dispatch(db, user, method.upper(), path, body, classified.kind or "other")
+        with agent_run_context():
+            return _dispatch(db, user, method.upper(), path, body, classified.kind or "other")
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -303,6 +305,8 @@ def _dispatch(db, user: User, method: str, path: str, body: dict, kind: str) -> 
         return _container_type(db, user, body)
     if path == "/analyses" or path == "/analytes" or re.match(r"^/analyses/[^/]+/analytes$", path):
         return _analyses(db, user, path, body)
+    if re.match(r"^/v1/analyses/[^/]+/analytes/[^/]+/calculation-config(/test-cases)?$", path):
+        return _calculation(db, user, method, path, body)
     if path == "/v1/sample-type-transitions":
         return _transition(db, user, body)
     if path in ("/v1/vendors", "/v1/reagents", "/v1/reagent-vendors"):
@@ -452,6 +456,28 @@ def _analyses(db, user, path: str, body: dict) -> list[AppliedChange]:
         raise HTTPException(status_code=404, detail="Analysis not found") from exc
     linked = link_analytes_to_analysis(analysis_id, AnalyteLinkRequest.model_validate(body), user, db)
     return [AppliedChange("analysis_analytes", ", ".join(a.name for a in linked) or "analytes", analysis_id)]
+
+
+def _calculation(db, user, method: str, path: str, body: dict) -> list[AppliedChange]:
+    """A calculation configuration proposal (a draft) or one of its test cases (S8).
+
+    The calls go to the same services the routes use, as the confirming user.
+    ``execute_step`` has set the configuring-agent run context, so the services
+    record a test case's expected value as system output.
+    """
+    from app.services import calculation_activation as activation
+    from app.services import calculation_config_service as config_service
+
+    parts = path.split("/")
+    try:
+        analysis_id, analyte_id = UUID(parts[3]), UUID(parts[5])
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Analysis or analyte not found") from exc
+    if path.endswith("/test-cases"):
+        case = activation.create_test_case(db, user, analysis_id, analyte_id, body)
+        return [AppliedChange("calculation_test_case", case["name"], case["id"])]
+    saved = config_service.save_configuration(db, analysis_id, analyte_id, body, user)
+    return [AppliedChange("calculation_config", saved["name"] or "calculation configuration", analyte_id)]
 
 
 def _container_type(db, user, body: dict) -> list[AppliedChange]:

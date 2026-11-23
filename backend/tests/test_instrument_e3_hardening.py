@@ -592,7 +592,7 @@ def test_0119_revision_id_and_single_head():
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0125_analysis_version_no_change"], heads
+    assert heads == ["0126_calculation_activation"], heads
 
 
 def test_live_void_trigger_body_keeps_reason_lock_nbsp_and_final_void(migrated_engine):

@@ -13,6 +13,11 @@ orders, the units that exist, the saved formulas). Every refusal is a
 A configuration stores no result unit (CALC-REQ-28) and no formula text for an
 attempt to copy (CALC-REQ-40, the attempt records the analysis version).
 
+Wording (Marc, 2026-11-22): a stage output is a *calculated value*, not a
+result. It becomes a result only when the experiment is published (S13). The
+configuration's ``result`` key is a pointer to the one stage output that will
+be published as the analyte's result. The key keeps its name; it writes nothing.
+
 What the builder refuses
 ------------------------
 * Anything not in the closed catalog (CALC-REQ-22): the stage names a function
@@ -313,6 +318,8 @@ class Stage:
 class ParsedConfig:
     name: str
     stages: tuple[Stage, ...]
+    # The pointer to the stage output that will be published as the analyte's
+    # result at experiment publish (S13). Every stage output is a calculated value.
     result_stage: str
     result_output: str
 
@@ -968,6 +975,8 @@ def parse_config(raw: Any, ctx: ConfigContext) -> ParsedConfig:
 
     _check_precedence(stages)
 
+    # ``result`` points at the output that will be published as the analyte's
+    # result when the experiment is published (S13). It is not a result itself.
     result_obj = _object(obj.get("result"), "result")
     _check_keys(result_obj, ("stage", "output"), "result")
     result_stage = result_obj.get("stage")

@@ -54,6 +54,14 @@ APPEND_ONLY_REVOKES: Mapping[str, FrozenSet[str]] = {
     # is a new version row. A snapshot is written by a database trigger.
     "calculation_formulas": frozenset({"UPDATE", "DELETE"}),
     "analysis_versions": frozenset({"INSERT", "UPDATE", "DELETE"}),
+    # 0126 — activation records are append-only. A confirm token is consumed by
+    # UPDATE and never deleted. Test cases are insert-only. Test-case results
+    # and dry runs are written by the stage runner (S9), not by S8.
+    "calculation_activations": frozenset({"UPDATE", "DELETE"}),
+    "calculation_confirm_tokens": frozenset({"DELETE"}),
+    "calculation_test_cases": frozenset({"UPDATE", "DELETE"}),
+    "calculation_test_case_results": frozenset({"INSERT", "UPDATE", "DELETE"}),
+    "calculation_dry_runs": frozenset({"INSERT", "UPDATE", "DELETE"}),
 }
 
 # Login roles that may skip app-row guards. session_user is not changed by

@@ -328,6 +328,28 @@ def get_current_user(
     return user
 
 
+def get_session_jti(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db),
+) -> str:
+    """The ``jti`` of the login this request came in on (calculations S8, CALC-REQ-34).
+
+    A confirm token is bound to it, so a token issued in one login is refused
+    in another. The user is checked by ``get_current_user``; this only reads
+    the session identifier from the same access token.
+    """
+    token, _auth_via = _extract_token(request, credentials)
+    token_data = verify_token(token, db=db)
+    if not token_data.jti:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has no session identifier",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return token_data.jti
+
+
 def get_user_permissions(user: User, db: Session) -> List[str]:
     """Get user permissions from their role"""
     permissions = db.query(Permission.name).join(

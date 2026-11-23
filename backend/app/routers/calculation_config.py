@@ -1,4 +1,5 @@
-"""Calculation configuration, saved formulas, and analysis versions (calculations S7).
+"""Calculation configuration, saved formulas, analysis versions (calculations S7),
+and activation (S8).
 
 The catalog is read-only here: it has no write route, so a POST, PUT, PATCH, or
 DELETE on it is 405 (CALC-REQ-22). There is no constants route (CALC-REQ-41),
@@ -7,25 +8,36 @@ that is the stage runner (S9).
 
 A refusal is HTTP 400 with ``{"code", "message"}`` (and ``stage`` when a stage
 is named). A caller without the Admin role that writes a formula gets 403.
+
+Activation (S8) is Admin only and interactive: review, then a single-use confirm
+token, then activate. None of those routes is on the configuring agent's
+allow-list, and each refuses a configuring-agent run context. A stage output is
+a calculated value; it becomes a result only when the experiment is published
+(S13). No route here writes a result.
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.rbac import require_admin, require_any_permission
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_session_jti
 from app.database import get_db
 from app.schemas.calculation_config import (
+    ActivationRecordResponse,
+    ActivationReviewResponse,
     AnalysisVersionDetail,
     AnalysisVersionSummary,
     CalculationConfigurationResponse,
     CalculationFormulaResponse,
+    CalculationTestCaseResponse,
     CatalogEntryResponse,
+    ConfirmTokenResponse,
     FormulaEvaluationResponse,
     NewAnalysisVersionResponse,
 )
+from app.services import calculation_activation as activation
 from app.services import calculation_config_service as service
 from app.services.calculation_config import catalog_entries
 from models.user import User
@@ -181,3 +193,116 @@ def read_analysis_version(
     db: Session = Depends(get_db),
 ):
     return service.get_version(db, analysis_id, version)
+
+
+_CALC_CONFIG = "/analyses/{analysis_id}/analytes/{analyte_id}/calculation-config"
+
+
+@router.get(
+    _CALC_CONFIG + "/activation-review",
+    response_model=ActivationReviewResponse,
+)
+def read_activation_review(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """The activation review document and its hash. Admin only. Writes nothing."""
+    return activation.read_review(db, current_user, analysis_id, analyte_id)
+
+
+@router.get(_CALC_CONFIG + "/activation-review/export")
+def export_activation_review(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Exactly what the dialog shows, as RFC 8785 canonical JSON. Runs no calculation."""
+    content, digest = activation.export_review(db, current_user, analysis_id, analyte_id)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "X-Review-Hash": digest,
+            "Content-Disposition": f'attachment; filename="activation-review-{digest[:12]}.json"',
+        },
+    )
+
+
+@router.post(
+    _CALC_CONFIG + "/activation-token",
+    response_model=ConfirmTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def issue_activation_token(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    body: Dict[str, Any] = Body(...),
+    current_user: User = Depends(require_admin),
+    session_jti: str = Depends(get_session_jti),
+    db: Session = Depends(get_db),
+):
+    """Issue a single-use confirm token (300 seconds) for the review the Admin was shown."""
+    return activation.issue_token(db, current_user, session_jti, analysis_id, analyte_id, body)
+
+
+@router.post(
+    _CALC_CONFIG + "/activate",
+    response_model=ActivationRecordResponse,
+)
+def activate_calculation_config(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    body: Dict[str, Any] = Body(...),
+    current_user: User = Depends(require_admin),
+    session_jti: str = Depends(get_session_jti),
+    db: Session = Depends(get_db),
+):
+    """Activate the draft. The body is the confirm token and nothing else (no password)."""
+    return activation.activate(db, current_user, session_jti, analysis_id, analyte_id, body)
+
+
+@router.get(
+    _CALC_CONFIG + "/activations",
+    response_model=List[ActivationRecordResponse],
+)
+def list_calculation_activations(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """The append-only activation records for this analyte, newest first."""
+    return activation.list_activations(db, analysis_id, analyte_id)
+
+
+@router.post(
+    _CALC_CONFIG + "/test-cases",
+    response_model=CalculationTestCaseResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_calculation_test_case(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    body: Dict[str, Any] = Body(...),
+    current_user: User = Depends(require_any_permission(_CONFIG_PERMISSIONS)),
+    db: Session = Depends(get_db),
+):
+    """Record a test case against the draft configuration version. It is stored, not run."""
+    return activation.create_test_case(db, current_user, analysis_id, analyte_id, body)
+
+
+@router.get(
+    _CALC_CONFIG + "/test-cases",
+    response_model=List[CalculationTestCaseResponse],
+)
+def list_calculation_test_cases(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    version: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return activation.list_test_cases(db, analysis_id, analyte_id, version)

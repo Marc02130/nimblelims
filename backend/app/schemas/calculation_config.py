@@ -65,3 +65,46 @@ class CatalogEntryResponse(BaseModel):
     stop_rule: str
     missing_data_rule: str
     failure_stops: List[str]
+
+
+class ActivationReviewResponse(BaseModel):
+    document: Dict[str, Any] = Field(..., description="The review document. The dialog renders only from it.")
+    review_hash: str = Field(..., description="SHA-256 of the document's RFC 8785 JCS encoding")
+
+
+class ConfirmTokenResponse(BaseModel):
+    confirm_token: str = Field(..., description="Single-use. Shown once. Only its hash is stored.")
+    review_hash: str
+    expires_in_seconds: int
+
+
+class ActivationRecordResponse(BaseModel):
+    id: UUID
+    analysis_id: UUID
+    analyte_id: UUID
+    configuration_name: str
+    configuration_version: int
+    function_versions: List[Dict[str, Any]]
+    lock_hash: str
+    validation_state: str
+    review_document: Dict[str, Any]
+    review_hash: str
+    created_at: datetime
+    created_by: UUID
+
+
+class CalculationTestCaseResponse(BaseModel):
+    id: UUID
+    analysis_id: UUID
+    analyte_id: UUID
+    configuration_version: int
+    name: str
+    inputs: Dict[str, Any]
+    expected: Dict[str, Any]
+    expected_source: str = Field(..., description="independent or system_output")
+    from_system_output: bool
+    passed_on_current_lock: Optional[bool] = Field(
+        None, description="None when no outcome is recorded on the current lock hash"
+    )
+    created_at: datetime
+    created_by: UUID
