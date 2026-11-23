@@ -6,7 +6,7 @@ Migrations: `backend/db/migrations/versions/0125_analysis_version_no_change.py` 
 
 Limits are not part of the calculations work (future issue #259). S8 reads no limit table. A stage that reads a limit is marked in the review so the Admin sees it.
 
-Only the eleven catalog functions are called validated catalog functions. No configuration, formula, or test case is labelled validated, and the validation state below is a record, not a gate.
+Only the eleven catalog functions are called validated catalog functions. Nothing else is labelled that way. The validation state below is a record of test counts, not a gate.
 
 ## Terms
 

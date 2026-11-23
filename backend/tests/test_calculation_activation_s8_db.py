@@ -204,7 +204,7 @@ def test_the_append_only_map_matches_the_migration():
     assert APPEND_ONLY_REVOKES["calculation_dry_runs"] == frozenset({"INSERT", "UPDATE", "DELETE"})
 
 
-def test_the_validation_state_is_a_closed_list_without_the_word_validated(migrated_engine):
+def test_the_validation_state_is_a_closed_list_of_four_test_count_values(migrated_engine):
     with migrated_engine.connect() as conn:
         tx = conn.begin()
         try:

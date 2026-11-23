@@ -70,7 +70,7 @@
 27. `test_activation_succeeds_whatever_the_test_counts`: the state is recorded and never blocks.
 28. `test_three_cases_two_passing_one_from_system_output_and_no_dry_run`: the summary reads "3 test cases, 2 passed, 1 from system output, no dry run".
 29. `test_a_pass_on_another_lock_hash_does_not_count`, `test_the_latest_outcome_on_the_lock_is_the_one_that_counts`.
-30. `test_the_validation_state_is_a_closed_list_without_the_word_validated` (DB) and `test_validation_state_is_a_closed_list_derived_from_the_counts`.
+30. `test_the_validation_state_is_a_closed_list_of_four_test_count_values` (DB) and `test_validation_state_is_a_closed_list_derived_from_the_counts`.
 31. `test_the_confirm_control_names_the_no_test_case_choice`: with no test cases the label is "Activate with no test cases recorded".
 32. Agent test cases: `test_the_agents_test_case_is_flagged_as_system_output`, `test_a_person_can_say_a_system_output_case_is_system_output`, `test_a_test_case_needs_the_config_permission_and_a_draft`, `test_test_case_inputs_are_checked`.
 
@@ -82,12 +82,12 @@
 
 ## Wording (CALC-REQ-46)
 
-36. `test_the_s8_files_use_validated_only_for_catalog_functions`, `test_s8_code_does_not_call_a_stage_output_a_result`, `test_s8_code_writes_nothing_to_result_tables`, `test_the_s8_files_hold_no_parked_constant`.
+36. `test_the_s8_files_use_the_word_only_for_catalog_functions`, `test_s8_code_does_not_call_a_stage_output_a_result`, `test_s8_code_writes_nothing_to_result_tables`, `test_the_s8_files_hold_no_parked_constant`.
 
 ## Dialog (manual)
 
 37. Sign in as the Admin. Open Admin, Analyses, Analyte rules for an analysis. Save a draft configuration on an analyte through the API or the configuring agent. The row's Calculation column reads "draft, version 1" and a calculator icon shows.
-38. Open the review. Confirm it shows the test case summary, the dry run line, the diff, the plain-language text, the formula text, and the declarations of every stage. With no test cases, the warning reads "No test cases recorded" and the button reads "Activate with no test cases recorded". Nothing on the page calls the configuration validated.
+38. Open the review. Confirm it shows the test case summary, the dry run line, the diff, the plain-language text, the formula text, and the declarations of every stage. With no test cases, the warning reads "No test cases recorded" and the button reads "Activate with no test cases recorded". Nothing on the page labels the configuration as proven.
 39. Select the button. The dialog says the configuration is active, and the row reads "active, version 1".
 40. Sign in as a Lab Manager. The same row shows no calculator icon. `GET .../activation-review` returns HTTP 403.
 41. `cd frontend && npm test -- --watchAll=false src/__tests__/CalculationActivationDialog.test.tsx` passes, and `npx tsc --noEmit` is clean.

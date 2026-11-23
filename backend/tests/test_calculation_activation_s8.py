@@ -342,7 +342,7 @@ def test_no_header_or_field_sets_the_agent_context() -> None:
 # ---- wording and parked constants (CALC-REQ-46, #258) --------------------------
 
 
-def test_the_s8_files_use_validated_only_for_catalog_functions() -> None:
+def test_the_s8_files_use_the_word_only_for_catalog_functions() -> None:
     migration = BACKEND / "db" / "migrations" / "versions" / "0126_calculation_activation.py"
     for path in (*S8_FILES, migration, *(p for p in S8_DOCS if p.exists())):
         for line in path.read_text(encoding="utf-8").splitlines():
