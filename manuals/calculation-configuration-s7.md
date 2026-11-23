@@ -1,6 +1,6 @@
 # Calculations S7: calculation configuration and the no-code builder
 
-Calculations slice S7 stores how a result is calculated on `analysis_analytes`, and gives the builder its rules. It covers CALC-REQ-40, 23, 48, 22, 28, 50, and 46. It runs nothing. A calculation first runs in slice S9 (the stage runner). Proposing and activating a configuration is slice S8, and nothing in S7 sets a configuration to `active`.
+Calculations slice S7 stores how a value is calculated on `analysis_analytes`, and gives the builder its rules. It covers CALC-REQ-40, 23, 48, 22, 28, 50, and 46. It runs nothing. A calculation first runs in slice S9 (the stage runner). Proposing and activating a configuration is slice S8, and nothing in S7 sets a configuration to `active`.
 
 Migration: `backend/db/migrations/versions/0124_calculation_configuration.py` (revises `0123_result_entry_data_model`). Builder rules: `backend/app/services/calculation_config.py`. Formula language: `backend/app/services/calculation_formula.py`. Storage and routes: `backend/app/services/calculation_config_service.py` and `backend/app/routers/calculation_config.py`. UAT: [UAT_Scripts/uat-calculations-s7.md](../UAT_Scripts/uat-calculations-s7.md).
 
@@ -11,6 +11,7 @@ Only the eleven catalog functions are called validated catalog functions. A form
 ## Analyses are versioned (CALC-REQ-40, OQ-CALC-31)
 
 - `analyses.version` is an integer, 1 at creation. Any committed change to the analysis, to one of its `analysis_analytes` rows, or to a calculation configuration raises it by one, once per transaction.
+- A save that changes nothing does not raise the version (migration 0125, slice S8). The trigger compares the new snapshot with the latest snapshot and ignores `version` and the audit columns. See [calculation-configuration-s8.md](calculation-configuration-s8.md).
 - A database trigger makes the change, not the application. The application role cannot write `version` (`analysis_version_locked`). Three edits in one transaction are one version.
 - `analysis_versions` keeps one snapshot per version: the analysis row and its analyte rows as they were when the transaction committed. It is how a past version, with its configuration, stays readable. The application role can read it and cannot write it.
 - Existing analyses were backfilled at version 1 with a snapshot.
@@ -83,7 +84,7 @@ Existing conventions hold. A refusal is HTTP 400 with `{"code", "message"}` and,
 
 - `kind` is `catalog_function`, `saved_formula` (`formula_name`, `formula_version`), or `ad_hoc_formula` (`formula_text`). The server sets an ad hoc formula's version: 1, and one more each time an admin changes the text.
 - A catalog function is the one named in the closed catalog at the pinned `function_version`. A name outside it is `catalog_function_unknown`. There is no builder control that adds a function, and no endpoint writes the catalog.
-- `result` names the stage and output that become the analyte's calculated value. It is required.
+- `result` is a pointer to the stage output that will be published as the analyte's result when the experiment is published (slice S13). Every stage output is a calculated value, not a result. The key name `result` is kept. It is required, and nothing writes to a result table before publication.
 - A stage may read only earlier stages. A forward or unknown stage is `stage_order_violation`.
 
 ### Bindings (CALC-REQ-23, 50, OQ-CALC-46)
@@ -117,7 +118,7 @@ Every stage declares what its failure does. All four keys must be present: `outc
 | `run_failed` | The run fails. |
 | `dilution_invalid` | The dilution is marked invalid. |
 | `sample_verdict` | The sample takes the `verdict` label. `verdict` is required for this outcome only. |
-| `flag` | The result carries the named flag. |
+| `flag` | The calculated value carries the named flag. |
 
 - `pass` is refused (`on_fail_pass_refused`). `on_fail_undeclared` is not something a user declares.
 - A stage whose failure is a stage stop declares that stop code, with `precedence_place` `above_list`. A stage that cannot stop in that way may not (`on_fail_stage_stop_not_applicable`).
