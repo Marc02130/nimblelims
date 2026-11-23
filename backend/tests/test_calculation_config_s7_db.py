@@ -23,7 +23,7 @@ from tests.test_calculation_result_entry_s6_db import (
     _world,
 )
 
-HEAD = "0124_calculation_configuration"
+HEAD = "0125_analysis_version_no_change"
 PREVIOUS = "0123_result_entry_data_model"
 
 CONFIG = json.dumps({"name": "n", "stages": [], "result": {"stage": "s", "output": "o"}})

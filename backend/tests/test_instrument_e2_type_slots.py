@@ -1385,5 +1385,5 @@ def test_0115_revision_id_and_single_head():
     cfg = Config(str(backend / "alembic.ini"))
     cfg.set_main_option("script_location", str(backend / "db/migrations"))
     live_heads = ScriptDirectory.from_config(cfg).get_heads()
-    assert live_heads == ["0124_calculation_configuration"], live_heads
+    assert live_heads == ["0125_analysis_version_no_change"], live_heads
     assert "0115_instrument_type_slots" not in live_heads
