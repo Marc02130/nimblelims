@@ -9,7 +9,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 
-from db.append_only_tables import APPEND_ONLY_REVOKES, MAINTENANCE_SESSION_ROLES
+from db.append_only_tables import APPEND_ONLY_REVOKES, MAINTENANCE_SESSION_ROLES, REGRANTED
 
 VERSIONS = Path(__file__).resolve().parents[1] / "db" / "migrations" / "versions"
 
@@ -111,7 +111,7 @@ def test_canonical_list_matches_migration_revokes():
     found = _revokes_in_migrations()
     missing = []
     for table, privileges in found.items():
-        needed = privileges & {"INSERT", "UPDATE", "DELETE"}
+        needed = (privileges - REGRANTED.get(table, frozenset())) & {"INSERT", "UPDATE", "DELETE"}
         if not needed:
             continue
         if table not in APPEND_ONLY_REVOKES:
@@ -122,6 +122,16 @@ def test_canonical_list_matches_migration_revokes():
     assert missing == [], missing
     extras = set(APPEND_ONLY_REVOKES) - set(found)
     assert extras == set(), extras
+
+
+def test_every_regrant_is_a_grant_in_a_later_migration():
+    sources = {path.name: path.read_text() for path in VERSIONS.glob("*.py")}
+    for table, privileges in REGRANTED.items():
+        assert not privileges & APPEND_ONLY_REVOKES[table], table
+        for privilege in privileges:
+            pattern = re.compile(rf"GRANT\s+{privilege}\s+ON\s+{table}\s+TO\s+\{{APP_ROLE\}}")
+            granted = [name for name, src in sources.items() if pattern.search(src)]
+            assert granted == ["0127_calculation_attempts.py"], (table, privilege, granted)
 
 
 def test_0117_inlined_roles_match_maintenance_session_roles():

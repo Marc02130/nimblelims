@@ -501,6 +501,18 @@ class ResultEntry(Base):
     )
     knocked_out_at = Column(DateTime(timezone=True), nullable=True)
     display_order = Column(Integer, nullable=True)
+    # The attempt that wrote calculated and reported (CALC-REQ-30). Set only on the
+    # calculation path, to an attempt of this row (migration 0127).
+    calculation_attempt_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey(
+            "calculation_attempts.id",
+            ondelete="RESTRICT",
+            name="fk_result_entries_calculation_attempt",
+            use_alter=True,
+        ),
+        nullable=True,
+    )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(

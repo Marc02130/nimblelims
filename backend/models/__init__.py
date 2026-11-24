@@ -101,6 +101,7 @@ from .result_acceptance import ResultAcceptance
 from .calculation import (
     AnalysisVersion,
     CalculationActivation,
+    CalculationAttempt,
     CalculationConfirmToken,
     CalculationDryRun,
     CalculationFormula,

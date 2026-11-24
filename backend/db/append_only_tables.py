@@ -55,13 +55,23 @@ APPEND_ONLY_REVOKES: Mapping[str, FrozenSet[str]] = {
     "calculation_formulas": frozenset({"UPDATE", "DELETE"}),
     "analysis_versions": frozenset({"INSERT", "UPDATE", "DELETE"}),
     # 0126 — activation records are append-only. A confirm token is consumed by
-    # UPDATE and never deleted. Test cases are insert-only. Test-case results
-    # and dry runs are written by the stage runner (S9), not by S8.
+    # UPDATE and never deleted. Test cases are insert-only.
     "calculation_activations": frozenset({"UPDATE", "DELETE"}),
     "calculation_confirm_tokens": frozenset({"DELETE"}),
     "calculation_test_cases": frozenset({"UPDATE", "DELETE"}),
-    "calculation_test_case_results": frozenset({"INSERT", "UPDATE", "DELETE"}),
-    "calculation_dry_runs": frozenset({"INSERT", "UPDATE", "DELETE"}),
+    # 0126 revoked INSERT too; 0127 grants it back, because the stage runner
+    # (S9) writes test-case results and dry runs. Both stay append-only.
+    "calculation_test_case_results": frozenset({"UPDATE", "DELETE"}),
+    "calculation_dry_runs": frozenset({"UPDATE", "DELETE"}),
+    # 0127 — calculation attempts are append-only.
+    "calculation_attempts": frozenset({"UPDATE", "DELETE"}),
+}
+
+# Privileges a later migration GRANTs back after an earlier one revoked them.
+# The revoke check subtracts these from the union of every migration's REVOKEs.
+REGRANTED: Mapping[str, FrozenSet[str]] = {
+    "calculation_test_case_results": frozenset({"INSERT"}),
+    "calculation_dry_runs": frozenset({"INSERT"}),
 }
 
 # Login roles that may skip app-row guards. session_user is not changed by

@@ -3,9 +3,11 @@
 The guards run for the application role (``lims_app``): an activation row's
 actor is ``current_user_id()`` and an Admin, an activation row is never updated
 or deleted, a confirm token is consumed once and its other fields never change,
-and the stage runner's tables (test-case results, dry runs) are read-only for
-the application. The migrator and superusers skip the guards
-(``skip_app_row_guard``), as in S7.
+and the stage runner's tables (test-case results, dry runs) were read-only for
+the application. S9 (migration 0127) grants INSERT on those two tables to the
+application and guards them; those checks are here and in
+``test_calculation_attempts_s9_db.py``. The migrator and superusers skip the
+guards (``skip_app_row_guard``), as in S7.
 """
 from __future__ import annotations
 
@@ -33,7 +35,7 @@ from tests.test_calculation_result_entry_s6_db import (
     _refused,
 )
 
-HEAD = "0126_calculation_activation"
+HEAD = "0127_calculation_attempts"
 PREVIOUS = "0125_analysis_version_no_change"
 LOCK = "a" * 64
 REVIEW = "b" * 64
@@ -181,8 +183,9 @@ def test_0126_schema_shape(migrated_engine):
             "calculation_activations": {"SELECT": True, "INSERT": True, "UPDATE": False, "DELETE": False},
             "calculation_confirm_tokens": {"SELECT": True, "INSERT": True, "UPDATE": True, "DELETE": False},
             "calculation_test_cases": {"SELECT": True, "INSERT": True, "UPDATE": False, "DELETE": False},
-            "calculation_test_case_results": {"SELECT": True, "INSERT": False, "UPDATE": False, "DELETE": False},
-            "calculation_dry_runs": {"SELECT": True, "INSERT": False, "UPDATE": False, "DELETE": False},
+            # INSERT is granted by 0127 (S9), when the stage runner starts writing them.
+            "calculation_test_case_results": {"SELECT": True, "INSERT": True, "UPDATE": False, "DELETE": False},
+            "calculation_dry_runs": {"SELECT": True, "INSERT": True, "UPDATE": False, "DELETE": False},
         }
         for table, privileges in expected.items():
             for privilege, granted in privileges.items():
@@ -200,8 +203,8 @@ def test_the_append_only_map_matches_the_migration():
     assert APPEND_ONLY_REVOKES["calculation_activations"] == frozenset({"UPDATE", "DELETE"})
     assert APPEND_ONLY_REVOKES["calculation_confirm_tokens"] == frozenset({"DELETE"})
     assert APPEND_ONLY_REVOKES["calculation_test_cases"] == frozenset({"UPDATE", "DELETE"})
-    assert APPEND_ONLY_REVOKES["calculation_test_case_results"] == frozenset({"INSERT", "UPDATE", "DELETE"})
-    assert APPEND_ONLY_REVOKES["calculation_dry_runs"] == frozenset({"INSERT", "UPDATE", "DELETE"})
+    assert APPEND_ONLY_REVOKES["calculation_test_case_results"] == frozenset({"UPDATE", "DELETE"})
+    assert APPEND_ONLY_REVOKES["calculation_dry_runs"] == frozenset({"UPDATE", "DELETE"})
 
 
 def test_the_validation_state_is_a_closed_list_of_four_test_count_values(migrated_engine):
@@ -368,7 +371,7 @@ def test_test_cases_are_insert_only_and_their_source_is_closed(migrated_engine):
             tx.rollback()
 
 
-def test_the_application_cannot_write_test_case_results_or_dry_runs(migrated_engine):
+def test_the_application_records_test_case_results_and_dry_runs_only_as_itself(migrated_engine):
     with migrated_engine.connect() as conn:
         tx = conn.begin()
         try:
@@ -378,27 +381,26 @@ def test_the_application_cannot_write_test_case_results_or_dry_runs(migrated_eng
                 {"a": ids["analysis"], "b": ids["analyte"], "n": "one", "src": "independent", "by": ids["admin"]},
             )
             case = conn.execute(text("SELECT id FROM calculation_test_cases")).scalar_one()
-            with _as_app(conn, ids):
-                _refused(
-                    conn,
-                    "INSERT INTO calculation_test_case_results (test_case_id, lock_hash, passed) VALUES (:c, :l, true)",
-                    {"c": case, "l": LOCK},
-                    "permission denied",
-                )
-                _refused(
-                    conn,
-                    "INSERT INTO calculation_dry_runs (analysis_id, analyte_id, configuration_version, input) "
-                    "VALUES (:a, :b, 1, CAST('{}' AS jsonb))",
-                    {"a": ids["analysis"], "b": ids["analyte"]},
-                    "permission denied",
-                )
-                assert conn.execute(text("SELECT count(*) FROM calculation_test_case_results")).scalar() == 0
-            conn.execute(
-                text("INSERT INTO calculation_test_case_results (test_case_id, lock_hash, passed) VALUES (:c, :l, true)"),
-                {"c": case, "l": LOCK},
+            other = _other_user(conn)
+            insert_result = (
+                "INSERT INTO calculation_test_case_results (test_case_id, lock_hash, passed, created_by) "
+                "VALUES (:c, :l, true, :by)"
+            )
+            insert_dry = (
+                "INSERT INTO calculation_dry_runs (analysis_id, analyte_id, configuration_version, input, created_by) "
+                "VALUES (:a, :b, 1, CAST('{}' AS jsonb), :by)"
             )
             with _as_app(conn, ids):
+                _refused(conn, insert_result, {"c": case, "l": LOCK, "by": other}, "calculation_run_record_actor")
+                _refused(
+                    conn, insert_dry, {"a": ids["analysis"], "b": ids["analyte"], "by": other}, "calculation_run_record_actor"
+                )
+                _allowed(conn, insert_result, {"c": case, "l": LOCK, "by": ids["admin"]})
+                _allowed(conn, insert_dry, {"a": ids["analysis"], "b": ids["analyte"], "by": ids["admin"]})
+                _refused(conn, "UPDATE calculation_test_case_results SET passed = false", {}, "permission denied")
+                _refused(conn, "DELETE FROM calculation_dry_runs", {}, "permission denied")
                 assert conn.execute(text("SELECT count(*) FROM calculation_test_case_results")).scalar() == 1
+                assert conn.execute(text("SELECT count(*) FROM calculation_dry_runs")).scalar() == 1
         finally:
             tx.rollback()
 
@@ -492,6 +494,7 @@ def test_0126_downgrade_removes_the_tables_and_upgrade_restores_them(migrated_en
             "calculation_test_cases",
             "calculation_test_case_results",
             "calculation_dry_runs",
+            "calculation_attempts",
         }
 
 

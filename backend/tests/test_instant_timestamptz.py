@@ -336,7 +336,8 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
     """0101 is before ELISA and instrument-tracking catalog rows.
 
     Head adds empty tables (including 0123's result_entries and 0124's
-    calculation_formulas, and 0126's five activation tables), one version-1 snapshot per analysis in
+    calculation_formulas, 0126's five activation tables, and 0127's calculation_attempts), one
+    version-1 snapshot per analysis in
     analysis_versions, renames instrument_types, seeds lists, and seeds the calculation units OD, s,
     and 1. Every other table keeps the same row count.
     """
@@ -363,6 +364,7 @@ def _assert_counts_after_later_migrations(before: dict, after: dict) -> None:
         "calculation_test_cases",
         "calculation_test_case_results",
         "calculation_dry_runs",
+        "calculation_attempts",
     }
     assert extra <= allowed_extra
     nonempty_ok = {
