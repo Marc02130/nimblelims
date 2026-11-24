@@ -1,9 +1,11 @@
-"""Result-entry rows on a LIMS run (calculations S6).
+"""Result-entry rows on a LIMS run (calculations S6, S9).
 
 GET lists the rows of the run's ``Results`` entry. PATCH lets a user type raw
 (and raw units) or overwrite reported. calculated_result is never accepted.
+POST ``.../calculate`` runs the active configuration on one row and records
+the calculation attempt (S9); it is the only path that writes calculated.
 """
-from typing import Any, Dict
+from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -12,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.rbac import require_result_enter, require_result_read, validate_client_access
 from app.database import get_db
 from app.schemas.result_entry import ResultEntryListResponse, ResultEntryRead
+from app.services import calculation_attempt_service as attempts
 from app.services.result_entry_service import ResultEntryService
 from models.entry import ResultEntry
 from models.flexible_experiment import LimsRun
@@ -43,6 +46,7 @@ def result_entry_read(row: ResultEntry) -> ResultEntryRead:
         knocked_out_by=row.knocked_out_by,
         knocked_out_at=row.knocked_out_at,
         display_order=row.display_order,
+        calculation_attempt_id=row.calculation_attempt_id,
         modified_at=row.modified_at,
         modified_by=row.modified_by,
     )
@@ -99,3 +103,46 @@ def update_result_entry(
     db.commit()
     db.refresh(row)
     return result_entry_read(row)
+
+
+@router.post("/{run_id}/result-entries/{row_id}/calculate")
+def calculate_result_entry(
+    run_id: UUID,
+    row_id: UUID,
+    current_user: User = Depends(require_result_enter),
+    db: Session = Depends(get_db),
+    r_client: Any = Depends(attempts.calculation_r_client),
+) -> Dict[str, Any]:
+    """Run the active configuration on this row and record the attempt.
+
+    200 with the attempt and the row once the call is accepted, including when
+    a stage stops (the attempt is ``stopped`` and calculated and reported are
+    empty). 400 for a refusal before acceptance (no active configuration, a
+    lock or sandbox refusal, a row already calculated, a knocked-out row, a
+    published run); nothing is written. 409 when an input changed while it ran.
+    """
+    _get_run(db, run_id)
+    row = ResultEntryService(db, current_user.id).get_row(run_id, row_id)
+    validate_client_access(current_user, row.test.sample.project.client_id)
+    attempt, row = attempts.calculate_row(db, current_user, run_id, row_id, r_client)
+    return {
+        "attempt": attempts.attempt_response(attempt),
+        "result_entry": result_entry_read(row).model_dump(),
+    }
+
+
+@router.get("/{run_id}/result-entries/{row_id}/calculation-attempts")
+def list_calculation_attempts(
+    run_id: UUID,
+    row_id: UUID,
+    current_user: User = Depends(require_result_read),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """The append-only calculation attempts of this row, oldest first."""
+    _get_run(db, run_id)
+    row = ResultEntryService(db, current_user.id).get_row(run_id, row_id)
+    validate_client_access(current_user, row.test.sample.project.client_id)
+    return [
+        attempts.attempt_response(attempt)
+        for attempt in attempts.list_attempts(db, run_id, row_id, current_user)
+    ]

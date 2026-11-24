@@ -27,6 +27,7 @@ class ResultEntryRead(BaseModel):
     knocked_out_by: Optional[UUID] = None
     knocked_out_at: Optional[datetime] = None
     display_order: Optional[int] = None
+    calculation_attempt_id: Optional[UUID] = None
     modified_at: Optional[datetime] = None
     modified_by: Optional[UUID] = None
 

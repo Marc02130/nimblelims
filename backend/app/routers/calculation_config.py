@@ -1,10 +1,10 @@
 """Calculation configuration, saved formulas, analysis versions (calculations S7),
-and activation (S8).
+activation (S8), and test-case and dry runs (S9).
 
 The catalog is read-only here: it has no write route, so a POST, PUT, PATCH, or
 DELETE on it is 405 (CALC-REQ-22). There is no constants route (CALC-REQ-41),
-and no route that accepts R source or runs R. Nothing here runs a calculation;
-that is the stage runner (S9).
+and no route that accepts R source. Only the S9 test-case and dry-run routes
+run the stage runner, and they write no result-entry row.
 
 A refusal is HTTP 400 with ``{"code", "message"}`` (and ``stage`` when a stage
 is named). A caller without the Admin role that writes a formula gets 403.
@@ -14,6 +14,10 @@ token, then activate. None of those routes is on the configuring agent's
 allow-list, and each refuses a configuring-agent run context. A stage output is
 a calculated value; it becomes a result only when the experiment is published
 (S13). No route here writes a result.
+
+S9 runs the stored test cases and dry runs through the stage runner and
+records each outcome with the lock hash it ran on. Neither route is on the
+configuring agent's allow-list.
 """
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -38,6 +42,8 @@ from app.schemas.calculation_config import (
     NewAnalysisVersionResponse,
 )
 from app.services import calculation_activation as activation
+from app.services import calculation_test_run_service as test_runs
+from app.services.calculation_attempt_service import calculation_r_client
 from app.services import calculation_config_service as service
 from app.services.calculation_config import catalog_entries
 from models.user import User
@@ -306,3 +312,28 @@ def list_calculation_test_cases(
     db: Session = Depends(get_db),
 ):
     return activation.list_test_cases(db, analysis_id, analyte_id, version)
+
+
+@router.post(_CALC_CONFIG + "/test-cases/run")
+def run_calculation_test_cases(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    current_user: User = Depends(require_any_permission(_CONFIG_PERMISSIONS)),
+    db: Session = Depends(get_db),
+    r_client: Any = Depends(calculation_r_client),
+):
+    """Run every test case of the current configuration version and record each outcome."""
+    return test_runs.run_test_cases(db, current_user, analysis_id, analyte_id, r_client)
+
+
+@router.post(_CALC_CONFIG + "/dry-run")
+def run_calculation_dry_run(
+    analysis_id: UUID,
+    analyte_id: UUID,
+    body: Dict[str, Any] = Body(...),
+    current_user: User = Depends(require_any_permission(_CONFIG_PERMISSIONS)),
+    db: Session = Depends(get_db),
+    r_client: Any = Depends(calculation_r_client),
+):
+    """Run the current configuration version on the given input and record the dry run."""
+    return test_runs.dry_run(db, current_user, analysis_id, analyte_id, body, r_client)

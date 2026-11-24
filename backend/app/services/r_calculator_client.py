@@ -170,7 +170,8 @@ class RCalculatorClient:
         CALC-REQ-4 and CALC-REQ-4a run here, not on ``fit`` or ``full_svg``.
         The backend stops waiting after 60 s (OQ-CALC-16). A timeout raises
         ``backend_timeout``. An R response with code ``r_timeout`` raises that
-        code. Neither path writes an attempt or a result; S9 records those.
+        code. Neither path writes anything here; the S9 stage runner records a
+        timeout as a stage stop on the calculation attempt.
         """
         from app.services.calculation_runtime import (
             CALCULATION_BACKEND_TIMEOUT_SECONDS,
