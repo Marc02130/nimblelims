@@ -98,9 +98,9 @@ Each input is bound with one of four kinds:
 | `reference` | `analyte_id`, `value` | The same-run value of another analyte on this analysis. That analyte must have a strictly earlier `calculation_order`. Never the analyte itself. |
 | `direct` | `value` | A decimal string written into the configuration (`"5.00"`). A JSON number is refused. The one token is `limit_compare.comparison`. |
 
-- A direct value is part of the configuration, so it is versioned with the analysis version. The attempt does not store it again.
+- A direct value is part of the configuration, so it is versioned with the analysis version. From S9 the calculation attempt also records it in `values_used` (OQ-CALC-46, provisional). See [calculation-configuration-s9.md](calculation-configuration-s9.md).
 - There is no constants picker and no constants identifiers. The #258 constants are not a menu in S7.
-- Which record a `reference` reads (replicate or average) is not decided yet (OQ-CALC-40). The runner in S9 settles it.
+- Which record a `reference` reads (replicate or average) is not decided yet (OQ-CALC-40). The S9 runner reads it only when the Test has exactly one row for that analyte, and stops with `reference_ambiguous` otherwise.
 - A formula term is bound by name. Bare names and `[bracketed names]` are terms. A formula term binding may not carry a `unit_id`.
 
 ### Units (CALC-REQ-28)
